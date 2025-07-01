@@ -234,7 +234,37 @@ IMPORTANTE:
         }
       }
       
-      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO OU NEGATIVA
+      // DETECÇÃO DE SAUDAÇÕES E CUMPRIMENTOS
+      const greetingWords = ['ola', 'olá', 'oi', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'hello', 'salve', 'fala'];
+      const isGreeting = greetingWords.some(word => currentMessage.includes(word));
+      
+      console.log(`👋 Verificando saudação para: "${userMessage}"`);
+      console.log(`👋 É saudação? ${isGreeting}`);
+      
+      if (isGreeting) {
+        const greetingResponses = [
+          'E aí! Beleza? 😄 Pronto pra anotar uns gastos? Manda aí: "gastei R$ 50 no mercado" ou algo assim! 💰',
+          'Opa! Tudo jóia? 😊 Vamos registrar seus gastos? É só falar: "gastei R$ 30 no lanche" que eu anoto tudo! 🍔💸',
+          'Salve! Show de bola! 🤙 Bora organizar as finanças? Fala aí qualquer gasto: "gastei R$ 100 na roupa"! 👕',
+          'E aí, tranquilo? 😎 Tô aqui pra te ajudar com os gastos! Manda qualquer coisa tipo: "gastei R$ 80 no uber"! 🚗',
+          'Opa! Beleza demais! 🎉 Pronto pra registrar uns gastos maneiros? Só falar: "gastei R$ 25 no açaí"! 🍨'
+        ];
+        
+        const randomResponse = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+        
+        return {
+          response: randomResponse,
+          extraction: {
+            valor: 0,
+            categoria: '',
+            descricao: '',
+            data: new Date().toISOString().split('T')[0],
+            isValid: false
+          }
+        };
+      }
+      
+      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO, NEGATIVA OU SAUDAÇÃO
       console.log('🔧 INICIANDO ANÁLISE LOCAL...');
       console.log('📝 Mensagem do usuário:', userMessage);
       
