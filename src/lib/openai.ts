@@ -200,29 +200,22 @@ IMPORTANTE:
           if (numberMatch) {
             valor = parseFloat(numberMatch[0].replace(',', '.'));
           } else {
-            // Try conversation history for recent values - look at last 3 messages
-            const recentHistory = conversationHistory.slice(-3);
-            for (let i = recentHistory.length - 1; i >= 0; i--) {
-              const msg = recentHistory[i];
-              if (msg.type === 'user') {
-                const historyMatch = msg.content.match(/(?:gastei|paguei|custou|foi)\s*(\d+(?:[.,]\d+)?)/);
-                if (historyMatch) {
-                  valor = parseFloat(historyMatch[1].replace(',', '.'));
-                  console.log(`Found value ${valor} from history message: ${msg.content}`);
-                  break;
-                }
-                // Also try simple number in user messages
-                const simpleMatch = msg.content.match(/\d+(?:[.,]\d+)?/);
-                if (simpleMatch) {
-                  valor = parseFloat(simpleMatch[0].replace(',', '.'));
-                  console.log(`Found simple value ${valor} from history: ${msg.content}`);
-                  break;
-                }
+            // INTELIGÊNCIA MELHORADA: Procurar valor nas últimas mensagens do usuário
+            const userMessages = conversationHistory.filter(msg => msg.type === 'user').slice(-3);
+            for (const msg of userMessages.reverse()) {
+              const valueMatch = msg.content.match(/(?:gastei|paguei|custou|foi|)\s*(\d+(?:[.,]\d+)?)/i) || 
+                                msg.content.match(/(\d+(?:[.,]\d+)?)/);
+              if (valueMatch) {
+                valor = parseFloat(valueMatch[1].replace(',', '.'));
+                console.log(`🧠 CONECTEI INFORMAÇÃO: Valor ${valor} da mensagem anterior: "${msg.content}"`);
+                break;
               }
             }
           }
-          
-          // Smart number words recognition
+        }
+        
+        // Smart number words recognition if value still not found
+        if (!valor) {
           const numberWords: {[key: string]: number} = {
             'dez': 10, 'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50,
             'sessenta': 60, 'setenta': 70, 'oitenta': 80, 'noventa': 90, 'cem': 100,
