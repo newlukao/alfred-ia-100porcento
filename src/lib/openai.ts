@@ -456,37 +456,33 @@ IMPORTANTE:
           
           let resposta = `${saudacao} Aqui está o que você gastou ${periodo === 'última semana' ? 'na última semana' : periodo === 'último mês' ? 'no último mês' : periodo === 'hoje' ? 'hoje' : periodo === 'ontem' ? 'ontem' : 'no total'}!\n\n`;
           
-          resposta += `💰 TOTAL GASTO\n`;
-          resposta += `   R$ ${totalGeral.toFixed(2)}\n\n`;
-          
-          resposta += `📋 TRANSAÇÕES\n`;
-          resposta += `   ${filteredExpenses.length} gastos registrados\n\n`;
+          resposta += `💰 TOTAL GASTO: R$ ${totalGeral.toFixed(2)}\n`;
+          resposta += `📋 TRANSAÇÕES: ${filteredExpenses.length} gastos registrados\n\n`;
           
           if (categoriasOrdenadas.length > 0) {
-            resposta += `🎯 RANKING POR CATEGORIA\n\n`;
+            resposta += `🎯 RANKING POR CATEGORIA:\n`;
             categoriasOrdenadas.forEach(([categoria, valor], index) => {
               const emoji = categoryEmojis[categoria] || '💰';
               const percentual = ((valor / totalGeral) * 100).toFixed(1);
               const posicao = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}º`;
-              resposta += `${posicao} ${emoji} ${categoria.toUpperCase()}\n`;
-              resposta += `   R$ ${valor.toFixed(2)} • ${percentual}%\n\n`;
+              resposta += `${posicao} ${emoji} ${categoria.toUpperCase()} - R$ ${valor.toFixed(2)} • ${percentual}%\n`;
             });
+            resposta += `\n`;
           }
           
           // Adicionar comentários personalizados baseados nos gastos
-          resposta += `💭 ANÁLISE\n`;
+          resposta += `💭 ANÁLISE: `;
           if (totalGeral > 1000) {
-            resposta += `   Eita! Gastou uma grana boa aí!\n   Mas tranquilo, o importante é ter controle! 😎\n\n`;
+            resposta += `Eita! Gastou uma grana boa aí! Mas tranquilo, o importante é ter controle! 😎\n\n`;
           } else if (totalGeral > 500) {
-            resposta += `   Beleza! Gastos na medida,\n   tá controlando direitinho! 😊\n\n`;
+            resposta += `Beleza! Gastos na medida, tá controlando direitinho! 😊\n\n`;
           } else if (totalGeral > 100) {
-            resposta += `   Show! Gastinhos bem controlados,\n   parabéns! 🎉\n\n`;
+            resposta += `Show! Gastinhos bem controlados, parabéns! 🎉\n\n`;
           } else {
-            resposta += `   Top! Super econômico,\n   mandou muito bem! 💪\n\n`;
+            resposta += `Top! Super econômico, mandou muito bem! 💪\n\n`;
           }
           
-          resposta += `🚀 DICA\n`;
-          resposta += `   No Dashboard tem gráficos maneiros\n   pra ver tudo detalhado!`;
+          resposta += `🚀 DICA: No Dashboard tem gráficos maneiros pra ver tudo detalhado!`;
           
           return {
             response: resposta,
