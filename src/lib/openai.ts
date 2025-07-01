@@ -212,8 +212,12 @@ IMPORTANTE:
       if (numberMatch) {
         valor = parseFloat(numberMatch[0].replace(',', '.'));
         console.log(`💰 VALOR ENCONTRADO na mensagem atual: R$ ${valor}`);
+        
+        // Se encontrou valor na mensagem atual, RESETAR contexto - é um novo gasto!
+        console.log('🔄 NOVO GASTO DETECTADO - resetando contexto de categoria');
+        
       } else {
-        // Buscar nas mensagens anteriores
+        // Buscar nas mensagens anteriores SOMENTE se não há valor na mensagem atual
         const userMessages = conversationHistory.filter(msg => msg.type === 'user');
         console.log(`🔍 Procurando valor em ${userMessages.length} mensagens...`);
         
@@ -227,9 +231,19 @@ IMPORTANTE:
         }
       }
       
-      // Buscar categoria
-      const allText = (conversationHistory.filter(msg => msg.type === 'user').map(m => m.content).join(' ') + ' ' + userMessage).toLowerCase();
-      console.log(`🏷️ Texto completo para análise: "${allText}"`);
+      // Buscar categoria SOMENTE na mensagem atual se há valor na mensagem atual
+      // OU no histórico completo se o valor veio do histórico
+      let textToAnalyze = '';
+      
+      if (numberMatch) {
+        // Valor na mensagem atual = analisar APENAS a mensagem atual para categoria
+        textToAnalyze = userMessage.toLowerCase();
+        console.log(`🏷️ Analisando APENAS mensagem atual: "${textToAnalyze}"`);
+      } else {
+        // Valor do histórico = pode analisar histórico completo
+        textToAnalyze = (conversationHistory.filter(msg => msg.type === 'user').map(m => m.content).join(' ') + ' ' + userMessage).toLowerCase();
+        console.log(`🏷️ Analisando histórico completo: "${textToAnalyze}"`);
+      }
       
       const categoryMap = {
         'alimentação': ['hamburg', 'hambúrguer', 'burger', 'churros', 'comida', 'pizza', 'lanche'],
@@ -238,7 +252,7 @@ IMPORTANTE:
       };
       
       for (const [cat, words] of Object.entries(categoryMap)) {
-        const found = words.find(word => allText.includes(word));
+        const found = words.find(word => textToAnalyze.includes(word));
         if (found) {
           categoria = cat;
           console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${found})`);
