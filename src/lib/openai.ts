@@ -1061,7 +1061,9 @@ IMPORTANTE:
         
         // Enhanced category detection with conversation context
         if (!categoria) {
-          const fullContext = fullConversationText;
+          // Usar apenas as últimas 3 mensagens para contexto, não toda a conversa
+          const recentMessages = conversationHistory.slice(-3).map(m => m.content).join(' ') + ' ' + userMessage;
+          const fullContext = recentMessages.toLowerCase();
           
           const categoryMappings = {
             'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'roupas', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco', 'shopping', 'loja', 'lojas', 'magazine', 'boutique', 'renner', 'c&a', 'zara', 'riachuelo', 'marisa', 'hering', 'bolsa', 'bolsas', 'carteira', 'sapatos', 'sneaker', 'chinelo', 'sandália', 'sandalia', 'boné', 'bone', 'chapéu', 'óculos', 'oculos', 'relógio', 'relogio', 'cinto', 'bermuda', 'jeans', 'all star', 'havaianas', 'bota', 'cueca', 'calcinha', 'meia', 'meias'],
