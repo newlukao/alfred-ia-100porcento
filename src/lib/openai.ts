@@ -258,7 +258,25 @@ IMPORTANTE:
         
         let response = parsed.response || '';
         
-        // Smarter fallback responses
+        // INTELIGÊNCIA APRIMORADA: Se tem valor E categoria, confirma e registra!
+        if (isValid && !response.includes('registr')) {
+          const celebrations = ["Show demais!", "Massa!", "Fechou!", "Top!", "Mandou bem!", "Dahora!", "Perfeito!"];
+          const randomCelebration = celebrations[Math.floor(Math.random() * celebrations.length)];
+          const categoryEmojis: {[key: string]: string} = {
+            'vestuário': '👕',
+            'alimentação': '🍽️',
+            'transporte': '🚗',
+            'mercado': '🛒',
+            'lazer': '🎉',
+            'saúde': '🏥',
+            'casa': '🏠',
+            'contas': '💡'
+          };
+          const emoji = categoryEmojis[categoria] || '💰';
+          response = `${randomCelebration} Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! ${emoji} Gasto registrado!`;
+        }
+        
+        // Fallback responses for incomplete data
         if (!response || response.length < 10) {
           if (isValid) {
             const celebrations = ["Show demais!", "Massa!", "Fechou!", "Top!", "Mandou bem!", "Dahora!", "Perfeito!"];
