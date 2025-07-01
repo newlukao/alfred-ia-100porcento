@@ -55,13 +55,27 @@ export class OpenAIService {
     const extractionPrompt = `
 ${systemInstructions}
 
-Analise a mensagem do usuário e extraia informações de gastos. Se houver um gasto mencionado, extraia:
+IMPORTANTE: Quando alguém mencionar um gasto, SEMPRE pergunte sobre a categoria se ela não foi especificada claramente.
+
+As categorias disponíveis são:
+- mercado
+- transporte  
+- contas
+- lazer
+- alimentação
+- saúde
+- educação
+- outros
+
+Se o usuário mencionar um valor mas não especificar a categoria claramente, pergunte: "Em qual categoria esse gasto se encaixa? Temos: mercado, transporte, contas, lazer, alimentação, saúde, educação ou outros."
+
+Analise a mensagem do usuário e extraia informações de gastos. Se houver um gasto mencionado com categoria clara, extraia:
 - valor (número)
-- categoria (mercado, transporte, contas, lazer, alimentação, saúde, educação, outros)
+- categoria (uma das categorias listadas acima)
 - descrição (texto livre)
 - data (formato YYYY-MM-DD, use hoje se não especificado)
 
-Responda no formato JSON:
+Responda SEMPRE no formato JSON válido:
 {
   "response": "sua resposta amigável ao usuário",
   "extraction": {
@@ -73,7 +87,7 @@ Responda no formato JSON:
   }
 }
 
-Se não houver gasto válido, mantenha isValid como false.
+Se não houver gasto válido ou categoria não especificada, mantenha isValid como false e pergunte sobre a categoria.
 `;
 
     try {
@@ -83,6 +97,7 @@ Se não houver gasto válido, mantenha isValid como false.
       ];
 
       const result = await this.chatCompletion(messages);
+      console.log('OpenAI raw response:', result);
       
       try {
         const parsed = JSON.parse(result);
@@ -98,6 +113,7 @@ Se não houver gasto válido, mantenha isValid como false.
         };
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
+        console.log('Raw response that failed to parse:', result);
         return {
           response: result,
           extraction: {
