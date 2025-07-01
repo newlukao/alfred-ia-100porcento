@@ -177,11 +177,19 @@ IMPORTANTE:
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
             let categoria = categoriaMatch[1].toLowerCase();
             
-            // Mapear categorias
-            if (['tecnologia', 'alimentação', 'vestuário', 'transporte', 'mercado', 'lazer', 'saúde', 'casa', 'contas'].includes(categoria)) {
-              // Categoria já está correta
-            } else {
-              categoria = 'outros';
+            // Mapear categorias corretamente - não sobrescrever!
+            console.log(`🔧 Categoria original detectada: "${categoria}"`);
+            
+            // Manter a categoria como foi detectada inicialmente
+            if (!['tecnologia', 'alimentação', 'vestuário', 'transporte', 'mercado', 'lazer', 'saúde', 'casa', 'contas'].includes(categoria)) {
+              // Se não for uma categoria válida, tentar mapear
+              if (categoria.includes('aliment') || categoria.includes('hamburg') || categoria.includes('comida')) {
+                categoria = 'alimentação';
+              } else if (categoria.includes('tecnolog') || categoria.includes('computador')) {
+                categoria = 'tecnologia';
+              } else {
+                categoria = 'outros';
+              }
             }
             
             console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria}`);
@@ -200,7 +208,33 @@ IMPORTANTE:
         }
       }
       
-      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO
+      // DETECÇÃO DE RESPOSTAS NEGATIVAS (não tem mais gastos)
+      const negativeWords = ['nao', 'não', 'nada', 'sem', 'rolou nao', 'rolou não', 'não rolou', 'nao rolou', 'por hoje não', 'hoje não', 'sem mais', 'acabou', 'só isso'];
+      const isNegative = negativeWords.some(word => currentMessage.includes(word));
+      
+      console.log(`❌ Verificando negativa para: "${userMessage}"`);
+      console.log(`❌ É negativa? ${isNegative}`);
+      
+      if (isNegative) {
+        // Verificar se a pergunta anterior foi sobre mais gastos
+        const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+        const lastBotMessage = botMessages[botMessages.length - 1];
+        
+        if (lastBotMessage && lastBotMessage.content.includes('mais algum gasto')) {
+          return {
+            response: 'Show! Qualquer coisa, se aparecer mais algum gasto, é só me chamar! Tô sempre aqui pra te ajudar! 😊✌️',
+            extraction: {
+              valor: 0,
+              categoria: '',
+              descricao: '',
+              data: new Date().toISOString().split('T')[0],
+              isValid: false
+            }
+          };
+        }
+      }
+      
+      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO OU NEGATIVA
       console.log('🔧 INICIANDO ANÁLISE LOCAL...');
       console.log('📝 Mensagem do usuário:', userMessage);
       
