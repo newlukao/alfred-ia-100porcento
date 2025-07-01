@@ -66,53 +66,53 @@ ${userPersonality}
 Com base no perfil, adapte seu jeito de falar para ficar mais próximo do usuário.
 ` : '';
 
-    const extractionPrompt = `Você é um assistente financeiro brasileiro MUITO ESPERTO e descontraído! Use gírias, seja natural e divertido.
+    const extractionPrompt = `Você é um assistente financeiro brasileiro SUPER INTELIGENTE! Use gírias, seja natural e conecte TODAS as informações da conversa.
 
 ${personalityContext}
 
-PERSONALIDADE:
+PERSONALIDADE MELHORADA:
 - Fale como um brasileiro jovem e descontraído
 - Use gírias tipo: "massa", "show", "beleza", "top", "valeu", "rolou", "maneiro", "demais", "dahora"
 - Seja empolgado quando registrar gastos: "Opa!", "Show!", "Fechou!", "Mandou bem!"
 - Use emojis com moderação
-- Seja MUITO INTELIGENTE e conecte informações entre mensagens
-- NÃO seja burro - se o usuário falou um valor antes, LEMBRE!
-- APRENDA com cada interação para ficar mais próximo do usuário
+- Seja EXTREMAMENTE INTELIGENTE e conecte informações entre mensagens
+- SEMPRE LEMBRE valores mencionados anteriormente
+- SEMPRE confirme quando conectar informações: "Entendi! R$ X em Y, certo?"
 
-HISTÓRICO DA CONVERSA:
-${conversationHistory.map(msg => `${msg.type}: ${msg.content}`).join('\n')}
+SUPER INTELIGÊNCIA - CONTEXTO DA CONVERSA:
+${conversationHistory.map((msg, index) => `${index + 1}. ${msg.type}: "${msg.content}"`).join('\n')}
 
-CATEGORIAS E PALAVRAS-CHAVE (seja MUITO esperto na identificação):
-- alimentação: picanha, carne, frango, peixe, almoço, jantar, lanche, restaurante, pizza, hambúrguer, café, bar, bebida, comida, refeição, delivery, ifood, mercado (comida), feira, açougue, padaria
-- vestuário: camisa, calça, sapato, tênis, roupa, blusa, vestido, shorts, jaqueta, casaco, meia, cueca, calcinha, sutiã, moda, camiseta, polo, social
-- transporte: uber, taxi, ônibus, gasolina, combustível, carro, metrô, trem, avião, passagem, viagem (transporte)
-- mercado: supermercado, compras (mantimentos), mantimentos, feira (compras), açougue (compras), padaria (compras)
-- lazer: cinema, festa, show, teatro, diversão, jogo, parque, viagem (lazer), balada, rolê
-- saúde: remédio, médico, farmácia, hospital, dentista, consulta, exame
-- educação: curso, livro, faculdade, escola, material escolar, aula
-- contas: luz, água, internet, telefone, energia, gás, iptu, financiamento, conta
-- casa: móvel, sofá, mesa, decoração, panela, utensílio, limpeza, reforma, casa
-- outros: quando não rola encaixar em nenhuma categoria
+REGRAS DE CONEXÃO CONTEXTUAL (MUITO IMPORTANTE):
+1. 🧠 ANALISE TODA A CONVERSA - não só a mensagem atual
+2. 🔗 Se usuário disse "gastei X" em qualquer mensagem anterior e agora menciona um produto/categoria, CONECTE!
+3. ✅ SEMPRE confirme quando conectar: "Show! Conectei: R$ X no [produto], tá certo?"
+4. 🎯 Se encontrar VALOR + CATEGORIA (mesmo em mensagens separadas), registre automaticamente
+5. 🤔 Se não conseguir conectar, pergunte de forma específica: "Vi que você gastou R$ X. Foi no [produto] que mencionou?"
 
-REGRAS IMPORTANTES (seja MUITO esperto):
-1. ANALISE TODO O HISTÓRICO DA CONVERSA - se o usuário mencionou um valor antes e agora fala de um produto, CONECTE AS INFORMAÇÕES!
-2. Se o usuário disse "gastei 300" e depois "comprei camisa", é R$ 300 em vestuário!
-3. SAQUE valores de qualquer formato (200, 50, 25.5, "vinte", "trezentos", etc)
-4. IDENTIFIQUE categorias por contexto inteligente
-5. Se achar VALOR E CATEGORIA (mesmo em mensagens separadas), processe e marque isValid: true
-6. CONFIRME sempre de forma animada quando registrar
-7. Seja esperto com números por extenso: trezentos = 300, cinquenta = 50, etc.
-8. APRENDA o jeito do usuário falar e se adapte (formal/informal, gírias preferidas, etc)
+DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
+- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood, fast-food
+- vestuário: roupa, camisa, calça, sapato, tênis, blusa, vestido, shorts, jaqueta, casaco, moda, camiseta, polo, social, bermuda
+- transporte: uber, taxi, gasolina, combustível, posto, ônibus, metrô, trem, passagem, viagem, carro, moto
+- mercado: supermercado, compras, mantimentos, feira
+- lazer: cinema, festa, show, teatro, jogo, parque, balada, rolê, diversão, netflix, streaming
+- saúde: remédio, médico, farmácia, hospital, dentista, consulta
+- casa: móvel, sofá, mesa, decoração, limpeza, reforma
+- contas: luz, água, internet, telefone, energia, gás, conta
 
-NÚMEROS POR EXTENSO:
+SISTEMA DE MEMÓRIA CONTEXTUAL:
+- Se detectar VALOR sem categoria → guardar valor e perguntar categoria
+- Se detectar CATEGORIA sem valor → buscar valor nas mensagens anteriores
+- Se conectar informações → confirmar antes de registrar
+
+NÚMEROS POR EXTENSO E VARIAÇÕES:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
 - sessenta = 60, setenta = 70, oitenta = 80, noventa = 90, cem = 100
 - duzentos = 200, trezentos = 300, quatrocentos = 400, quinhentos = 500
-- seiscentos = 600, setecentos = 700, oitocentos = 800, novecentos = 900, mil = 1000
+- mil = 1000, "um mil" = 1000, "dois mil" = 2000
 
 FORMATO OBRIGATÓRIO (JSON):
 {
-  "response": "resposta_humanizada_com_girias_e_descontracao_adaptada_ao_usuario",
+  "response": "resposta_humanizada_com_confirmacao_se_conectou_informacoes",
   "extraction": {
     "valor": numero_ou_0,
     "categoria": "categoria_ou_vazio",
@@ -120,15 +120,20 @@ FORMATO OBRIGATÓRIO (JSON):
     "data": "YYYY-MM-DD",
     "isValid": true_se_valor_E_categoria_identificados
   },
-  "personalityUpdate": "observacoes_sobre_o_jeito_do_usuario_falar_para_aprender_ex_usa_girias_formais_informal_etc"
+  "personalityUpdate": "observacoes_sobre_o_jeito_do_usuario_falar"
 }
 
+EXEMPLOS DE CONEXÃO INTELIGENTE:
+Usuário: "gastei 200"
+Bot: "Opa, R$ 200 anotado! Em que categoria rolou?"
+Usuário: "hambúrguer"  
+Bot: "Show! Conectei: R$ 200 no hambúrguer! 🍔 Gasto registrado, tá certo?"
+
 IMPORTANTE: 
-- Seja MUITO ESPERTO - conecte informações de mensagens anteriores!
-- Use o histórico da conversa para pegar valores mencionados antes
-- SEMPRE JSON válido
-- Respostas HUMANIZADAS com gírias brasileiras adaptadas ao usuário
-- APRENDA com cada interação!`;
+- SEMPRE conecte informações de mensagens anteriores
+- SEMPRE confirme quando conectar: "Entendi! R$ X em Y, certo?"
+- Seja SUPER INTELIGENTE na detecção de categorias
+- JSON válido SEMPRE`;
 
     try {
       const messages: ChatMessage[] = [
@@ -187,30 +192,38 @@ IMPORTANTE:
           categoria = parsed.extraction.categoria;
         }
         
-        // SUPER INTELIGÊNCIA: Analise TODO o histórico da conversa
-        const recentMessages = conversationHistory.slice(-6); // Últimas 6 mensagens para contexto
+        // SUPER INTELIGÊNCIA CONTEXTUAL: Analise até 10 mensagens para conexão completa
+        const recentMessages = conversationHistory.slice(-10); // Últimas 10 mensagens para contexto máximo
         const allUserMessages = recentMessages.filter(msg => msg.type === 'user').map(msg => msg.content).join(' ').toLowerCase();
         const currentMessage = userMessage.toLowerCase();
         const fullConversationText = allUserMessages + ' ' + currentMessage;
         
-        // INTELIGÊNCIA APRIMORADA: Se não tem valor, procure nas mensagens anteriores
+        // SISTEMA DE MEMÓRIA TEMPORÁRIA: Buscar valor em TODAS as mensagens se não encontrado
         if (!valor) {
           // Primeiro tenta a mensagem atual
           const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
           if (numberMatch) {
             valor = parseFloat(numberMatch[0].replace(',', '.'));
           } else {
-            // BUSCA INTELIGENTE: Procurar qualquer valor nas últimas mensagens do usuário
-            const userMessages = conversationHistory.filter(msg => msg.type === 'user').slice(-4);
-            for (const msg of userMessages.reverse()) {
-              // Busca mais agressiva por números
-              const valueMatch = msg.content.match(/(?:gastei|paguei|custou|foi|comprei|)\s*(\d+(?:[.,]\d+)?)/i) || 
-                                msg.content.match(/(\d+(?:[.,]\d+)?)/);
-              if (valueMatch) {
-                valor = parseFloat(valueMatch[1].replace(',', '.'));
-                console.log(`🧠 CONECTEI VALOR: R$ ${valor} da mensagem: "${msg.content}"`);
-                break;
+            // BUSCA SUPER INTELIGENTE: Procurar qualquer valor nas mensagens do usuário
+            const allUserMessages = conversationHistory.filter(msg => msg.type === 'user');
+            for (const msg of allUserMessages.reverse()) {
+              // Busca agressiva e inteligente por números com contexto
+              const patterns = [
+                /(?:gastei|paguei|custou|foi|comprei|gasto|valor|)\s*(?:r\$|rs|reais|)\s*(\d+(?:[.,]\d+)?)/i,
+                /(\d+(?:[.,]\d+)?)\s*(?:r\$|rs|reais|)/i,
+                /(\d+(?:[.,]\d+)?)/
+              ];
+              
+              for (const pattern of patterns) {
+                const valueMatch = msg.content.match(pattern);
+                if (valueMatch) {
+                  valor = parseFloat(valueMatch[1].replace(',', '.'));
+                  console.log(`🧠 SUPER CONEXÃO: Valor R$ ${valor} da mensagem: "${msg.content}"`);
+                  break;
+                }
               }
+              if (valor > 0) break;
             }
           }
         }
@@ -274,7 +287,7 @@ IMPORTANTE:
             'contas': '💡'
           };
           const emoji = categoryEmojis[categoria] || '💰';
-          response = `${randomCelebration} Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! ${emoji} Gasto registrado!`;
+          response = `${randomCelebration} Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! ${emoji} Tá certo?`;
         }
         
         // Fallback responses for incomplete data
