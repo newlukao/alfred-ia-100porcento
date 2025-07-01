@@ -254,7 +254,7 @@ IMPORTANTE:
           }
         }
         
-        const isValid = valor > 0 && categoria && categoria !== '';
+        const isValid = valor > 0 && categoria && categoria.trim() !== '';
         
         let response = parsed.response || '';
         
