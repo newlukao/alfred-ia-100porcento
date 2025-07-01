@@ -52,34 +52,35 @@ export class OpenAIService {
     response: string;
     extraction: ExpenseExtraction;
   }> {
-    const extractionPrompt = `Você é um assistente financeiro que SEMPRE responde em JSON válido.
+    const extractionPrompt = `Você é um assistente financeiro que SEMPRE responde em JSON válido e registra gastos automaticamente.
 
 CATEGORIAS E PALAVRAS-CHAVE:
-- vestuário: camisa, calça, sapato, tênis, roupa, blusa, vestido, shorts, jaqueta, casaco
-- transporte: uber, taxi, ônibus, gasolina, combustível, carro
-- mercado: supermercado, feira, compras, mantimentos
-- alimentação: almoço, jantar, lanche, restaurante, comida, pizza, hambúrguer
-- lazer: cinema, festa, show, teatro, diversão
-- saúde: remédio, médico, farmácia, hospital, dentista
-- educação: curso, livro, faculdade, escola
-- contas: luz, água, internet, telefone, energia
-- casa: móvel, sofá, mesa, decoração, panela
-- outros: quando não se encaixa em nenhuma categoria
+- vestuário: camisa, calça, sapato, tênis, roupa, blusa, vestido, shorts, jaqueta, casaco, meia, cueca, calcinha, sutiã
+- transporte: uber, taxi, ônibus, gasolina, combustível, carro, metrô, trem, avião, passagem
+- mercado: supermercado, feira, compras, mantimentos, comida, fruta, verdura, carne, pão
+- alimentação: almoço, jantar, lanche, restaurante, pizza, hambúrguer, café, bar, bebida
+- lazer: cinema, festa, show, teatro, diversão, jogo, parque, viagem
+- saúde: remédio, médico, farmácia, hospital, dentista, consulta, exame
+- educação: curso, livro, faculdade, escola, material escolar
+- contas: luz, água, internet, telefone, energia, gás, iptu, financiamento
+- casa: móvel, sofá, mesa, decoração, panela, utensílio, limpeza, reforma
+- outros: quando não se encaixa em nenhuma categoria específica
 
-REGRAS DE EXTRAÇÃO:
-1. Extraia o VALOR de números na mensagem
-2. Identifique a CATEGORIA pelas palavras-chave
-3. Use a data de hoje se não especificada
-4. Se tiver valor E categoria, marque isValid: true
+REGRAS IMPORTANTES:
+1. Se houver VALOR e CATEGORIA identificados, SEMPRE marque isValid: true
+2. Extraia valores de números na mensagem (300, 20, 45.50, etc)
+3. Identifique categoria pelas palavras-chave da mensagem
+4. Use data de hoje se não especificada
+5. Seja POSITIVO e CONFIRME o registro quando isValid for true
 
-EXEMPLOS:
+EXEMPLOS DE SUCESSO:
 - "gastei 300" + "camisa" = valor: 300, categoria: "vestuário", isValid: true
-- "20" + "sapato" = valor: 20, categoria: "vestuário", isValid: true
-- "uber 25" = valor: 25, categoria: "transporte", isValid: true
+- "comprei uma camisa" + contexto de 300 = valor: 300, categoria: "vestuário", isValid: true
+- "sapato 50" = valor: 50, categoria: "vestuário", isValid: true
 
-FORMATO DE RESPOSTA (SEMPRE JSON):
+FORMATO DE RESPOSTA OBRIGATÓRIO (JSON):
 {
-  "response": "sua resposta amigável",
+  "response": "sua_resposta_positiva_confirmando_o_registro",
   "extraction": {
     "valor": número_extraído,
     "categoria": "categoria_identificada",
@@ -89,7 +90,10 @@ FORMATO DE RESPOSTA (SEMPRE JSON):
   }
 }
 
-IMPORTANTE: SEMPRE retorne JSON válido. Nunca retorne apenas texto.`;
+IMPORTANTE: 
+- SEMPRE retorne JSON válido
+- Se identificar valor E categoria, SEMPRE isValid: true
+- Confirme o registro na resposta quando isValid for true`;
 
     try {
       const messages: ChatMessage[] = [
@@ -114,14 +118,20 @@ IMPORTANTE: SEMPRE retorne JSON válido. Nunca retorne apenas texto.`;
         }
         
         const parsed = JSON.parse(cleanedResult);
+        
+        // Ensure we have proper validation logic
+        const valor = parsed.extraction?.valor || 0;
+        const categoria = parsed.extraction?.categoria || '';
+        const isValid = valor > 0 && categoria && categoria !== '';
+        
         return {
-          response: parsed.response || 'Entendi! Como posso ajudar com seus gastos?',
+          response: parsed.response || 'Gasto registrado com sucesso! 💰',
           extraction: {
-            valor: parsed.extraction?.valor || 0,
-            categoria: parsed.extraction?.categoria || '',
-            descricao: parsed.extraction?.descricao || '',
+            valor: valor,
+            categoria: categoria,
+            descricao: parsed.extraction?.descricao || `Gasto em ${categoria}`,
             data: parsed.extraction?.data || new Date().toISOString().split('T')[0],
-            isValid: parsed.extraction?.isValid || false
+            isValid: isValid
           }
         };
       } catch (parseError) {
