@@ -150,6 +150,69 @@ IMPORTANTE:
       const result = await this.chatCompletion(messages);
       console.log('OpenAI raw response:', result);
       
+      // FORÇAR ANÁLISE LOCAL SE OpenAI FALHAR
+      console.log('🔧 INICIANDO ANÁLISE LOCAL FORÇADA...');
+      console.log('📝 Mensagem do usuário:', userMessage);
+      console.log('📚 Histórico da conversa:', conversationHistory);
+      
+      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM)
+      let valor = 0;
+      let categoria = '';
+      
+      // Buscar valor na mensagem atual ou histórico
+      const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
+      if (numberMatch) {
+        valor = parseFloat(numberMatch[0].replace(',', '.'));
+        console.log(`💰 VALOR ENCONTRADO na mensagem atual: R$ ${valor}`);
+      } else {
+        // Buscar nas mensagens anteriores
+        const userMessages = conversationHistory.filter(msg => msg.type === 'user');
+        console.log(`🔍 Procurando valor em ${userMessages.length} mensagens...`);
+        
+        for (const msg of userMessages.reverse()) {
+          const valueMatch = msg.content.match(/(\d+(?:[.,]\d+)?)/);
+          if (valueMatch) {
+            valor = parseFloat(valueMatch[1].replace(',', '.'));
+            console.log(`🧠 VALOR CONECTADO: R$ ${valor} da mensagem: "${msg.content}"`);
+            break;
+          }
+        }
+      }
+      
+      // Buscar categoria
+      const allText = (conversationHistory.filter(msg => msg.type === 'user').map(m => m.content).join(' ') + ' ' + userMessage).toLowerCase();
+      console.log(`🏷️ Texto completo para análise: "${allText}"`);
+      
+      const categoryMap = {
+        'alimentação': ['hamburg', 'hambúrguer', 'burger', 'churros', 'comida', 'pizza', 'lanche'],
+        'tecnologia': ['computador', 'notebook', 'pc', 'celular', 'tablet'],
+        'vestuário': ['camisa', 'roupa', 'sapato']
+      };
+      
+      for (const [cat, words] of Object.entries(categoryMap)) {
+        const found = words.find(word => allText.includes(word));
+        if (found) {
+          categoria = cat;
+          console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${found})`);
+          break;
+        }
+      }
+      
+      // SE CONECTOU VALOR + CATEGORIA = SUCESSO!
+      if (valor > 0 && categoria) {
+        console.log(`✅ CONEXÃO REALIZADA: R$ ${valor} em ${categoria}`);
+        return {
+          response: `Show! Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! 💰 Tá certo?`,
+          extraction: {
+            valor: valor,
+            categoria: categoria,
+            descricao: `Gasto em ${categoria}`,
+            data: new Date().toISOString().split('T')[0],
+            isValid: false // Aguarda confirmação
+          }
+        };
+      }
+      
       try {
         // Clean the response to ensure it's valid JSON
         let cleanedResult = result.trim();
