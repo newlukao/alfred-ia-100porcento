@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Settings, Activity, Database } from 'lucide-react';
+import { Users, Settings, Activity, Database, Key } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, User, Expense, Configuration } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
@@ -57,7 +58,8 @@ const AdminPanel: React.FC = () => {
     try {
       await database.updateConfiguration({
         instrucoes_personalizadas: config.instrucoes_personalizadas,
-        modelo_usado: config.modelo_usado
+        modelo_usado: config.modelo_usado,
+        openai_api_key: config.openai_api_key
       });
       
       toast({
@@ -111,6 +113,8 @@ const AdminPanel: React.FC = () => {
         .reduce((sum, expense) => sum + expense.valor, 0)
     }));
 
+  const isApiKeyConfigured = config?.openai_api_key && config.openai_api_key.trim().length > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -118,6 +122,20 @@ const AdminPanel: React.FC = () => {
         <h1 className="text-3xl font-bold">⚙️ Painel Administrativo</h1>
         <p className="text-muted-foreground">Gerencie configurações e monitore usuários</p>
       </div>
+
+      {/* API Key Status Alert */}
+      {!isApiKeyConfigured && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <Key className="h-5 w-5 text-yellow-600" />
+              <p className="text-yellow-800 dark:text-yellow-200">
+                ⚠️ API Key do OpenAI não configurada. Configure na aba "Configurações" para que os usuários possam usar o chat.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -158,12 +176,14 @@ const AdminPanel: React.FC = () => {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Modelo IA</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Status API</CardTitle>
+            <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">{config?.modelo_usado}</div>
-            <p className="text-xs text-muted-foreground">modelo atual</p>
+            <div className={`text-lg font-bold ${isApiKeyConfigured ? 'text-green-500' : 'text-red-500'}`}>
+              {isApiKeyConfigured ? 'Configurada' : 'Não configurada'}
+            </div>
+            <p className="text-xs text-muted-foreground">OpenAI API Key</p>
           </CardContent>
         </Card>
       </div>
@@ -180,25 +200,25 @@ const AdminPanel: React.FC = () => {
         <TabsContent value="config" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Configurações do Assistente IA</CardTitle>
+              <CardTitle>Configurações do Sistema</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Instruções Personalizadas para o GPT
+                  🔑 API Key do OpenAI
                 </label>
-                <Textarea
-                  value={config?.instrucoes_personalizadas || ''}
+                <Input
+                  type="password"
+                  value={config?.openai_api_key || ''}
                   onChange={(e) => setConfig(prev => prev ? {
                     ...prev,
-                    instrucoes_personalizadas: e.target.value
+                    openai_api_key: e.target.value
                   } : null)}
-                  placeholder="Ex: Você é um assistente financeiro amigável. Use emojis e seja motivacional..."
-                  rows={6}
+                  placeholder="sk-..."
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Estas instruções serão enviadas como system message para o ChatGPT em todas as conversas.
+                  Esta chave será usada por todos os usuários para o chat com IA. Mantenha em segurança.
                 </p>
               </div>
 
@@ -217,11 +237,30 @@ const AdminPanel: React.FC = () => {
                     <SelectValue placeholder="Selecione o modelo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Mais rápido)</SelectItem>
+                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Mais rápido e econômico)</SelectItem>
                     <SelectItem value="gpt-4">GPT-4 (Mais inteligente)</SelectItem>
                     <SelectItem value="gpt-4-turbo">GPT-4 Turbo (Balanceado)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Instruções Personalizadas para o Assistente IA
+                </label>
+                <Textarea
+                  value={config?.instrucoes_personalizadas || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    instrucoes_personalizadas: e.target.value
+                  } : null)}
+                  placeholder="Ex: Você é um assistente financeiro amigável. Use emojis e seja motivacional..."
+                  rows={6}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estas instruções serão enviadas como system message para o ChatGPT em todas as conversas.
+                </p>
               </div>
 
               <Button 
@@ -345,7 +384,13 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>API OpenAI:</span>
-                  <Badge variant="outline">Configurada</Badge>
+                  <Badge variant={isApiKeyConfigured ? "outline" : "destructive"}>
+                    {isApiKeyConfigured ? 'Configurada' : 'Não configurada'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Modelo atual:</span>
+                  <Badge variant="outline">{config?.modelo_usado}</Badge>
                 </div>
               </div>
             </CardContent>

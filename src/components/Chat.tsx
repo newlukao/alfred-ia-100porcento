@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenAIService } from '@/lib/openai';
 import { database } from '@/lib/database';
@@ -30,8 +30,8 @@ const Chat: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(true);
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [isCheckingConfig, setIsCheckingConfig] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -42,9 +42,34 @@ const Chat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    checkApiKeyConfiguration();
+  }, []);
+
+  const checkApiKeyConfiguration = async () => {
+    setIsCheckingConfig(true);
+    try {
+      const config = await database.getConfiguration();
+      setApiKeyConfigured(config.openai_api_key && config.openai_api_key.trim().length > 0);
+    } catch (error) {
+      console.error('Error checking API key configuration:', error);
+      setApiKeyConfigured(false);
+    } finally {
+      setIsCheckingConfig(false);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !apiKey.trim()) return;
-    if (!user) return;
+    if (!inputValue.trim() || !user) return;
+
+    if (!apiKeyConfigured) {
+      toast({
+        title: "API não configurada",
+        description: "O administrador precisa configurar a API key do OpenAI",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -58,8 +83,8 @@ const Chat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const openAI = new OpenAIService(apiKey);
       const config = await database.getConfiguration();
+      const openAI = new OpenAIService(config.openai_api_key);
       
       const result = await openAI.extractExpenseData(inputValue, config.instrucoes_personalizadas);
       
@@ -94,7 +119,7 @@ const Chat: React.FC = () => {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: '😔 Desculpe, ocorreu um erro. Verifique sua API key do OpenAI e tente novamente.',
+        content: '😔 Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns momentos.',
         timestamp: new Date()
       };
 
@@ -102,7 +127,7 @@ const Chat: React.FC = () => {
       
       toast({
         title: "Erro",
-        description: "Falha ao processar mensagem. Verifique sua API key.",
+        description: "Falha ao processar mensagem. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -117,43 +142,42 @@ const Chat: React.FC = () => {
     }
   };
 
-  if (showApiKeyInput) {
+  if (isCheckingConfig) {
+    return (
+      <div className="max-w-4xl mx-auto h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verificando configuração...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiKeyConfigured) {
     return (
       <div className="max-w-2xl mx-auto">
         <Card className="p-6">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold mb-2">🔑 Configurar API Key</h2>
+            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">🔧 Configuração Necessária</h2>
             <p className="text-muted-foreground">
-              Para usar o chat com IA, insira sua chave da API do OpenAI
+              O chat com IA não está disponível ainda
             </p>
           </div>
           
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                API Key do OpenAI
-              </label>
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
-                className="w-full"
-              />
-            </div>
-            
-            <Alert>
-              <AlertDescription>
-                💡 Sua API key será armazenada apenas localmente no seu navegador e usada apenas para suas conversas.
-              </AlertDescription>
-            </Alert>
-            
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              💡 O administrador do sistema precisa configurar a API key do OpenAI no painel administrativo para que o chat funcione.
+            </AlertDescription>
+          </Alert>
+
+          <div className="mt-4 text-center">
             <Button 
-              onClick={() => setShowApiKeyInput(false)}
-              className="w-full"
-              disabled={!apiKey.trim()}
+              onClick={checkApiKeyConfiguration}
+              variant="outline"
             >
-              Começar Chat
+              Verificar Novamente
             </Button>
           </div>
         </Card>
@@ -170,13 +194,10 @@ const Chat: React.FC = () => {
           <h2 className="text-lg font-semibold">Assistente Financeiro</h2>
         </div>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowApiKeyInput(true)}
-        >
-          Trocar API Key
-        </Button>
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span className="text-sm text-muted-foreground">Online</span>
+        </div>
       </div>
 
       {/* Messages */}
@@ -242,11 +263,11 @@ const Chat: React.FC = () => {
             onKeyPress={handleKeyPress}
             placeholder="Digite seu gasto... ex: Gastei R$ 45 no mercado"
             className="flex-1"
-            disabled={isLoading}
+            disabled={isLoading || !apiKeyConfigured}
           />
           <Button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={!inputValue.trim() || isLoading || !apiKeyConfigured}
             size="icon"
           >
             <Send size={16} />
