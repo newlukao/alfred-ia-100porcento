@@ -372,9 +372,12 @@ IMPORTANTE:
       }
       
       const categoryMap = {
-        'alimentação': ['hamburg', 'hambúrguer', 'burger', 'churros', 'comida', 'pizza', 'lanche'],
-        'tecnologia': ['computador', 'notebook', 'pc', 'celular', 'tablet'],
-        'vestuário': ['camisa', 'roupa', 'sapato']
+        'alimentação': ['hamburg', 'hambúrguer', 'burger', 'churros', 'comida', 'pizza', 'lanche', 'almoço', 'jantar', 'café', 'bar', 'bebida', 'restaurante'],
+        'tecnologia': ['computador', 'notebook', 'pc', 'celular', 'tablet', 'mouse', 'teclado', 'fone'],
+        'vestuário': ['camisa', 'roupa', 'sapato', 'tênis', 'calça', 'blusa', 'vestido'],
+        'transporte': ['uber', 'taxi', 'gasolina', 'combustível', 'posto', 'ônibus', 'metrô', 'carro', 'moto', 'conserto', 'manutenção', 'mecânico', 'oficina', 'pneu', 'óleo', 'revisão'],
+        'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza', 'reforma'],
+        'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista']
       };
       
       for (const [cat, words] of Object.entries(categoryMap)) {
