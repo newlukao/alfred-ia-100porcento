@@ -1,6 +1,23 @@
 
 import { database } from './database';
 
+// Função para obter data no fuso horário UTC-3 (Brasil)
+function getBrazilDate(): Date {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const brazilTime = new Date(utc + (-3 * 3600000)); // UTC-3
+  return brazilTime;
+}
+
+// Função para formatar data brasileira
+function formatBrazilDate(date: Date): string {
+  return date.toLocaleDateString('pt-BR', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric' 
+  });
+}
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -201,14 +218,157 @@ IMPORTANTE:
             
             console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria}`);
             
+            // NOVO FLUXO: Perguntar sobre a data
+            const hoje = formatBrazilDate(getBrazilDate());
+            
             return {
-              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!\n\nE aí, rolou mais algum gasto hoje que você quer anotar? 😊`,
+              response: `Show! R$ ${valor.toFixed(2)} em ${categoria} confirmado! 👍\n\n📅 Esse gasto foi hoje (${hoje})?\n\nResponde "sim" se foi hoje ou "não" se foi outro dia!`,
+              extraction: {
+                valor: valor,
+                categoria: categoria,
+                descricao: `Aguardando confirmação de data`,
+                data: '', // Vazio até confirmar data
+                isValid: false // Ainda não finalizado
+              }
+            };
+          }
+        }
+        
+        // NOVO: Detectar negativa para data "hoje" - quando não foi hoje
+        if (lastBotMessage && lastBotMessage.content.includes('foi hoje') && currentMessage.includes('não')) {
+          // Buscar dados do gasto pendente na mensagem do bot
+          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          
+          if (valorMatch && categoriaMatch) {
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            const categoria = categoriaMatch[1].toLowerCase();
+            
+            return {
+              response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
+              extraction: {
+                valor: valor,
+                categoria: categoria,
+                descricao: `Aguardando data específica`,
+                data: '', // Vazio até confirmar data
+                isValid: false
+              }
+            };
+          }
+        }
+        
+        // NOVO: Detectar entrada de data específica
+        if (lastBotMessage && lastBotMessage.content.includes('quando foi esse gasto')) {
+          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          
+          if (valorMatch && categoriaMatch) {
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            const categoria = categoriaMatch[1].toLowerCase();
+            
+            // Tentar interpretar a data informada
+            let dataInterpretada = '';
+            let dataFormatada = '';
+            
+            if (currentMessage.includes('ontem')) {
+              const ontem = getBrazilDate();
+              ontem.setDate(ontem.getDate() - 1);
+              dataInterpretada = ontem.toISOString().split('T')[0];
+              dataFormatada = formatBrazilDate(ontem);
+            } else if (currentMessage.includes('anteontem')) {
+              const anteontem = getBrazilDate();
+              anteontem.setDate(anteontem.getDate() - 2);
+              dataInterpretada = anteontem.toISOString().split('T')[0];
+              dataFormatada = formatBrazilDate(anteontem);
+            } else {
+              // Tentar extrair data no formato DD/MM ou DD/MM/YYYY
+              const dateMatch = currentMessage.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+              if (dateMatch) {
+                const dia = parseInt(dateMatch[1]);
+                const mes = parseInt(dateMatch[2]) - 1; // Mês base 0
+                const ano = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : getBrazilDate().getFullYear();
+                
+                const dataParsed = new Date(ano, mes, dia);
+                dataInterpretada = dataParsed.toISOString().split('T')[0];
+                dataFormatada = formatBrazilDate(dataParsed);
+              } else {
+                // Se não conseguiu interpretar, pedir novamente
+                return {
+                  response: `Hmm, não consegui entender essa data... 🤔\n\nPode tentar de novo? Exemplos:\n• "ontem"\n• "dia 15/12"\n• "15/12/2024"\n• "anteontem"`,
+                  extraction: {
+                    valor: 0,
+                    categoria: '',
+                    descricao: 'Data não compreendida',
+                    data: '',
+                    isValid: false
+                  }
+                };
+              }
+            }
+            
+            if (dataInterpretada) {
+              return {
+                response: `Perfeito! Então foi dia ${dataFormatada}? 📅\n\nR$ ${valor.toFixed(2)} em ${categoria} no dia ${dataFormatada}.\n\nResponde "sim" pra confirmar ou "não" se a data tá errada!`,
+                extraction: {
+                  valor: valor,
+                  categoria: categoria,
+                  descricao: `Confirmando data: ${dataFormatada}`,
+                  data: dataInterpretada,
+                  isValid: false // Aguardando confirmação final
+                }
+              };
+            }
+          }
+        }
+        
+        // NOVO: Confirmação final da data específica
+        if (lastBotMessage && lastBotMessage.content.includes('Então foi dia') && lastBotMessage.content.includes('pra confirmar')) {
+          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          const dataMatch = lastBotMessage.content.match(/no dia (.+?)\./);
+          
+          if (valorMatch && categoriaMatch && dataMatch) {
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            const categoria = categoriaMatch[1].toLowerCase();
+            const dataFormatada = dataMatch[1];
+            
+            // Converter data formatada de volta para ISO
+            const partesData = dataFormatada.split('/');
+            const dataFinal = new Date(parseInt(partesData[2]), parseInt(partesData[1]) - 1, parseInt(partesData[0]));
+            const dataISO = dataFinal.toISOString().split('T')[0];
+            
+            return {
+              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} do dia ${dataFormatada} registrado! 🎉\n\nGasto salvo com sucesso!\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
               extraction: {
                 valor: valor,
                 categoria: categoria,
                 descricao: `Gasto em ${categoria}`,
-                data: new Date().toISOString().split('T')[0],
-                isValid: true // CONFIRMA E REGISTRA!
+                data: dataISO,
+                isValid: true // FINALIZA COM DATA CORRETA!
+              }
+            };
+          }
+        }
+        
+        // NOVO: Detectar confirmação de data "hoje"
+        if (lastBotMessage && lastBotMessage.content.includes('foi hoje')) {
+          // Buscar dados do gasto pendente na mensagem do bot
+          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          
+          if (valorMatch && categoriaMatch) {
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            const categoria = categoriaMatch[1].toLowerCase();
+            const dataHoje = getBrazilDate().toISOString().split('T')[0];
+            
+            return {
+              response: `Perfeito! R$ ${valor.toFixed(2)} em ${categoria} de hoje registrado! 🎉\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
+              extraction: {
+                valor: valor,
+                categoria: categoria,
+                descricao: `Gasto em ${categoria}`,
+                data: dataHoje,
+                isValid: true // FINALIZA!
               }
             };
           }
