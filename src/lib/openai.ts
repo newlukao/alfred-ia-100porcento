@@ -372,12 +372,85 @@ IMPORTANTE:
       }
       
       const categoryMap = {
-        'alimentação': ['hamburg', 'hambúrguer', 'burger', 'churros', 'comida', 'pizza', 'lanche', 'almoço', 'jantar', 'café', 'bar', 'bebida', 'restaurante'],
-        'tecnologia': ['computador', 'notebook', 'pc', 'celular', 'tablet', 'mouse', 'teclado', 'fone'],
-        'vestuário': ['camisa', 'roupa', 'sapato', 'tênis', 'calça', 'blusa', 'vestido'],
-        'transporte': ['uber', 'taxi', 'gasolina', 'combustível', 'posto', 'ônibus', 'metrô', 'carro', 'moto', 'conserto', 'manutenção', 'mecânico', 'oficina', 'pneu', 'óleo', 'revisão'],
-        'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza', 'reforma'],
-        'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista']
+        'alimentação': [
+          // Comidas
+          'comida', 'almoço', 'jantar', 'lanche', 'café', 'refeição', 'pizza', 'hambúrguer', 'hamburg', 'burger', 'churros', 'açaí', 'sorvete', 'doce', 'bolo', 'sanduíche', 'pão', 'biscoito', 'chocolate', 'picanha', 'carne', 'frango', 'peixe', 'salada', 'sopa', 'macarrão', 'arroz', 'feijão', 'batata', 'ovo', 'queijo', 'presunto', 'frutas', 'verduras', 'legumes',
+          // Bebidas  
+          'bebida', 'água', 'refrigerante', 'suco', 'cerveja', 'vinho', 'caipirinha', 'drink', 'whisky', 'vodka', 'energético', 'isotônico', 'leite', 'café', 'cappuccino', 'expresso',
+          // Restaurantes e locais
+          'restaurante', 'bar', 'lanchonete', 'padaria', 'açougue', 'pizzaria', 'churrascaria', 'fast-food', 'delivery', 'ifood', 'mcdonalds', 'bk', 'subway', 'kfc', 'dominos', 'outback', 'giraffas'
+        ],
+        'tecnologia': [
+          // Dispositivos
+          'computador', 'notebook', 'pc', 'desktop', 'mac', 'macbook', 'celular', 'smartphone', 'iphone', 'samsung', 'motorola', 'lg', 'xiaomi', 'tablet', 'ipad', 'tv', 'televisão', 'monitor', 'smartwatch', 'relógio',
+          // Acessórios
+          'mouse', 'teclado', 'fone', 'headset', 'carregador', 'cabo', 'adaptador', 'powerbank', 'capinha', 'película', 'suporte',
+          // Games e entretenimento
+          'playstation', 'xbox', 'nintendo', 'switch', 'ps5', 'ps4', 'jogo', 'game', 'controle', 'headphone',
+          // Software e serviços
+          'software', 'aplicativo', 'netflix', 'spotify', 'amazon', 'google', 'microsoft', 'adobe', 'steam'
+        ],
+        'vestuário': [
+          // Roupas básicas
+          'roupa', 'camisa', 'camiseta', 'polo', 'blusa', 'regata', 'calça', 'jeans', 'shorts', 'bermuda', 'vestido', 'saia', 'casaco', 'jaqueta', 'blazer', 'suéter', 'moletom', 'pijama',
+          // Calçados
+          'sapato', 'tênis', 'sandália', 'chinelo', 'bota', 'sapatilha', 'scarpin', 'salto', 'all-star', 'nike', 'adidas', 'havaianas',
+          // Acessórios e íntimos
+          'meia', 'cueca', 'calcinha', 'sutiã', 'cinto', 'bolsa', 'carteira', 'mochila', 'óculos', 'relógio', 'colar', 'pulseira', 'anel', 'brinco', 'chapéu', 'boné', 'lenço'
+        ],
+        'transporte': [
+          // Transporte público e privado
+          'uber', 'taxi', '99', 'cabify', 'ônibus', 'metrô', 'trem', 'avião', 'passagem', 'viagem', 'pedágio', 'estacionamento', 'valet',
+          // Veículos
+          'carro', 'moto', 'bicicleta', 'bike', 'patinete', 'scooter',
+          // Combustível e manutenção
+          'gasolina', 'álcool', 'diesel', 'combustível', 'posto', 'shell', 'petrobras', 'ipiranga', 'ale', 'conserto', 'manutenção', 'mecânico', 'oficina', 'pneu', 'óleo', 'revisão', 'lavagem', 'seguro', 'ipva', 'licenciamento', 'multa'
+        ],
+        'casa': [
+          // Móveis
+          'móvel', 'sofá', 'mesa', 'cadeira', 'cama', 'guarda-roupa', 'armário', 'estante', 'rack', 'cômoda', 'poltrona', 'banqueta', 'escrivaninha',
+          // Decoração
+          'decoração', 'quadro', 'espelho', 'vaso', 'planta', 'cortina', 'tapete', 'almofada', 'luminária', 'abajur',
+          // Utensílios e eletrodomésticos
+          'panela', 'frigideira', 'prato', 'copo', 'talheres', 'microondas', 'geladeira', 'fogão', 'liquidificador', 'batedeira', 'aspirador', 'ferro', 'ventilador', 'ar-condicionado',
+          // Reforma e manutenção
+          'reforma', 'pintura', 'tinta', 'pedreiro', 'eletricista', 'encanador', 'azulejo', 'piso', 'porta', 'janela', 'fechadura',
+          // Limpeza
+          'limpeza', 'detergente', 'sabão', 'desinfetante', 'vassoura', 'rodo', 'pano', 'esponja', 'produto'
+        ],
+        'saúde': [
+          // Medicamentos
+          'remédio', 'medicamento', 'vitamina', 'suplemento', 'antibiótico', 'analgésico', 'dipirona', 'paracetamol', 'ibuprofeno',
+          // Profissionais
+          'médico', 'dentista', 'psicólogo', 'fisioterapeuta', 'nutricionista', 'dermatologista', 'cardiologista', 'ginecologista',
+          // Locais e procedimentos
+          'hospital', 'clínica', 'farmácia', 'drogaria', 'consulta', 'exame', 'raio-x', 'ultrassom', 'cirurgia', 'tratamento', 'terapia', 'vacina', 'óculos', 'lente'
+        ],
+        'lazer': [
+          // Entretenimento
+          'cinema', 'filme', 'teatro', 'show', 'concerto', 'festa', 'balada', 'bar', 'clube', 'parque', 'zoológico', 'aquário', 'museu',
+          // Esportes e atividades
+          'academia', 'natação', 'futebol', 'tênis', 'golf', 'surf', 'skate', 'bike', 'corrida', 'caminhada', 'yoga', 'pilates',
+          // Hobbies
+          'livro', 'revista', 'jornal', 'jogo', 'quebra-cabeça', 'pintura', 'desenho', 'artesanato', 'música', 'instrumento',
+          // Viagens
+          'viagem', 'hotel', 'pousada', 'resort', 'turismo', 'excursão', 'cruzeiro'
+        ],
+        'educação': [
+          'curso', 'faculdade', 'universidade', 'escola', 'colégio', 'aula', 'professor', 'tutor', 'livro', 'apostila', 'material', 'caderno', 'caneta', 'lápis', 'mochila', 'estojo', 'calculadora', 'mensalidade', 'matrícula', 'formatura', 'diploma'
+        ],
+        'beleza': [
+          'salão', 'cabelo', 'corte', 'escova', 'pintura', 'luzes', 'alisamento', 'unha', 'manicure', 'pedicure', 'sobrancelha', 'depilação', 'massagem', 'facial', 'limpeza', 'hidratação', 'maquiagem', 'perfume', 'creme', 'shampoo', 'condicionador', 'batom', 'base', 'rímel', 'esmalte'
+        ],
+        'pets': [
+          'veterinário', 'ração', 'petshop', 'vacina', 'consulta', 'banho', 'tosa', 'coleira', 'brinquedo', 'casinha', 'cama', 'comedouro', 'bebedouro', 'remédio', 'cachorro', 'gato', 'pássaro', 'peixe', 'hamster'
+        ],
+        'mercado': [
+          'mercado', 'supermercado', 'hipermercado', 'compras', 'mantimentos', 'feira', 'hortifruti', 'atacadão', 'extra', 'carrefour', 'pão-de-açúcar', 'walmart', 'assaí', 'sam'
+        ],
+        'contas': [
+          'luz', 'energia', 'elétrica', 'água', 'saneamento', 'internet', 'wifi', 'telefone', 'celular', 'gás', 'condomínio', 'aluguel', 'iptu', 'financiamento', 'empréstimo', 'cartão', 'fatura', 'boleto', 'conta'
+        ]
       };
       
       for (const [cat, words] of Object.entries(categoryMap)) {
