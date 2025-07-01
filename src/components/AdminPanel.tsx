@@ -55,7 +55,7 @@ const AdminPanel: React.FC = () => {
     
     setIsSaving(true);
     try {
-      await database.updateConfiguration({
+      const updatedConfig = await database.updateConfiguration({
         instrucoes_personalizadas: config.instrucoes_personalizadas,
         modelo_usado: config.modelo_usado,
         openai_api_key: config.openai_api_key,
@@ -65,6 +65,9 @@ const AdminPanel: React.FC = () => {
         instrucoes_individuais: config.instrucoes_individuais,
         mensagem_inicial: config.mensagem_inicial
       });
+      
+      // Update local state with the saved configuration
+      setConfig(updatedConfig);
       
       toast({
         title: "Sucesso! ⚙️",
