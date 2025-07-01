@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Send, Bot, User, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { OpenAIService } from '@/lib/openai';
+import { OpenAIService } from '@/lib/openai-simple';
 import { database } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 
