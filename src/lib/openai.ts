@@ -264,7 +264,69 @@ IMPORTANTE:
         };
       }
       
-      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO, NEGATIVA OU SAUDAÇÃO
+      // DETECÇÃO DE CONFIRMAÇÕES CONVERSACIONAIS (respostas positivas após saudação)
+      const conversationalWords = ['vamos', 'bora', 'ok', 'beleza', 'sim', 'claro', 'dale', 'show', 'massa', 'vamo', 'bora lá', 'pode ser', 'tranquilo', 'fechou'];
+      const isConversational = conversationalWords.some(word => currentMessage.includes(word));
+      
+      console.log(`💬 Verificando resposta conversacional para: "${userMessage}"`);
+      console.log(`💬 É conversacional? ${isConversational}`);
+      
+      if (isConversational) {
+        // Verificar se a mensagem anterior do bot foi uma saudação
+        const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+        const lastBotMessage = botMessages[botMessages.length - 1];
+        
+        if (lastBotMessage && (lastBotMessage.content.includes('Pronto pra anotar') || lastBotMessage.content.includes('Vamos registrar'))) {
+          const readyResponses = [
+            'Show! 🎉 Então me fala aí, qual foi o último gasto que você fez? Pode ser qualquer coisa: comida, roupa, transporte... 💰',
+            'Massa! 😊 Vamos lá então! Me conta, gastou com o quê hoje? Almoço? Uber? Compras? 🛒',
+            'Dahora! 🚀 Bora anotar! Qual foi a última vez que você abriu a carteira? Me fala aí! 💳',
+            'Top! 🔥 Perfeito! Então me conta: qual foi o gasto mais recente? Pode ser desde um café até uma compra maior! ☕💸',
+            'Beleza! 🤙 Vamos organizar essas finanças! Me fala qualquer gasto que você lembra... o que rolou? 📊'
+          ];
+          
+          const randomResponse = readyResponses[Math.floor(Math.random() * readyResponses.length)];
+          
+          return {
+            response: randomResponse,
+            extraction: {
+              valor: 0,
+              categoria: '',
+              descricao: '',
+              data: new Date().toISOString().split('T')[0],
+              isValid: false
+            }
+          };
+        }
+      }
+      
+      // DETECÇÃO DE CONVERSAS VAGAS (quando não entende o contexto)
+      const vagueWords = ['sim', 'não', 'ok', 'certo', 'talvez', 'pode ser'];
+      const isVague = vagueWords.some(word => currentMessage === word.toLowerCase()) && !isConfirmation;
+      
+      if (isVague) {
+        const helpResponses = [
+          'Hmm, não entendi muito bem... 🤔 Você quer anotar algum gasto? Me fala tipo: "gastei R$ 30 no almoço"! 🍽️',
+          'Opa, ficou meio vago aí! 😅 Tá querendo registrar alguma despesa? Fala aí: "comprei uma camisa por R$ 80"! 👕',
+          'Não tô sacando... 🧐 Bora ser mais específico? Me conta algum gasto: "paguei R$ 15 no uber"! 🚗',
+          'Meio confuso aqui! 😵 Você gastou alguma coisa que quer anotar? Tipo: "gastei R$ 50 no mercado"! 🛒'
+        ];
+        
+        const randomResponse = helpResponses[Math.floor(Math.random() * helpResponses.length)];
+        
+        return {
+          response: randomResponse,
+          extraction: {
+            valor: 0,
+            categoria: '',
+            descricao: '',
+            data: new Date().toISOString().split('T')[0],
+            isValid: false
+          }
+        };
+      }
+      
+      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO, NEGATIVA, SAUDAÇÃO OU CONVERSACIONAL
       console.log('🔧 INICIANDO ANÁLISE LOCAL...');
       console.log('📝 Mensagem do usuário:', userMessage);
       
