@@ -127,7 +127,7 @@ NÚMEROS POR EXTENSO E VARIAÇÕES:
 - duzentos = 200, trezentos = 300, quatrocentos = 400, quinhentos = 500
 - mil = 1000, "um mil" = 1000, "dois mil" = 2000
 
-FORMATO OBRIGATÓRIO (JSON):
+FORMATO OBRIGATÓRIO - RESPONDA SEMPRE EM JSON:
 {
   "response": "resposta_humanizada_com_confirmacao_ou_celebracao",
   "extraction": {
@@ -139,6 +139,8 @@ FORMATO OBRIGATÓRIO (JSON):
   },
   "personalityUpdate": "observacoes_sobre_o_jeito_do_usuario_falar"
 }
+
+CRITICAL: SEMPRE responda APENAS com JSON válido. NÃO adicione texto antes ou depois do JSON.
 
 EXEMPLOS DE FLUXO COMPLETO:
 Usuário: "gastei 200"
