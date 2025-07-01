@@ -260,28 +260,59 @@ IMPORTANTE:
               dataInterpretada = anteontem.toISOString().split('T')[0];
               dataFormatada = formatBrazilDate(anteontem);
             } else {
-              // Tentar extrair data no formato DD/MM ou DD/MM/YYYY
-              const dateMatch = currentMessage.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-              if (dateMatch) {
-                const dia = parseInt(dateMatch[1]);
-                const mes = parseInt(dateMatch[2]) - 1; // Mês base 0
-                const ano = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : getBrazilDate().getFullYear();
+              // Verificar dias da semana
+              const dayMappings = {
+                'segunda': 1, 'segunda-feira': 1, 'segunda feira': 1,
+                'terça': 2, 'terça-feira': 2, 'terca': 2, 'terca-feira': 2, 'terça feira': 2, 'terca feira': 2,
+                'quarta': 3, 'quarta-feira': 3, 'quarta feira': 3,
+                'quinta': 4, 'quinta-feira': 4, 'quinta feira': 4,
+                'sexta': 5, 'sexta-feira': 5, 'sexta feira': 5,
+                'sábado': 6, 'sabado': 6,
+                'domingo': 0
+              };
+              
+              let targetDay = -1;
+              for (const [dayName, dayNum] of Object.entries(dayMappings)) {
+                if (currentMessage.toLowerCase().includes(dayName)) {
+                  targetDay = dayNum;
+                  break;
+                }
+              }
+              
+              if (targetDay !== -1) {
+                const today = getBrazilDate();
+                const currentDay = today.getDay();
+                let daysBack = currentDay - targetDay;
+                if (daysBack <= 0) daysBack += 7; // Se for no futuro, assumir semana passada
                 
-                const dataParsed = new Date(ano, mes, dia);
-                dataInterpretada = dataParsed.toISOString().split('T')[0];
-                dataFormatada = formatBrazilDate(dataParsed);
+                const targetDate = getBrazilDate();
+                targetDate.setDate(targetDate.getDate() - daysBack);
+                dataInterpretada = targetDate.toISOString().split('T')[0];
+                dataFormatada = formatBrazilDate(targetDate);
               } else {
-                // Se não conseguiu interpretar, pedir novamente
-                return {
-                  response: `Hmm, não consegui entender essa data... 🤔\n\nPode tentar de novo? Exemplos:\n• "ontem"\n• "dia 15/12"\n• "15/12/2024"\n• "anteontem"`,
-                  extraction: {
-                    valor: 0,
-                    categoria: '',
-                    descricao: 'Data não compreendida',
-                    data: '',
-                    isValid: false
-                  }
-                };
+                // Tentar extrair data no formato DD/MM ou DD/MM/YYYY
+                const dateMatch = currentMessage.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+                if (dateMatch) {
+                  const dia = parseInt(dateMatch[1]);
+                  const mes = parseInt(dateMatch[2]) - 1; // Mês base 0
+                  const ano = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : getBrazilDate().getFullYear();
+                  
+                  const dataParsed = new Date(ano, mes, dia);
+                  dataInterpretada = dataParsed.toISOString().split('T')[0];
+                  dataFormatada = formatBrazilDate(dataParsed);
+                } else {
+                  // Se não conseguiu interpretar, pedir novamente
+                  return {
+                    response: `Hmm, não consegui entender essa data... 🤔\n\nPode tentar de novo? Exemplos:\n• "ontem"\n• "dia 15/12"\n• "15/12/2024"\n• "anteontem"\n• "segunda-feira"`,
+                    extraction: {
+                      valor: 0,
+                      categoria: '',
+                      descricao: 'Data não compreendida',
+                      data: '',
+                      isValid: false
+                    }
+                  };
+                }
               }
             }
             
@@ -363,7 +394,7 @@ IMPORTANTE:
         
         // Buscar dados do gasto pendente na mensagem do bot
         const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-        const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+        const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
         
         if (valorMatch && categoriaMatch) {
           const valor = parseFloat(valorMatch[1].replace(',', '.'));
