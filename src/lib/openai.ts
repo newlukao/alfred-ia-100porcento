@@ -187,27 +187,28 @@ IMPORTANTE:
           categoria = parsed.extraction.categoria;
         }
         
-        // Enhanced context analysis - look at conversation history MORE INTELLIGENTLY
-        const recentMessages = conversationHistory.slice(-4); // Last 4 messages for better context
+        // SUPER INTELIGÊNCIA: Analise TODO o histórico da conversa
+        const recentMessages = conversationHistory.slice(-6); // Últimas 6 mensagens para contexto
         const allUserMessages = recentMessages.filter(msg => msg.type === 'user').map(msg => msg.content).join(' ').toLowerCase();
         const currentMessage = userMessage.toLowerCase();
         const fullConversationText = allUserMessages + ' ' + currentMessage;
         
-        // Smart value extraction from current message or history
+        // INTELIGÊNCIA APRIMORADA: Se não tem valor, procure nas mensagens anteriores
         if (!valor) {
-          // Try current message first
+          // Primeiro tenta a mensagem atual
           const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
           if (numberMatch) {
             valor = parseFloat(numberMatch[0].replace(',', '.'));
           } else {
-            // INTELIGÊNCIA MELHORADA: Procurar valor nas últimas mensagens do usuário
-            const userMessages = conversationHistory.filter(msg => msg.type === 'user').slice(-3);
+            // BUSCA INTELIGENTE: Procurar qualquer valor nas últimas mensagens do usuário
+            const userMessages = conversationHistory.filter(msg => msg.type === 'user').slice(-4);
             for (const msg of userMessages.reverse()) {
-              const valueMatch = msg.content.match(/(?:gastei|paguei|custou|foi|)\s*(\d+(?:[.,]\d+)?)/i) || 
+              // Busca mais agressiva por números
+              const valueMatch = msg.content.match(/(?:gastei|paguei|custou|foi|comprei|)\s*(\d+(?:[.,]\d+)?)/i) || 
                                 msg.content.match(/(\d+(?:[.,]\d+)?)/);
               if (valueMatch) {
                 valor = parseFloat(valueMatch[1].replace(',', '.'));
-                console.log(`🧠 CONECTEI INFORMAÇÃO: Valor ${valor} da mensagem anterior: "${msg.content}"`);
+                console.log(`🧠 CONECTEI VALOR: R$ ${valor} da mensagem: "${msg.content}"`);
                 break;
               }
             }
@@ -338,7 +339,7 @@ IMPORTANTE:
         // Simple category detection from full context
         if (['camisa', 'calça', 'roupa', 'sapato', 'tênis', 'blusa', 'vestido'].some(term => fullText.includes(term))) {
           categoria = 'vestuário';
-        } else if (['picanha', 'carne', 'comida', 'almoço', 'jantar', 'mercado'].some(term => fullText.includes(term))) {
+        } else if (['picanha', 'carne', 'comida', 'almoço', 'jantar', 'mercado', 'hambúrguer', 'hamburg', 'pizza', 'lanche'].some(term => fullText.includes(term))) {
           categoria = 'alimentação';
         } else if (['uber', 'taxi', 'gasolina', 'posto'].some(term => fullText.includes(term))) {
           categoria = 'transporte';
