@@ -235,27 +235,6 @@ IMPORTANTE:
         }
         
         // NOVO: Detectar negativa para data "hoje" - quando não foi hoje
-        if (lastBotMessage && lastBotMessage.content.includes('foi hoje') && currentMessage.includes('não')) {
-          // Buscar dados do gasto pendente na mensagem do bot
-          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
-          
-          if (valorMatch && categoriaMatch) {
-            const valor = parseFloat(valorMatch[1].replace(',', '.'));
-            const categoria = categoriaMatch[1].toLowerCase();
-            
-            return {
-              response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
-              extraction: {
-                valor: valor,
-                categoria: categoria,
-                descricao: `Aguardando data específica`,
-                data: '', // Vazio até confirmar data
-                isValid: false
-              }
-            };
-          }
-        }
         
         // NOVO: Detectar entrada de data específica
         if (lastBotMessage && lastBotMessage.content.includes('quando foi esse gasto')) {
@@ -372,6 +351,36 @@ IMPORTANTE:
               }
             };
           }
+        }
+      }
+      
+      // DETECÇÃO ESPECÍFICA: "Não foi hoje" (PRIORITY #2 - ANTES DE DETECTAR NEGATIVAS GERAIS)
+      const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+      const lastBotMessage = botMessages[botMessages.length - 1];
+      
+      if (lastBotMessage && lastBotMessage.content.includes('foi hoje') && currentMessage.includes('não')) {
+        console.log(`📅 DETECTADO: Usuário disse que NÃO foi hoje`);
+        
+        // Buscar dados do gasto pendente na mensagem do bot
+        const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+        const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+        
+        if (valorMatch && categoriaMatch) {
+          const valor = parseFloat(valorMatch[1].replace(',', '.'));
+          const categoria = categoriaMatch[1].toLowerCase();
+          
+          console.log(`📅 PROCESSANDO: R$ ${valor} em ${categoria} - perguntando data específica`);
+          
+          return {
+            response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
+            extraction: {
+              valor: valor,
+              categoria: categoria,
+              descricao: `Aguardando data específica`,
+              data: '', // Vazio até confirmar data
+              isValid: false
+            }
+          };
         }
       }
       
