@@ -1,4 +1,6 @@
 
+import { database } from './database';
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -52,7 +54,8 @@ export class OpenAIService {
     userMessage: string, 
     systemInstructions: string, 
     conversationHistory: any[] = [],
-    userPersonality?: string
+    userPersonality?: string,
+    userId?: string
   ): Promise<{
     response: string;
     extraction: ExpenseExtraction;
@@ -355,15 +358,142 @@ IMPORTANTE:
       console.log(`📊 Verificando consulta de relatório para: "${userMessage}"`);
       console.log(`📊 É consulta de relatório? ${isReportQuery}`);
       
-      if (isReportQuery) {
-        // IMPORTANTE: Esta função precisa receber userId como parâmetro
-        // Para poder fazer consultas reais no banco de dados
+      if (isReportQuery && userId) {
+        console.log(`📊 Executando consulta de relatório para usuário: ${userId}`);
+        
+        try {
+          // Buscar todos os gastos do usuário
+          const userExpenses = await database.getExpensesByUser(userId);
+          console.log(`📋 Total de gastos encontrados: ${userExpenses.length}`);
+          
+          // Detectar período solicitado
+          let periodo = 'total';
+          let startDate = new Date('2000-01-01'); // Data muito antiga para incluir tudo
+          let endDate = new Date();
+          
+          if (currentMessage.includes('semana') || currentMessage.includes('última semana')) {
+            periodo = 'última semana';
+            startDate = new Date();
+            startDate.setDate(startDate.getDate() - 7);
+          } else if (currentMessage.includes('mês') || currentMessage.includes('mes') || currentMessage.includes('último mês')) {
+            periodo = 'último mês';
+            startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 1);
+          } else if (currentMessage.includes('hoje')) {
+            periodo = 'hoje';
+            startDate = new Date();
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date();
+            endDate.setHours(23, 59, 59, 999);
+          } else if (currentMessage.includes('ontem')) {
+            periodo = 'ontem';
+            startDate = new Date();
+            startDate.setDate(startDate.getDate() - 1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date();
+            endDate.setDate(endDate.getDate() - 1);
+            endDate.setHours(23, 59, 59, 999);
+          }
+          
+          // Filtrar gastos por período
+          const filteredExpenses = userExpenses.filter(expense => {
+            const expenseDate = new Date(expense.data);
+            return expenseDate >= startDate && expenseDate <= endDate;
+          });
+          
+          console.log(`📅 Gastos filtrados para ${periodo}: ${filteredExpenses.length}`);
+          
+          if (filteredExpenses.length === 0) {
+            return {
+              response: `🤷‍♂️ Opa! Não encontrei gastos ${periodo === 'total' ? 'registrados' : `da ${periodo}`}!\n\n💡 Que tal começar anotando algum gasto? Fala aí: "gastei R$ 50 no almoço"!`,
+              extraction: {
+                valor: 0,
+                categoria: '',
+                descricao: `Consulta sem gastos: ${periodo}`,
+                data: new Date().toISOString().split('T')[0],
+                isValid: false
+              }
+            };
+          }
+          
+          // Calcular total geral
+          const totalGeral = filteredExpenses.reduce((sum, expense) => sum + expense.valor, 0);
+          
+          // Agrupar por categoria
+          const porCategoria: { [key: string]: number } = {};
+          filteredExpenses.forEach(expense => {
+            porCategoria[expense.categoria] = (porCategoria[expense.categoria] || 0) + expense.valor;
+          });
+          
+          // Ordenar categorias por valor (maior primeiro)
+          const categoriasOrdenadas = Object.entries(porCategoria)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5); // Top 5 categorias
+          
+          // Emojis para categorias
+          const categoryEmojis: {[key: string]: string} = {
+            'alimentação': '🍽️',
+            'vestuário': '👕',
+            'transporte': '🚗',
+            'tecnologia': '💻',
+            'mercado': '🛒',
+            'lazer': '🎉',
+            'saúde': '🏥',
+            'casa': '🏠',
+            'contas': '💡',
+            'educação': '📚',
+            'beleza': '💅',
+            'pets': '🐕',
+            'outros': '💰'
+          };
+          
+          // Montar resposta
+          let resposta = `📊 **RELATÓRIO ${periodo.toUpperCase()}**\n\n`;
+          resposta += `💰 **Total gasto**: R$ ${totalGeral.toFixed(2)}\n`;
+          resposta += `📋 **${filteredExpenses.length} transações** registradas\n\n`;
+          
+          if (categoriasOrdenadas.length > 0) {
+            resposta += `🏆 **Top categorias:**\n`;
+            categoriasOrdenadas.forEach(([categoria, valor], index) => {
+              const emoji = categoryEmojis[categoria] || '💰';
+              const percentual = ((valor / totalGeral) * 100).toFixed(1);
+              resposta += `${index + 1}. ${emoji} ${categoria}: R$ ${valor.toFixed(2)} (${percentual}%)\n`;
+            });
+          }
+          
+          resposta += `\n💡 **Dica**: Use o Dashboard para ver gráficos detalhados!`;
+          
+          return {
+            response: resposta,
+            extraction: {
+              valor: totalGeral,
+              categoria: '',
+              descricao: `Relatório ${periodo}: R$ ${totalGeral.toFixed(2)}`,
+              data: new Date().toISOString().split('T')[0],
+              isValid: false
+            }
+          };
+          
+        } catch (error) {
+          console.error('Erro ao gerar relatório:', error);
+          return {
+            response: `😅 Eita! Deu um perrengue aqui ao buscar seus gastos... Tenta de novo em alguns segundos!\n\n💡 Ou vai direto no Dashboard que lá funciona certinho! 📊`,
+            extraction: {
+              valor: 0,
+              categoria: '',
+              descricao: `Erro ao consultar relatório`,
+              data: new Date().toISOString().split('T')[0],
+              isValid: false
+            }
+          };
+        }
+      } else if (isReportQuery && !userId) {
         return {
-          response: `🤖 **FUNCIONALIDADE EM DESENVOLVIMENTO**\n\nDetectei que você quer ver seus gastos! Mas ainda não consigo acessar o banco de dados para calcular totais por período.\n\n**Por enquanto, use o Dashboard** (botão no menu) para ver:\n📊 Gráficos completos\n💰 Totais por categoria\n📅 Gastos por período\n\n**Em breve** vou conseguir responder diretamente no chat: "Você gastou R$ 450 na última semana!"`,
+          response: `🤖 **ERRO TÉCNICO**\n\nDetectei que você quer ver seus gastos, mas houve um problema de autenticação!\n\n🔧 **Tente**:\n1. Recarregar a página\n2. Fazer login novamente\n3. Ou usar o Dashboard no menu`,
           extraction: {
             valor: 0,
             categoria: '',
-            descricao: `Consulta de relatório solicitada`,
+            descricao: `Consulta sem userId`,
             data: new Date().toISOString().split('T')[0],
             isValid: false
           }

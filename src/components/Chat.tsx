@@ -127,7 +127,8 @@ const Chat: React.FC = () => {
         inputValue, 
         config.instrucoes_personalizadas, 
         conversationHistory,
-        userPersonality?.personality_profile
+        userPersonality?.personality_profile,
+        user.id
       );
       
       const assistantMessage: Message = {
