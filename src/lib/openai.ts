@@ -119,14 +119,14 @@ DETECÇÃO DE CONFIRMAÇÕES:
 - Negativas: não, nao, errado, não é isso, tá errado
 
 DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
-- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, habburg, churros, churro, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood
-- vestuário: roupa, camisa, calça, sapato, tênis, blusa, vestido, shorts, jaqueta, casaco, moda, camiseta, polo, social, bermuda
-- transporte: uber, taxi, gasolina, combustível, posto, ônibus, metrô, trem, passagem, viagem, carro, moto
-- mercado: supermercado, compras, mantimentos, feira
-- lazer: cinema, festa, show, teatro, jogo, parque, balada, rolê, diversão, netflix, streaming
-- saúde: remédio, médico, farmácia, hospital, dentista, consulta
-- casa: móvel, sofá, mesa, decoração, limpeza, reforma
-- contas: luz, água, internet, telefone, energia, gás, conta
+- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, habburg, churros, churro, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood, churrasco, churrascaria, alimentos, comer, eating, bebidas, suco, refrigerante, cerveja, vinho, água, leite, café, cappuccino
+- vestuário: roupa, roupas, camisa, calça, sapato, tênis, blusa, vestido, shorts, jaqueta, casaco, moda, camiseta, polo, social, bermuda, shopping, loja, lojas, magazine, renner, c&a, zara, riachuelo, bolsa, bolsas, sapatos, sneaker, chinelo, sandália, boné, óculos, relógio
+- transporte: uber, taxi, gasolina, combustível, posto, ônibus, metrô, trem, passagem, viagem, carro, moto, 99, cabify, aplicativo, transporte, deslocamento, ida, volta, corrida, carona
+- mercado: supermercado, compras, mantimentos, feira, mercadinho, atacadão, assaí, carrefour, extra, pão de açúcar, walmart, compra, comprar, shopping, hipermercado
+- lazer: cinema, festa, show, teatro, jogo, parque, balada, rolê, diversão, netflix, streaming, spotify, ingresso, entretenimento, passeio, viagem, turismo, clube, academia
+- saúde: remédio, médico, farmácia, hospital, dentista, consulta, exame, tratamento, medicamento, drogaria, clínica, laboratório, check-up, fisioterapia
+- casa: móvel, sofá, mesa, decoração, limpeza, reforma, casa, lar, móveis, eletrodomésticos, geladeira, fogão, microondas, tv, televisão, cama, colchão
+- contas: luz, água, internet, telefone, energia, gás, conta, fatura, boleto, prestação, financiamento, cartão, taxa, iptu, ipva, seguro
 
 NÚMEROS POR EXTENSO E VARIAÇÕES:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
@@ -1012,7 +1012,7 @@ IMPORTANTE:
           console.log(`🏷️ Procurando categoria em: "${fullContext}"`);
           
           const categoryMappings = {
-            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
+            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'roupas', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco', 'shopping', 'loja', 'lojas', 'magazine', 'boutique', 'renner', 'c&a', 'zara', 'riachuelo', 'marisa', 'hering', 'bolsa', 'bolsas', 'carteira', 'sapatos', 'sneaker', 'chinelo', 'sandália', 'sandalia', 'boné', 'bone', 'chapéu', 'óculos', 'oculos', 'relógio', 'relogio', 'cinto', 'bermuda', 'jeans', 'all star', 'havaianas', 'bota', 'cueca', 'calcinha', 'meia', 'meias'],
             'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'hamburg', 'hamb', 'burger', 'burguer', 'habburg', 'churros', 'churro', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'sanduíche', 'sanduiche', 'food', 'mcdonalds', 'bk', 'subway', 'fastfood'],
             'tecnologia': ['computador', 'notebook', 'celular', 'smartphone', 'tablet', 'mouse', 'teclado', 'monitor', 'tv', 'televisão', 'playstation', 'xbox', 'nintendo', 'fone', 'headset', 'carregador', 'cabo', 'eletrônicos', 'eletronicos', 'pc', 'mac', 'iphone', 'samsung', 'motorola', 'lg'],
             'mercado': ['mercado', 'supermercado', 'compras', 'mantimentos'],
@@ -1055,7 +1055,7 @@ IMPORTANTE:
           const fullContext = fullConversationText;
           
           const categoryMappings = {
-            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
+            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'roupas', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco', 'shopping', 'loja', 'lojas', 'magazine', 'boutique', 'renner', 'c&a', 'zara', 'riachuelo', 'marisa', 'hering', 'bolsa', 'bolsas', 'carteira', 'sapatos', 'sneaker', 'chinelo', 'sandália', 'sandalia', 'boné', 'bone', 'chapéu', 'óculos', 'oculos', 'relógio', 'relogio', 'cinto', 'bermuda', 'jeans', 'all star', 'havaianas', 'bota', 'cueca', 'calcinha', 'meia', 'meias'],
             'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'hamburg', 'hamb', 'burger', 'burguer', 'habburg', 'churros', 'churro', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'sanduíche', 'sanduiche', 'food', 'mcdonalds', 'bk', 'subway', 'fastfood'],
             'tecnologia': ['computador', 'notebook', 'celular', 'smartphone', 'tablet', 'mouse', 'teclado', 'monitor', 'tv', 'televisão', 'playstation', 'xbox', 'nintendo', 'fone', 'headset', 'carregador', 'cabo', 'eletrônicos', 'eletronicos', 'pc', 'mac', 'iphone', 'samsung', 'motorola', 'lg'],
             'mercado': ['mercado', 'supermercado', 'compras', 'mantimentos'],
