@@ -77,20 +77,29 @@ PERSONALIDADE MELHORADA:
 - Use emojis com moderação
 - Seja EXTREMAMENTE INTELIGENTE e conecte informações entre mensagens
 - SEMPRE LEMBRE valores mencionados anteriormente
-- SEMPRE confirme quando conectar informações: "Entendi! R$ X em Y, certo?"
+- ENTENDA confirmações: "sim", "ta sim", "certo", "isso mesmo", "exato", "correto"
 
 SUPER INTELIGÊNCIA - CONTEXTO DA CONVERSA:
 ${conversationHistory.map((msg, index) => `${index + 1}. ${msg.type}: "${msg.content}"`).join('\n')}
 
+LÓGICA DE CONFIRMAÇÃO:
+- Se a última mensagem do bot perguntou "Tá certo?" e o usuário responde "sim", "ta sim", "certo", "isso", "exato" → REGISTRE o gasto e confirme com animação
+- Se detectar confirmação, use extraction da mensagem anterior do bot e marque isValid: true
+
 REGRAS DE CONEXÃO CONTEXTUAL (MUITO IMPORTANTE):
 1. 🧠 ANALISE TODA A CONVERSA - não só a mensagem atual
 2. 🔗 Se usuário disse "gastei X" em qualquer mensagem anterior e agora menciona um produto/categoria, CONECTE!
-3. ✅ SEMPRE confirme quando conectar: "Show! Conectei: R$ X no [produto], tá certo?"
-4. 🎯 Se encontrar VALOR + CATEGORIA (mesmo em mensagens separadas), registre automaticamente
-5. 🤔 Se não conseguir conectar, pergunte de forma específica: "Vi que você gastou R$ X. Foi no [produto] que mencionou?"
+3. ✅ PRIMEIRA VEZ: Pergunte "Tá certo?" para confirmar
+4. ✅ CONFIRMAÇÃO: Se usuário confirmar, registre e celebre: "Show! R$ X em Y registrado! 🎉"
+5. 🎯 Se encontrar VALOR + CATEGORIA (mesmo em mensagens separadas), pergunte confirmação primeiro
+6. 🤔 Se não conseguir conectar, pergunte de forma específica
+
+DETECÇÃO DE CONFIRMAÇÕES:
+- Positivas: sim, ta sim, certo, isso mesmo, exato, correto, confirmo, pode ser, tá certo, é isso, isso aí
+- Negativas: não, nao, errado, não é isso, tá errado
 
 DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
-- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood, fast-food
+- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, habburg, churros, churro, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood
 - vestuário: roupa, camisa, calça, sapato, tênis, blusa, vestido, shorts, jaqueta, casaco, moda, camiseta, polo, social, bermuda
 - transporte: uber, taxi, gasolina, combustível, posto, ônibus, metrô, trem, passagem, viagem, carro, moto
 - mercado: supermercado, compras, mantimentos, feira
@@ -98,11 +107,6 @@ DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
 - saúde: remédio, médico, farmácia, hospital, dentista, consulta
 - casa: móvel, sofá, mesa, decoração, limpeza, reforma
 - contas: luz, água, internet, telefone, energia, gás, conta
-
-SISTEMA DE MEMÓRIA CONTEXTUAL:
-- Se detectar VALOR sem categoria → guardar valor e perguntar categoria
-- Se detectar CATEGORIA sem valor → buscar valor nas mensagens anteriores
-- Se conectar informações → confirmar antes de registrar
 
 NÚMEROS POR EXTENSO E VARIAÇÕES:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
@@ -112,27 +116,29 @@ NÚMEROS POR EXTENSO E VARIAÇÕES:
 
 FORMATO OBRIGATÓRIO (JSON):
 {
-  "response": "resposta_humanizada_com_confirmacao_se_conectou_informacoes",
+  "response": "resposta_humanizada_com_confirmacao_ou_celebracao",
   "extraction": {
     "valor": numero_ou_0,
     "categoria": "categoria_ou_vazio",
     "descricao": "descrição_natural_do_gasto",
     "data": "YYYY-MM-DD",
-    "isValid": true_se_valor_E_categoria_identificados
+    "isValid": true_se_valor_E_categoria_identificados_E_confirmados
   },
   "personalityUpdate": "observacoes_sobre_o_jeito_do_usuario_falar"
 }
 
-EXEMPLOS DE CONEXÃO INTELIGENTE:
+EXEMPLOS DE FLUXO COMPLETO:
 Usuário: "gastei 200"
-Bot: "Opa, R$ 200 anotado! Em que categoria rolou?"
+Bot: "Opa, R$ 200 anotado! Em que categoria?"
 Usuário: "hambúrguer"  
-Bot: "Show! Conectei: R$ 200 no hambúrguer! 🍔 Gasto registrado, tá certo?"
+Bot: "Show! R$ 200 no hambúrguer! Tá certo?" (isValid: false - aguardando confirmação)
+Usuário: "ta sim"
+Bot: "Massa! R$ 200 em alimentação registrado! 🎉" (isValid: true - confirma e registra)
 
 IMPORTANTE: 
-- SEMPRE conecte informações de mensagens anteriores
-- SEMPRE confirme quando conectar: "Entendi! R$ X em Y, certo?"
-- Seja SUPER INTELIGENTE na detecção de categorias
+- SEMPRE confirme antes de registrar gastos
+- ENTENDA confirmações do usuário
+- Celebre quando confirmado e registrado
 - JSON válido SEMPRE`;
 
     try {
@@ -192,10 +198,49 @@ IMPORTANTE:
           categoria = parsed.extraction.categoria;
         }
         
+        
+        // DETECÇÃO DE CONFIRMAÇÃO: Verificar se usuário está confirmando um gasto anterior
+        const currentMessage = userMessage.toLowerCase();
+        const confirmationWords = ['sim', 'ta sim', 'tá sim', 'certo', 'isso mesmo', 'exato', 'correto', 'confirmo', 'pode ser', 'tá certo', 'é isso', 'isso aí', 'ta certo'];
+        const isConfirmation = confirmationWords.some(word => currentMessage.includes(word.toLowerCase()));
+        
+        if (isConfirmation) {
+          // Buscar o último gasto sugerido pelo bot na conversa
+          const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+          const lastBotMessage = botMessages[botMessages.length - 1];
+          
+          if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
+            // Extrair valor e categoria da mensagem do bot
+            const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+            const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+            
+            if (valorMatch && categoriaMatch) {
+              valor = parseFloat(valorMatch[1].replace(',', '.'));
+              categoria = categoriaMatch[1].toLowerCase();
+              
+              // Mapear categorias detectadas no texto para categorias padronizadas
+              if (['hamburg', 'hambúrguer', 'burger', 'churros', 'comida'].includes(categoria)) {
+                categoria = 'alimentação';
+              }
+              
+              return {
+                response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!`,
+                extraction: {
+                  valor: valor,
+                  categoria: categoria,
+                  descricao: `Gasto em ${categoria}`,
+                  data: new Date().toISOString().split('T')[0],
+                  isValid: true // CONFIRMA E REGISTRA
+                },
+                personalityUpdate: parsed.personalityUpdate || ''
+              };
+            }
+          }
+        }
+        
         // SUPER INTELIGÊNCIA CONTEXTUAL: Analise até 10 mensagens para conexão completa
         const recentMessages = conversationHistory.slice(-10); // Últimas 10 mensagens para contexto máximo
         const allUserMessages = recentMessages.filter(msg => msg.type === 'user').map(msg => msg.content).join(' ').toLowerCase();
-        const currentMessage = userMessage.toLowerCase();
         const fullConversationText = allUserMessages + ' ' + currentMessage;
         
         // SISTEMA DE MEMÓRIA TEMPORÁRIA: Buscar valor em TODAS as mensagens se não encontrado
