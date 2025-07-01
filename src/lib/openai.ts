@@ -188,7 +188,7 @@ IMPORTANTE:
         if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
           // Extrair valor e categoria da mensagem do bot
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
           
           console.log(`💰 Valor extraído: ${valorMatch?.[1]}`);
           console.log(`🏷️ Categoria extraída: ${categoriaMatch?.[1]}`);
@@ -239,7 +239,7 @@ IMPORTANTE:
         // NOVO: Detectar entrada de data específica
         if (lastBotMessage && lastBotMessage.content.includes('quando foi esse gasto')) {
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
           
           if (valorMatch && categoriaMatch) {
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
@@ -334,7 +334,7 @@ IMPORTANTE:
         // NOVO: Confirmação final da data específica
         if (lastBotMessage && lastBotMessage.content.includes('Então foi dia') && lastBotMessage.content.includes('pra confirmar')) {
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
           const dataMatch = lastBotMessage.content.match(/no dia (.+?)\./);
           
           if (valorMatch && categoriaMatch && dataMatch) {
@@ -364,7 +364,7 @@ IMPORTANTE:
         if (lastBotMessage && lastBotMessage.content.includes('foi hoje')) {
           // Buscar dados do gasto pendente na mensagem do bot
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
           
           if (valorMatch && categoriaMatch) {
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
@@ -442,8 +442,13 @@ IMPORTANTE:
       }
       
       // DETECÇÃO DE SAUDAÇÕES E CUMPRIMENTOS
-      const greetingWords = ['ola', 'olá', 'oi', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'hello', 'salve', 'fala'];
-      const isGreeting = greetingWords.some(word => currentMessage.includes(word));
+      const greetingWords = ['ola', 'olá', 'oi ', ' oi', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'hello', 'salve', 'fala'];
+      const isGreeting = greetingWords.some(word => 
+        currentMessage.startsWith(word) || 
+        currentMessage.includes(' ' + word + ' ') || 
+        currentMessage.endsWith(' ' + word) ||
+        (word.includes(' ') && currentMessage.includes(word))
+      );
       
       console.log(`👋 Verificando saudação para: "${userMessage}"`);
       console.log(`👋 É saudação? ${isGreeting}`);
@@ -983,7 +988,7 @@ IMPORTANTE:
           if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
             // Extrair valor e categoria da mensagem do bot
             const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-            const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+            const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
             
             if (valorMatch && categoriaMatch) {
               valor = parseFloat(valorMatch[1].replace(',', '.'));
