@@ -187,10 +187,11 @@ IMPORTANTE:
           categoria = parsed.extraction.categoria;
         }
         
-        // Enhanced context analysis - look at conversation history
-        const allMessages = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
+        // Enhanced context analysis - look at conversation history MORE INTELLIGENTLY
+        const recentMessages = conversationHistory.slice(-4); // Last 4 messages for better context
+        const allUserMessages = recentMessages.filter(msg => msg.type === 'user').map(msg => msg.content).join(' ').toLowerCase();
         const currentMessage = userMessage.toLowerCase();
-        const fullText = allMessages + ' ' + currentMessage;
+        const fullConversationText = allUserMessages + ' ' + currentMessage;
         
         // Smart value extraction from current message or history
         if (!valor) {
@@ -230,7 +231,7 @@ IMPORTANTE:
           };
           
           for (const [word, num] of Object.entries(numberWords)) {
-            if (fullText.includes(word)) {
+            if (fullConversationText.includes(word)) {
               valor = num;
               break;
             }
@@ -239,7 +240,7 @@ IMPORTANTE:
         
         // Enhanced category detection with conversation context
         if (!categoria) {
-          const fullContext = allMessages + ' ' + currentMessage;
+          const fullContext = fullConversationText;
           
           const categoryMappings = {
             'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
