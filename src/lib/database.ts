@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   nome: string;
@@ -63,13 +64,37 @@ class MockDatabase {
     }
   ];
 
-  private configuration: Configuration = {
-    id: '1',
-    instrucoes_personalizadas: 'Você é um assistente financeiro amigável e motivacional. Use emojis e seja positivo ao ajudar os usuários a organizarem seus gastos. Sempre parabenize quando eles registrarem gastos e dê dicas financeiras úteis.',
-    modelo_usado: 'gpt-3.5-turbo',
-    openai_api_key: '',
-    updated_at: new Date().toISOString()
-  };
+  private configuration: Configuration;
+
+  constructor() {
+    // Load configuration from localStorage or use default
+    const savedConfig = localStorage.getItem('app_configuration');
+    if (savedConfig) {
+      this.configuration = JSON.parse(savedConfig);
+    } else {
+      this.configuration = {
+        id: '1',
+        instrucoes_personalizadas: 'Você é um assistente financeiro amigável e motivacional. Use emojis e seja positivo ao ajudar os usuários a organizarem seus gastos. Sempre parabenize quando eles registrarem gastos e dê dicas financeiras úteis.',
+        modelo_usado: 'gpt-3.5-turbo',
+        openai_api_key: '',
+        updated_at: new Date().toISOString()
+      };
+    }
+
+    // Load expenses from localStorage
+    const savedExpenses = localStorage.getItem('app_expenses');
+    if (savedExpenses) {
+      this.expenses = JSON.parse(savedExpenses);
+    }
+  }
+
+  private saveConfiguration() {
+    localStorage.setItem('app_configuration', JSON.stringify(this.configuration));
+  }
+
+  private saveExpenses() {
+    localStorage.setItem('app_expenses', JSON.stringify(this.expenses));
+  }
 
   async getUserByEmail(email: string): Promise<User | null> {
     return this.users.find(user => user.email === email) || null;
@@ -94,6 +119,7 @@ class MockDatabase {
       created_at: new Date().toISOString()
     };
     this.expenses.push(newExpense);
+    this.saveExpenses();
     return newExpense;
   }
 
@@ -107,6 +133,7 @@ class MockDatabase {
       ...updates,
       updated_at: new Date().toISOString()
     };
+    this.saveConfiguration();
     return { ...this.configuration };
   }
 
@@ -114,6 +141,7 @@ class MockDatabase {
     const index = this.expenses.findIndex(expense => expense.id === id);
     if (index > -1) {
       this.expenses.splice(index, 1);
+      this.saveExpenses();
     }
   }
 }
