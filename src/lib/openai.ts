@@ -199,10 +199,25 @@ IMPORTANTE:
           if (numberMatch) {
             valor = parseFloat(numberMatch[0].replace(',', '.'));
           } else {
-            // Try conversation history for recent values
-            const historyNumberMatch = fullText.match(/(?:gastei|paguei|custou|foi)\s+(\d+(?:[.,]\d+)?)/);
-            if (historyNumberMatch) {
-              valor = parseFloat(historyNumberMatch[1].replace(',', '.'));
+            // Try conversation history for recent values - look at last 3 messages
+            const recentHistory = conversationHistory.slice(-3);
+            for (let i = recentHistory.length - 1; i >= 0; i--) {
+              const msg = recentHistory[i];
+              if (msg.type === 'user') {
+                const historyMatch = msg.content.match(/(?:gastei|paguei|custou|foi)\s*(\d+(?:[.,]\d+)?)/);
+                if (historyMatch) {
+                  valor = parseFloat(historyMatch[1].replace(',', '.'));
+                  console.log(`Found value ${valor} from history message: ${msg.content}`);
+                  break;
+                }
+                // Also try simple number in user messages
+                const simpleMatch = msg.content.match(/\d+(?:[.,]\d+)?/);
+                if (simpleMatch) {
+                  valor = parseFloat(simpleMatch[0].replace(',', '.'));
+                  console.log(`Found simple value ${valor} from history: ${msg.content}`);
+                  break;
+                }
+              }
             }
           }
           
