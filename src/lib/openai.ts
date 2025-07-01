@@ -404,8 +404,11 @@ IMPORTANTE:
           console.log(`📅 Gastos filtrados para ${periodo}: ${filteredExpenses.length}`);
           
           if (filteredExpenses.length === 0) {
+            const motivadores = ['Beleza!', 'Tranquilo!', 'Show!', 'Massa!'];
+            const motivador = motivadores[Math.floor(Math.random() * motivadores.length)];
+            
             return {
-              response: `🤷‍♂️ Opa! Não encontrei gastos ${periodo === 'total' ? 'registrados' : `da ${periodo}`}!\n\n💡 Que tal começar anotando algum gasto? Fala aí: "gastei R$ 50 no almoço"!`,
+              response: `${motivador} Não achei gastos ${periodo === 'total' ? 'registrados ainda' : `da ${periodo}`}! 🤷‍♂️\n\n💡 **Bora começar?** Fala aí qualquer gasto: "gastei R$ 50 no almoço" ou "paguei R$ 30 no uber"!\n\n✨ Quanto mais você registrar, melhor vou te ajudar a controlar as finanças! 😊`,
               extraction: {
                 valor: 0,
                 categoria: '',
@@ -447,21 +450,36 @@ IMPORTANTE:
             'outros': '💰'
           };
           
-          // Montar resposta
-          let resposta = `📊 **RELATÓRIO ${periodo.toUpperCase()}**\n\n`;
-          resposta += `💰 **Total gasto**: R$ ${totalGeral.toFixed(2)}\n`;
-          resposta += `📋 **${filteredExpenses.length} transações** registradas\n\n`;
+          // Montar resposta com personalidade brasileira
+          const saudacoes = ['Show de bola!', 'Massa!', 'Mandou bem!', 'Top demais!', 'Dahora!'];
+          const saudacao = saudacoes[Math.floor(Math.random() * saudacoes.length)];
+          
+          let resposta = `${saudacao} Aqui está o que você gastou ${periodo === 'última semana' ? 'na última semana' : periodo === 'último mês' ? 'no último mês' : periodo === 'hoje' ? 'hoje' : periodo === 'ontem' ? 'ontem' : 'no total'}! 📊\n\n`;
+          resposta += `💰 **Rolou R$ ${totalGeral.toFixed(2)}** no total\n`;
+          resposta += `📋 Foram **${filteredExpenses.length} gastos** registrados\n\n`;
           
           if (categoriasOrdenadas.length > 0) {
-            resposta += `🏆 **Top categorias:**\n`;
+            resposta += `🔥 **Onde você mais gastou:**\n`;
             categoriasOrdenadas.forEach(([categoria, valor], index) => {
               const emoji = categoryEmojis[categoria] || '💰';
               const percentual = ((valor / totalGeral) * 100).toFixed(1);
-              resposta += `${index + 1}. ${emoji} ${categoria}: R$ ${valor.toFixed(2)} (${percentual}%)\n`;
+              const posicao = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+              resposta += `${posicao} ${emoji} **${categoria}**: R$ ${valor.toFixed(2)} (${percentual}%)\n`;
             });
           }
           
-          resposta += `\n💡 **Dica**: Use o Dashboard para ver gráficos detalhados!`;
+          // Adicionar comentários personalizados baseados nos gastos
+          if (totalGeral > 1000) {
+            resposta += `\n💸 **Eita!** Gastou uma grana boa aí! Mas tranquilo, o importante é ter controle! 😎`;
+          } else if (totalGeral > 500) {
+            resposta += `\n👍 **Beleza!** Gastos na medida, tá controlando direitinho! 😊`;
+          } else if (totalGeral > 100) {
+            resposta += `\n✨ **Show!** Gastinhos bem controlados, parabéns! 🎉`;
+          } else {
+            resposta += `\n🏆 **Top!** Super econômico, mandou muito bem! 💪`;
+          }
+          
+          resposta += `\n\n💡 **Dica massa**: No Dashboard tem gráficos maneiros pra ver tudo detalhado! 🚀`;
           
           return {
             response: resposta,
