@@ -187,7 +187,7 @@ IMPORTANTE:
             console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria}`);
             
             return {
-              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!`,
+              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!\n\nE aí, rolou mais algum gasto hoje que você quer anotar? 😊`,
               extraction: {
                 valor: valor,
                 categoria: categoria,
