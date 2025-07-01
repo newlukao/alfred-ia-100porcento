@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   nome: string;
@@ -27,7 +26,6 @@ export interface Configuration {
   contexto_geral: string;
   instrucoes_individuais: string;
   mensagem_inicial: string;
-  webhook_url: string;
   updated_at: string;
 }
 
@@ -88,7 +86,6 @@ class MockDatabase {
         contexto_geral: 'Somos uma empresa de tecnologia focada em soluções financeiras inovadoras. Ajudamos pessoas a organizarem melhor seus gastos e tomarem decisões financeiras mais inteligentes.',
         instrucoes_individuais: 'Personalize a conversa com base no histórico do usuário: {{nome_usuario}}, {{historico_gastos}}, {{categoria_preferida}}.',
         mensagem_inicial: '👋 Olá! Sou seu assistente financeiro pessoal. Estou aqui para ajudar você a organizar seus gastos e melhorar sua vida financeira. Como posso te ajudar hoje?',
-        webhook_url: '',
         updated_at: new Date().toISOString()
       };
     }

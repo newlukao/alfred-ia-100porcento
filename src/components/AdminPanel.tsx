@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,7 +58,12 @@ const AdminPanel: React.FC = () => {
       await database.updateConfiguration({
         instrucoes_personalizadas: config.instrucoes_personalizadas,
         modelo_usado: config.modelo_usado,
-        openai_api_key: config.openai_api_key
+        openai_api_key: config.openai_api_key,
+        criterios_sucesso: config.criterios_sucesso,
+        situacoes_interrupcao: config.situacoes_interrupcao,
+        contexto_geral: config.contexto_geral,
+        instrucoes_individuais: config.instrucoes_individuais,
+        mensagem_inicial: config.mensagem_inicial
       });
       
       toast({
@@ -246,25 +250,6 @@ const AdminPanel: React.FC = () => {
                     <SelectItem value="gpt-4-turbo">GPT-4 Turbo (Balanceado)</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  URL do Webhook
-                </label>
-                <Input
-                  type="url"
-                  value={config?.webhook_url || ''}
-                  onChange={(e) => setConfig(prev => prev ? {
-                    ...prev,
-                    webhook_url: e.target.value
-                  } : null)}
-                  placeholder="https://seu-site.com/webhook"
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  URL para onde as respostas do bot serão enviadas via webhook.
-                </p>
               </div>
 
               <Button 
