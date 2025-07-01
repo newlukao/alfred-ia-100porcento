@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +23,7 @@ const Chat: React.FC = () => {
     {
       id: '1',
       type: 'assistant',
-      content: '👋 Olá! Sou seu assistente financeiro pessoal. Conte-me sobre seus gastos e eu vou organizá-los para você!',
+      content: '👋 E aí! Beleza? Sou seu assistente financeiro e tô aqui pra te ajudar a organizar seus gastos! Manda aí o que você gastou que eu anoto tudo certinho! 💰',
       timestamp: new Date()
     }
   ]);
@@ -107,8 +106,17 @@ const Chat: React.FC = () => {
           data: result.extraction.data
         });
 
+        const successMessages = [
+          "Massa! Gasto registrado! 💰",
+          "Show! Anotado no sistema! 🎉",
+          "Top! Registrado com sucesso! ✨",
+          "Fechou! Mais um gasto no controle! 📊"
+        ];
+        
+        const randomMessage = successMessages[Math.floor(Math.random() * successMessages.length)];
+
         toast({
-          title: "Gasto registrado! 💰",
+          title: randomMessage,
           description: `R$ ${result.extraction.valor.toFixed(2)} em ${result.extraction.categoria}`,
         });
       }
@@ -119,15 +127,15 @@ const Chat: React.FC = () => {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: '😔 Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns momentos.',
+        content: '😅 Opa, rolou um perrengue aqui! Tenta mandar de novo em alguns segundos, beleza?',
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, errorMessage]);
       
       toast({
-        title: "Erro",
-        description: "Falha ao processar mensagem. Tente novamente.",
+        title: "Eita!",
+        description: "Deu ruim aqui... Tenta de novo! 😅",
         variant: "destructive"
       });
     } finally {
@@ -261,7 +269,7 @@ const Chat: React.FC = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Digite seu gasto... ex: Gastei R$ 45 no mercado"
+            placeholder="Manda aí seu gasto... tipo: 'Gastei R$ 45 no mercado' 😎"
             className="flex-1"
             disabled={isLoading || !apiKeyConfigured}
           />

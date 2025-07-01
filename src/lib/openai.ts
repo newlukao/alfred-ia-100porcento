@@ -31,8 +31,8 @@ export class OpenAIService {
         body: JSON.stringify({
           model,
           messages,
-          temperature: 0.3,
-          max_tokens: 300,
+          temperature: 0.7, // Aumentado para mais criatividade
+          max_tokens: 400,
         }),
       });
 
@@ -52,50 +52,57 @@ export class OpenAIService {
     response: string;
     extraction: ExpenseExtraction;
   }> {
-    const extractionPrompt = `Você é um assistente financeiro que SEMPRE responde em JSON válido e registra gastos automaticamente.
+    const extractionPrompt = `Você é um assistente financeiro brasileiro super descontraído e esperto! Use gírias, seja natural e divertido.
 
-CATEGORIAS E PALAVRAS-CHAVE:
-- alimentação: picanha, carne, frango, peixe, almoço, jantar, lanche, restaurante, pizza, hambúrguer, café, bar, bebida, comida, refeição, delivery, ifood
-- vestuário: camisa, calça, sapato, tênis, roupa, blusa, vestido, shorts, jaqueta, casaco, meia, cueca, calcinha, sutiã
-- transporte: uber, taxi, ônibus, gasolina, combustível, carro, metrô, trem, avião, passagem
-- mercado: supermercado, feira, compras, mantimentos, fruta, verdura, carne, pão, açougue, padaria
-- lazer: cinema, festa, show, teatro, diversão, jogo, parque, viagem
+PERSONALIDADE:
+- Fale como um brasileiro jovem e descontraído
+- Use gírias tipo: "massa", "show", "beleza", "top", "valeu", "rolou", "maneiro"
+- Seja empolgado quando registrar gastos: "Opa!", "Show!", "Fechou!"
+- Use emojis com moderação
+- Seja inteligente e sacado, não robótico
+
+CATEGORIAS E PALAVRAS-CHAVE (seja esperto na identificação):
+- alimentação: picanha, carne, frango, peixe, almoço, jantar, lanche, restaurante, pizza, hambúrguer, café, bar, bebida, comida, refeição, delivery, ifood, mercado (comida), feira, açougue, padaria
+- vestuário: camisa, calça, sapato, tênis, roupa, blusa, vestido, shorts, jaqueta, casaco, meia, cueca, calcinha, sutiã, moda
+- transporte: uber, taxi, ônibus, gasolina, combustível, carro, metrô, trem, avião, passagem, viagem (transporte)
+- mercado: supermercado, compras (mantimentos), mantimentos, feira (compras), açougue (compras), padaria (compras)
+- lazer: cinema, festa, show, teatro, diversão, jogo, parque, viagem (lazer), balada, rolê
 - saúde: remédio, médico, farmácia, hospital, dentista, consulta, exame
-- educação: curso, livro, faculdade, escola, material escolar
-- contas: luz, água, internet, telefone, energia, gás, iptu, financiamento
-- casa: móvel, sofá, mesa, decoração, panela, utensílio, limpeza, reforma
-- outros: quando não se encaixa em nenhuma categoria específica
+- educação: curso, livro, faculdade, escola, material escolar, aula
+- contas: luz, água, internet, telefone, energia, gás, iptu, financiamento, conta
+- casa: móvel, sofá, mesa, decoração, panela, utensílio, limpeza, reforma, casa
+- outros: quando não rola encaixar em nenhuma categoria
 
-REGRAS CRÍTICAS:
-1. EXTRAIA VALORES de qualquer número mencionado (200, 50, 25.5, etc)
-2. IDENTIFIQUE CATEGORIAS por palavras-chave (picanha = alimentação, camisa = vestuário)
-3. Se encontrar VALOR OU CATEGORIA, processe e marque isValid: true
-4. CONFIRME sempre que registrar um gasto válido
-5. Para palavras como "picanha", "comida" = categoria "alimentação"
+REGRAS (seja esperto):
+1. SAQUE os valores de qualquer número (200, 50, 25.5, "vinte", etc)
+2. IDENTIFIQUE categorias por contexto (não só palavra exata)
+3. Se achar VALOR E CATEGORIA, processe e marque isValid: true
+4. CONFIRME sempre de forma animada quando registrar
+5. Seja inteligente: "comprei picanha" = alimentação, "fui no posto" = transporte
 
-EXEMPLOS FUNCIONAIS:
-- "200" + "picanha" = valor: 200, categoria: "alimentação", isValid: true
-- "gastei 50" + "camisa" = valor: 50, categoria: "vestuário", isValid: true  
-- "30 reais" + "uber" = valor: 30, categoria: "transporte", isValid: true
-- "picanha" (sem valor) = valor: 0, categoria: "alimentação", isValid: false
-- "200" (sem categoria) = valor: 200, categoria: "", isValid: false
+EXEMPLOS DE RESPOSTAS HUMANIZADAS:
+- Sucesso: "Show! Registrei aqui: R$ 200 em alimentação pela picanha! 🥩"
+- Falta categoria: "Opa, R$ 50 anotado! Mas em que categoria rolou esse gasto?"
+- Falta valor: "Beleza, vi que foi em alimentação! Mas quanto custou?"
+- Erro: "Opa, não consegui sacar direito... Pode falar tipo 'gastei R$ 50 no mercado'?"
 
 FORMATO OBRIGATÓRIO (JSON):
 {
-  "response": "mensagem_confirmando_o_registro_ou_pedindo_informacao_faltante",
+  "response": "resposta_humanizada_e_descontraida",
   "extraction": {
-    "valor": numero_encontrado_ou_0,
-    "categoria": "categoria_identificada_ou_vazio",
-    "descricao": "descrição_do_gasto",
+    "valor": numero_ou_0,
+    "categoria": "categoria_ou_vazio",
+    "descricao": "descrição_natural_do_gasto",
     "data": "YYYY-MM-DD",
     "isValid": true_se_valor_E_categoria_identificados
   }
 }
 
 IMPORTANTE: 
-- Se identificar categoria como "picanha" ou "comida", use "alimentação"
-- SEMPRE retorne JSON válido
-- Apenas marque isValid: true se tiver VALOR > 0 E CATEGORIA não vazia`;
+- Seja ESPERTO na identificação (contexto > palavra exata)
+- SEMPRE JSON válido
+- Respostas HUMANIZADAS e com gírias brasileiras
+- Não seja robô chato!`;
 
     try {
       const messages: ChatMessage[] = [
@@ -128,44 +135,69 @@ IMPORTANTE:
         if (parsed.extraction?.valor) {
           valor = parsed.extraction.valor;
         } else {
-          // Try to extract number from user message
-          const numberMatch = userMessage.match(/\d+(?:\.\d+)?/);
+          // Try to extract number from user message - mais inteligente
+          const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
           if (numberMatch) {
-            valor = parseFloat(numberMatch[0]);
+            valor = parseFloat(numberMatch[0].replace(',', '.'));
+          }
+          
+          // Números por extenso básicos
+          const numberWords: {[key: string]: number} = {
+            'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50,
+            'dez': 10, 'quinze': 15, 'cem': 100, 'duzentos': 200
+          };
+          
+          const lowerMessage = userMessage.toLowerCase();
+          for (const [word, num] of Object.entries(numberWords)) {
+            if (lowerMessage.includes(word)) {
+              valor = num;
+              break;
+            }
           }
         }
         
-        // Extract category with better mapping
+        // Extract category with better mapping - mais esperto
         if (parsed.extraction?.categoria) {
           categoria = parsed.extraction.categoria;
         } else {
-          // Map common food terms to alimentação
-          const foodTerms = ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante'];
-          const clothingTerms = ['camisa', 'calça', 'sapato', 'roupa'];
-          const transportTerms = ['uber', 'taxi', 'gasolina'];
-          
           const lowerMessage = userMessage.toLowerCase();
           
-          if (foodTerms.some(term => lowerMessage.includes(term))) {
-            categoria = 'alimentação';
-          } else if (clothingTerms.some(term => lowerMessage.includes(term))) {
-            categoria = 'vestuário';
-          } else if (transportTerms.some(term => lowerMessage.includes(term))) {
-            categoria = 'transporte';
+          // Mapeamento mais inteligente por contexto
+          const categoryMappings = {
+            'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'mercado'],
+            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda'],
+            'transporte': ['uber', 'taxi', 'gasolina', 'posto', 'combustível', 'ônibus', 'metrô', 'passagem'],
+            'lazer': ['cinema', 'festa', 'show', 'teatro', 'jogo', 'parque', 'balada', 'rolê', 'diversão'],
+            'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista'],
+            'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza'],
+            'contas': ['luz', 'água', 'internet', 'telefone', 'energia', 'conta']
+          };
+          
+          for (const [cat, terms] of Object.entries(categoryMappings)) {
+            if (terms.some(term => lowerMessage.includes(term))) {
+              categoria = cat;
+              break;
+            }
           }
         }
         
         const isValid = valor > 0 && categoria && categoria !== '';
         
         let response = parsed.response || '';
-        if (isValid) {
-          response = `✅ Gasto registrado! R$ ${valor.toFixed(2)} em ${categoria}`;
-        } else if (valor > 0 && !categoria) {
-          response = `R$ ${valor.toFixed(2)} registrado! Em qual categoria? (alimentação, vestuário, transporte...)`;
-        } else if (!valor && categoria) {
-          response = `Categoria ${categoria} identificada! Qual foi o valor do gasto?`;
-        } else {
-          response = 'Por favor, me informe o valor e a categoria do seu gasto. Ex: "Gastei R$ 50 no mercado"';
+        
+        // Fallback humanizado se a IA não gerou resposta boa
+        if (!response || response.length < 10) {
+          if (isValid) {
+            const celebrations = ["Show!", "Massa!", "Fechou!", "Top!", "Beleza!"];
+            const randomCelebration = celebrations[Math.floor(Math.random() * celebrations.length)];
+            response = `${randomCelebration} Registrei aqui: R$ ${valor.toFixed(2)} em ${categoria}! 💰`;
+          } else if (valor > 0 && !categoria) {
+            response = `Opa, R$ ${valor.toFixed(2)} anotado! Mas em que categoria rolou esse gasto? (alimentação, transporte, lazer...)`;
+          } else if (!valor && categoria) {
+            response = `Beleza, vi que foi em ${categoria}! Mas quanto custou essa parada?`;
+          } else {
+            response = 'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅';
+          }
         }
         
         return {
@@ -182,30 +214,32 @@ IMPORTANTE:
         console.error('Error parsing OpenAI response:', parseError);
         console.log('Raw response that failed to parse:', result);
         
-        // Enhanced fallback with better parsing
+        // Enhanced fallback mais humanizado
         let valor = 0;
         let categoria = '';
         
         // Extract number from user message
-        const numberMatch = userMessage.match(/\d+(?:\.\d+)?/);
+        const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
         if (numberMatch) {
-          valor = parseFloat(numberMatch[0]);
+          valor = parseFloat(numberMatch[0].replace(',', '.'));
         }
         
         // Simple category detection
         const lowerMessage = userMessage.toLowerCase();
-        if (['picanha', 'carne', 'comida', 'almoço', 'jantar'].some(term => lowerMessage.includes(term))) {
+        if (['picanha', 'carne', 'comida', 'almoço', 'jantar', 'mercado'].some(term => lowerMessage.includes(term))) {
           categoria = 'alimentação';
-        } else if (['camisa', 'roupa', 'sapato'].some(term => lowerMessage.includes(term))) {
+        } else if (['camisa', 'roupa', 'sapato', 'tênis'].some(term => lowerMessage.includes(term))) {
           categoria = 'vestuário';
+        } else if (['uber', 'taxi', 'gasolina', 'posto'].some(term => lowerMessage.includes(term))) {
+          categoria = 'transporte';
         }
         
         const isValid = valor > 0 && categoria !== '';
         
         return {
           response: isValid ? 
-            `✅ Gasto registrado! R$ ${valor.toFixed(2)} em ${categoria}` : 
-            'Desculpe, não consegui processar. Pode repetir com valor e categoria? Ex: "Gastei R$ 50 em comida"',
+            `Show! Registrei R$ ${valor.toFixed(2)} em ${categoria}! 💰` : 
+            'Opa, não consegui sacar direito... Pode repetir tipo "gastei R$ 50 em comida"? 😅',
           extraction: {
             valor: valor,
             categoria: categoria,
