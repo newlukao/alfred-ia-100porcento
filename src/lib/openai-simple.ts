@@ -129,6 +129,37 @@ export class OpenAIService {
       }
     }
     
+    // DETECÇÃO DE RESPOSTAS POSITIVAS (quando pergunta sobre mais gastos)
+    const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+    const lastBotMessage = botMessages[botMessages.length - 1];
+    
+    if (lastBotMessage && lastBotMessage.content.includes('mais algum gasto')) {
+      const positiveWords = ['sim', 'tive', 'teve', 'tenho', 'rolou sim', 'rolou', 'claro', 'óbvio', 'vários', 'alguns', 'mais'];
+      const isPositive = positiveWords.some(word => currentMessage.includes(word));
+      
+      if (isPositive) {
+        const encouragingResponses = [
+          'Opa! Show! 🎉 Então me conta aí: qual foi esse outro gasto? Valor e categoria, vai! 💰',
+          'Massa! 😊 Bora anotar mais um! Me fala aí o que rolou... quanto gastou e com o quê? 🛒',
+          'Dahora! 🚀 Vamos registrar! Qual foi esse gasto? Me manda o valor e o que você comprou! 💳',
+          'Beleza! 🤙 Mais um pra lista! Me conta: gastou quanto e em quê? 📊'
+        ];
+        
+        const randomResponse = encouragingResponses[Math.floor(Math.random() * encouragingResponses.length)];
+        
+        return {
+          response: randomResponse,
+          extraction: {
+            valor: 0,
+            categoria: '',
+            descricao: '',
+            data: new Date().toISOString().split('T')[0],
+            isValid: false
+          }
+        };
+      }
+    }
+    
     // DETECÇÃO DE NEGATIVAS
     const negativeWords = ['nao', 'não', 'nada', 'sem', 'rolou nao', 'rolou não', 'não rolou', 'nao rolou'];
     const isNegative = negativeWords.some(word => currentMessage.includes(word));
