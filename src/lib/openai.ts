@@ -249,11 +249,13 @@ IMPORTANTE:
           const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
           if (numberMatch) {
             valor = parseFloat(numberMatch[0].replace(',', '.'));
+            console.log(`💰 VALOR ENCONTRADO na mensagem atual: R$ ${valor}`);
           } else {
             // BUSCA SUPER INTELIGENTE: Procurar qualquer valor nas mensagens do usuário
             const allUserMessages = conversationHistory.filter(msg => msg.type === 'user');
+            console.log(`🔍 Procurando valor em ${allUserMessages.length} mensagens do usuário...`);
+            
             for (const msg of allUserMessages.reverse()) {
-              // Busca agressiva e inteligente por números com contexto
               const patterns = [
                 /(?:gastei|paguei|custou|foi|comprei|gasto|valor|)\s*(?:r\$|rs|reais|)\s*(\d+(?:[.,]\d+)?)/i,
                 /(\d+(?:[.,]\d+)?)\s*(?:r\$|rs|reais|)/i,
@@ -269,6 +271,33 @@ IMPORTANTE:
                 }
               }
               if (valor > 0) break;
+            }
+          }
+        }
+        
+        // Enhanced category detection with conversation context
+        if (!categoria) {
+          const fullContext = fullConversationText;
+          console.log(`🏷️ Procurando categoria em: "${fullContext}"`);
+          
+          const categoryMappings = {
+            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
+            'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'hamburg', 'hamb', 'burger', 'burguer', 'habburg', 'churros', 'churro', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'sanduíche', 'sanduiche', 'food', 'mcdonalds', 'bk', 'subway', 'fastfood'],
+            'tecnologia': ['computador', 'notebook', 'celular', 'smartphone', 'tablet', 'mouse', 'teclado', 'monitor', 'tv', 'televisão', 'playstation', 'xbox', 'nintendo', 'fone', 'headset', 'carregador', 'cabo', 'eletrônicos', 'eletronicos', 'pc', 'mac', 'iphone', 'samsung', 'motorola', 'lg'],
+            'mercado': ['mercado', 'supermercado', 'compras', 'mantimentos'],
+            'transporte': ['uber', 'taxi', 'gasolina', 'posto', 'combustível', 'ônibus', 'metrô', 'passagem'],
+            'lazer': ['cinema', 'festa', 'show', 'teatro', 'jogo', 'parque', 'balada', 'rolê', 'diversão'],
+            'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista'],
+            'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza'],
+            'contas': ['luz', 'água', 'internet', 'telefone', 'energia', 'conta']
+          };
+          
+          for (const [cat, terms] of Object.entries(categoryMappings)) {
+            const foundTerm = terms.find(term => fullContext.includes(term));
+            if (foundTerm) {
+              categoria = cat;
+              console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${foundTerm})`);
+              break;
             }
           }
         }
