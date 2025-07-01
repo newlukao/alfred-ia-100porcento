@@ -254,7 +254,7 @@ IMPORTANTE:
               ontem.setDate(ontem.getDate() - 1);
               dataInterpretada = ontem.toISOString().split('T')[0];
               dataFormatada = formatBrazilDate(ontem);
-            } else if (currentMessage.includes('anteontem')) {
+            } else if (currentMessage.includes('anteontem') || currentMessage.includes('antes de ontem')) {
               const anteontem = getBrazilDate();
               anteontem.setDate(anteontem.getDate() - 2);
               dataInterpretada = anteontem.toISOString().split('T')[0];
@@ -371,8 +371,8 @@ IMPORTANTE:
           
           console.log(`📅 PROCESSANDO: R$ ${valor} em ${categoria} - perguntando data específica`);
           
-          return {
-            response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
+            return {
+              response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
             extraction: {
               valor: valor,
               categoria: categoria,
