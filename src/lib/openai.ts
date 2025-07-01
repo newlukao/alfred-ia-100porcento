@@ -1,4 +1,5 @@
 
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -72,7 +73,20 @@ CATEGORIAS DISPONÍVEIS:
 - alimentação
 - saúde
 - educação
+- vestuário (roupas, sapatos, tênis, etc.)
+- casa (móveis, decoração, utensílios)
 - outros
+
+RECONHECIMENTO INTELIGENTE DE CATEGORIAS:
+- "tênis", "sapato", "roupa", "camisa" = vestuário
+- "uber", "ônibus", "gasolina", "combustível" = transporte
+- "mercado", "supermercado", "feira" = mercado
+- "almoço", "jantar", "lanche", "restaurante" = alimentação
+- "cinema", "festa", "balada", "diversão" = lazer
+- "remédio", "médico", "farmácia" = saúde
+- "curso", "livro", "faculdade" = educação
+- "luz", "água", "internet", "telefone" = contas
+- "sofá", "mesa", "panela", "decoração" = casa
 
 EXTRAÇÃO INTELIGENTE:
 Quando o usuário mencionar um gasto, tente extrair automaticamente:
@@ -107,6 +121,12 @@ Resposta: "R$200! Em qual categoria foi esse gasto? Mercado, transporte, aliment
 Usuário: "200"
 Resposta: "R$200, entendi! E foi gasto com o quê? Mercado, transporte, alimentação...?"
 
+Usuário: "tenis" (após mencionar valor)
+Resposta: "Ah, um tênis! R$[valor] em vestuário então. Posso salvar assim?"
+
+Usuário: "sapato", "roupa", "camisa" (após mencionar valor)
+Resposta: "Entendi! R$[valor] em vestuário. Confirma para eu salvar?"
+
 CONFIRMAÇÕES E RESPOSTAS POSITIVAS:
 Quando o usuário confirmar com "sim", "pode salvar", "confirma", "ok", "certo", etc., responda com encerramento natural:
 - "Pronto! Gasto anotado. Qualquer coisa é só me chamar! 😊"
@@ -116,7 +136,7 @@ Quando o usuário confirmar com "sim", "pode salvar", "confirma", "ok", "certo",
 
 SE NÃO CONSEGUIR EXTRAIR TUDO:
 - Se faltou valor E não há número na mensagem: "Quanto foi mesmo esse gasto?"
-- Se extraiu valor mas faltou categoria: "R$[valor]! Em qual categoria foi esse gasto? Mercado, transporte, alimentação...?"
+- Se extraiu valor mas faltou categoria: "R$[valor]! Em qual categoria foi esse gasto? Mercado, transporte, alimentação, vestuário...?"
 - Se não entendeu: "Não entendi direito esse último gasto. Pode me falar de outro jeito?"
 
 SEMPRE responda no formato JSON válido:
@@ -139,6 +159,7 @@ IMPORTANTE:
 - Mantenha a conversa fluida e contextual
 - CONFIRMAÇÕES como "sim", "ok", "pode salvar": responda com encerramento natural, não pergunte sobre novos gastos
 - NUNCA pergunte sobre valor se já extraiu um número da mensagem
+- RECONHEÇA palavras como "tênis", "sapato", "roupa" como categoria "vestuário"
 `;
 
     try {
@@ -182,3 +203,4 @@ IMPORTANTE:
     }
   }
 }
+
