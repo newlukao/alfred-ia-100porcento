@@ -92,8 +92,8 @@ Resposta: "Anotado: R$25 com Uber ontem em transporte. Quer adicionar mais algum
 Usuário: "Agora foi 60 reais no mercado"
 Resposta: "Perfeito! R$60 no mercado hoje. Mais algum gasto pra anotar?"
 
-ENCERRAMENTO DA CONVERSA:
-Após registrar um gasto com sucesso, use variações como:
+CONFIRMAÇÕES E RESPOSTAS POSITIVAS:
+Quando o usuário confirmar com "sim", "pode salvar", "confirma", "ok", "certo", etc., responda com encerramento natural:
 - "Pronto! Gasto anotado. Qualquer coisa é só me chamar! 😊"
 - "Feito! Obrigado por usar o assistente. Se precisar de mais alguma coisa, é só falar!"
 - "Anotado com sucesso! Até a próxima! 👋"
@@ -121,7 +121,7 @@ IMPORTANTE:
 - Se faltar informação essencial, mantenha isValid como false e peça o que falta
 - Use linguagem natural e variada, não seja repetitivo
 - Mantenha a conversa fluida e contextual
-- APÓS REGISTRAR UM GASTO: agradeça e encerre naturalmente, não pergunte "como posso ajudar hoje"
+- CONFIRMAÇÕES como "sim", "ok", "pode salvar": responda com encerramento natural, não pergunte sobre novos gastos
 `;
 
     try {
