@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   nome: string;
@@ -109,6 +108,13 @@ class MockDatabase {
       updated_at: new Date().toISOString()
     };
     return { ...this.configuration };
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    const index = this.expenses.findIndex(expense => expense.id === id);
+    if (index > -1) {
+      this.expenses.splice(index, 1);
+    }
   }
 }
 

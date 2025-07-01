@@ -65,7 +65,7 @@ const Dashboard: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const userExpenses = await database.getExpenses(user.id);
+      const userExpenses = await database.getExpensesByUser(user.id);
       setExpenses(userExpenses.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()));
     } catch (error) {
       console.error('Error loading expenses:', error);
