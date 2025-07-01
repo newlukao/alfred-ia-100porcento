@@ -356,34 +356,14 @@ IMPORTANTE:
       console.log(`📊 É consulta de relatório? ${isReportQuery}`);
       
       if (isReportQuery) {
-        // Detectar período
-        let periodo = 'total';
-        if (currentMessage.includes('semana') || currentMessage.includes('última semana')) {
-          periodo = 'semana';
-        } else if (currentMessage.includes('mês') || currentMessage.includes('mes') || currentMessage.includes('último mês')) {
-          periodo = 'mes';
-        } else if (currentMessage.includes('hoje')) {
-          periodo = 'hoje';
-        } else if (currentMessage.includes('ontem')) {
-          periodo = 'ontem';
-        }
-        
-        console.log(`📅 Período detectado: ${periodo}`);
-        
-        const reportResponses = [
-          `Opa! Vou buscar seus gastos da ${periodo === 'semana' ? 'última semana' : periodo === 'mes' ? 'último mês' : periodo === 'hoje' ? 'hoje' : periodo === 'ontem' ? 'ontem' : 'geral'}! 📊 Só um segundinho...`,
-          `Show! Deixa eu ver aqui seus gastos ${periodo === 'semana' ? 'da semana' : periodo === 'mes' ? 'do mês' : periodo === 'hoje' ? 'de hoje' : periodo === 'ontem' ? 'de ontem' : 'total'}! 💰`,
-          `Beleza! Vou fazer o levantamento dos seus gastos ${periodo === 'semana' ? 'semanais' : periodo === 'mes' ? 'mensais' : periodo === 'hoje' ? 'do dia' : periodo === 'ontem' ? 'de ontem' : 'gerais'}! 📈`
-        ];
-        
-        const randomResponse = reportResponses[Math.floor(Math.random() * reportResponses.length)];
-        
+        // IMPORTANTE: Esta função precisa receber userId como parâmetro
+        // Para poder fazer consultas reais no banco de dados
         return {
-          response: `${randomResponse}\n\n⚠️ **Recurso em desenvolvimento**: Para ver seus gastos detalhados, clique em "Dashboard" no menu! Lá você encontra gráficos e relatórios completos! 📊`,
+          response: `🤖 **FUNCIONALIDADE EM DESENVOLVIMENTO**\n\nDetectei que você quer ver seus gastos! Mas ainda não consigo acessar o banco de dados para calcular totais por período.\n\n**Por enquanto, use o Dashboard** (botão no menu) para ver:\n📊 Gráficos completos\n💰 Totais por categoria\n📅 Gastos por período\n\n**Em breve** vou conseguir responder diretamente no chat: "Você gastou R$ 450 na última semana!"`,
           extraction: {
             valor: 0,
             categoria: '',
-            descricao: `Consulta de relatório: ${periodo}`,
+            descricao: `Consulta de relatório solicitada`,
             data: new Date().toISOString().split('T')[0],
             isValid: false
           }
