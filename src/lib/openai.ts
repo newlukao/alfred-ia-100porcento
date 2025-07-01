@@ -98,15 +98,28 @@ DETECÇÃO DE CONFIRMAÇÕES:
 - Positivas: sim, ta sim, certo, isso mesmo, exato, correto, confirmo, pode ser, tá certo, é isso, isso aí
 - Negativas: não, nao, errado, não é isso, tá errado
 
-DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
-- alimentação: comida, almoço, jantar, lanche, restaurante, pizza, hambúrguer, hamburg, hamb, burger, burguer, habburg, churros, churro, mc, mcdonalds, bk, kfc, subway, ifood, delivery, café, bar, bebida, picanha, carne, frango, peixe, feira, açougue, padaria, sanduíche, sanduiche, food, fastfood
-- vestuário: roupa, camisa, calça, sapato, tênis, blusa, vestido, shorts, jaqueta, casaco, moda, camiseta, polo, social, bermuda
-- transporte: uber, taxi, gasolina, combustível, posto, ônibus, metrô, trem, passagem, viagem, carro, moto
-- mercado: supermercado, compras, mantimentos, feira
-- lazer: cinema, festa, show, teatro, jogo, parque, balada, rolê, diversão, netflix, streaming
-- saúde: remédio, médico, farmácia, hospital, dentista, consulta
-- casa: móvel, sofá, mesa, decoração, limpeza, reforma
-- contas: luz, água, internet, telefone, energia, gás, conta
+DETECÇÃO INTELIGENTE DE CATEGORIAS (use sua inteligência para interpretar):
+- alimentação: qualquer comida, bebida, restaurante, delivery, mercado (quando for comida)
+- tecnologia: eletrônicos, computadores, celulares, games, software, streaming
+- vestuário: roupas, sapatos, acessórios, bolsas, óculos
+- transporte: uber, taxi, gasolina, carro, moto, ônibus, passagens, consertos de veículo
+- casa: móveis, decoração, utensílios, eletrodomésticos, reforma, limpeza
+- saúde: remédios, médicos, dentista, exames, hospitais, farmácia
+- lazer: cinema, shows, viagens, hotéis, academia, livros, hobbies
+- educação: cursos, faculdade, livros educacionais, material escolar
+- beleza: salão, cabelo, maquiagem, perfumes, produtos de beleza
+- pets: veterinário, ração, petshop, cuidados com animais
+- mercado: supermercado, compras de mantimentos (não comida pronta)
+- contas: luz, água, internet, telefone, aluguel, financiamentos
+
+IMPORTANTE: USE SUA INTELIGÊNCIA! 
+- "veterinário" = pets (óbvio!)
+- "shampoo" = beleza (óbvio!)
+- "netflix" = tecnologia (óbvio!)
+- "gasolina" = transporte (óbvio!)
+- "pizza" = alimentação (óbvio!)
+
+Não seja literal com palavras-chave. INTERPRETE o contexto como um humano faria!
 
 NÚMEROS POR EXTENSO E VARIAÇÕES:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
@@ -330,157 +343,7 @@ IMPORTANTE:
         };
       }
       
-      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO, NEGATIVA, SAUDAÇÃO OU CONVERSACIONAL
-      console.log('🔧 INICIANDO ANÁLISE LOCAL...');
-      console.log('📝 Mensagem do usuário:', userMessage);
-      
-      let valor = 0;
-      let categoria = '';
-      
-      // Buscar valor na mensagem atual ou histórico
-      const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
-      if (numberMatch) {
-        valor = parseFloat(numberMatch[0].replace(',', '.'));
-        console.log(`💰 VALOR ENCONTRADO na mensagem atual: R$ ${valor}`);
-        
-        // Se encontrou valor na mensagem atual, RESETAR contexto - é um novo gasto!
-        console.log('🔄 NOVO GASTO DETECTADO - resetando contexto de categoria');
-        
-      } else {
-        // Buscar nas mensagens anteriores SOMENTE se não há valor na mensagem atual
-        const userMessages = conversationHistory.filter(msg => msg.type === 'user');
-        console.log(`🔍 Procurando valor em ${userMessages.length} mensagens...`);
-        
-        for (const msg of userMessages.reverse()) {
-          const valueMatch = msg.content.match(/(\d+(?:[.,]\d+)?)/);
-          if (valueMatch) {
-            valor = parseFloat(valueMatch[1].replace(',', '.'));
-            console.log(`🧠 VALOR CONECTADO: R$ ${valor} da mensagem: "${msg.content}"`);
-            break;
-          }
-        }
-      }
-      
-      // Buscar categoria SOMENTE na mensagem atual se há valor na mensagem atual
-      // OU no histórico completo se o valor veio do histórico
-      let textToAnalyze = '';
-      
-      if (numberMatch) {
-        // Valor na mensagem atual = analisar APENAS a mensagem atual para categoria
-        textToAnalyze = userMessage.toLowerCase();
-        console.log(`🏷️ Analisando APENAS mensagem atual: "${textToAnalyze}"`);
-      } else {
-        // Valor do histórico = pode analisar histórico completo
-        textToAnalyze = (conversationHistory.filter(msg => msg.type === 'user').map(m => m.content).join(' ') + ' ' + userMessage).toLowerCase();
-        console.log(`🏷️ Analisando histórico completo: "${textToAnalyze}"`);
-      }
-      
-      const categoryMap = {
-        'alimentação': [
-          // Comidas
-          'comida', 'almoço', 'jantar', 'lanche', 'café', 'refeição', 'pizza', 'hambúrguer', 'hamburg', 'burger', 'churros', 'açaí', 'sorvete', 'doce', 'bolo', 'sanduíche', 'pão', 'biscoito', 'chocolate', 'picanha', 'carne', 'frango', 'peixe', 'salada', 'sopa', 'macarrão', 'arroz', 'feijão', 'batata', 'ovo', 'queijo', 'presunto', 'frutas', 'verduras', 'legumes',
-          // Bebidas  
-          'bebida', 'água', 'refrigerante', 'suco', 'cerveja', 'vinho', 'caipirinha', 'drink', 'whisky', 'vodka', 'energético', 'isotônico', 'leite', 'café', 'cappuccino', 'expresso',
-          // Restaurantes e locais
-          'restaurante', 'bar', 'lanchonete', 'padaria', 'açougue', 'pizzaria', 'churrascaria', 'fast-food', 'delivery', 'ifood', 'mcdonalds', 'bk', 'subway', 'kfc', 'dominos', 'outback', 'giraffas'
-        ],
-        'tecnologia': [
-          // Dispositivos
-          'computador', 'notebook', 'pc', 'desktop', 'mac', 'macbook', 'celular', 'smartphone', 'iphone', 'samsung', 'motorola', 'lg', 'xiaomi', 'tablet', 'ipad', 'tv', 'televisão', 'monitor', 'smartwatch', 'relógio',
-          // Acessórios
-          'mouse', 'teclado', 'fone', 'headset', 'carregador', 'cabo', 'adaptador', 'powerbank', 'capinha', 'película', 'suporte',
-          // Games e entretenimento
-          'playstation', 'xbox', 'nintendo', 'switch', 'ps5', 'ps4', 'jogo', 'game', 'controle', 'headphone',
-          // Software e serviços
-          'software', 'aplicativo', 'netflix', 'spotify', 'amazon', 'google', 'microsoft', 'adobe', 'steam'
-        ],
-        'vestuário': [
-          // Roupas básicas
-          'roupa', 'camisa', 'camiseta', 'polo', 'blusa', 'regata', 'calça', 'jeans', 'shorts', 'bermuda', 'vestido', 'saia', 'casaco', 'jaqueta', 'blazer', 'suéter', 'moletom', 'pijama',
-          // Calçados
-          'sapato', 'tênis', 'sandália', 'chinelo', 'bota', 'sapatilha', 'scarpin', 'salto', 'all-star', 'nike', 'adidas', 'havaianas',
-          // Acessórios e íntimos
-          'meia', 'cueca', 'calcinha', 'sutiã', 'cinto', 'bolsa', 'carteira', 'mochila', 'óculos', 'relógio', 'colar', 'pulseira', 'anel', 'brinco', 'chapéu', 'boné', 'lenço'
-        ],
-        'transporte': [
-          // Transporte público e privado
-          'uber', 'taxi', '99', 'cabify', 'ônibus', 'metrô', 'trem', 'avião', 'passagem', 'viagem', 'pedágio', 'estacionamento', 'valet',
-          // Veículos
-          'carro', 'moto', 'bicicleta', 'bike', 'patinete', 'scooter',
-          // Combustível e manutenção
-          'gasolina', 'álcool', 'diesel', 'combustível', 'posto', 'shell', 'petrobras', 'ipiranga', 'ale', 'conserto', 'manutenção', 'mecânico', 'oficina', 'pneu', 'óleo', 'revisão', 'lavagem', 'seguro', 'ipva', 'licenciamento', 'multa'
-        ],
-        'casa': [
-          // Móveis
-          'móvel', 'sofá', 'mesa', 'cadeira', 'cama', 'guarda-roupa', 'armário', 'estante', 'rack', 'cômoda', 'poltrona', 'banqueta', 'escrivaninha',
-          // Decoração
-          'decoração', 'quadro', 'espelho', 'vaso', 'planta', 'cortina', 'tapete', 'almofada', 'luminária', 'abajur',
-          // Utensílios e eletrodomésticos
-          'panela', 'frigideira', 'prato', 'copo', 'talheres', 'microondas', 'geladeira', 'fogão', 'liquidificador', 'batedeira', 'aspirador', 'ferro', 'ventilador', 'ar-condicionado',
-          // Reforma e manutenção
-          'reforma', 'pintura', 'tinta', 'pedreiro', 'eletricista', 'encanador', 'azulejo', 'piso', 'porta', 'janela', 'fechadura',
-          // Limpeza
-          'limpeza', 'detergente', 'sabão', 'desinfetante', 'vassoura', 'rodo', 'pano', 'esponja', 'produto'
-        ],
-        'saúde': [
-          // Medicamentos
-          'remédio', 'medicamento', 'vitamina', 'suplemento', 'antibiótico', 'analgésico', 'dipirona', 'paracetamol', 'ibuprofeno',
-          // Profissionais
-          'médico', 'dentista', 'psicólogo', 'fisioterapeuta', 'nutricionista', 'dermatologista', 'cardiologista', 'ginecologista',
-          // Locais e procedimentos
-          'hospital', 'clínica', 'farmácia', 'drogaria', 'consulta', 'exame', 'raio-x', 'ultrassom', 'cirurgia', 'tratamento', 'terapia', 'vacina', 'óculos', 'lente'
-        ],
-        'lazer': [
-          // Entretenimento
-          'cinema', 'filme', 'teatro', 'show', 'concerto', 'festa', 'balada', 'bar', 'clube', 'parque', 'zoológico', 'aquário', 'museu',
-          // Esportes e atividades
-          'academia', 'natação', 'futebol', 'tênis', 'golf', 'surf', 'skate', 'bike', 'corrida', 'caminhada', 'yoga', 'pilates',
-          // Hobbies
-          'livro', 'revista', 'jornal', 'jogo', 'quebra-cabeça', 'pintura', 'desenho', 'artesanato', 'música', 'instrumento',
-          // Viagens
-          'viagem', 'hotel', 'pousada', 'resort', 'turismo', 'excursão', 'cruzeiro'
-        ],
-        'educação': [
-          'curso', 'faculdade', 'universidade', 'escola', 'colégio', 'aula', 'professor', 'tutor', 'livro', 'apostila', 'material', 'caderno', 'caneta', 'lápis', 'mochila', 'estojo', 'calculadora', 'mensalidade', 'matrícula', 'formatura', 'diploma'
-        ],
-        'beleza': [
-          'salão', 'cabelo', 'corte', 'escova', 'pintura', 'luzes', 'alisamento', 'unha', 'manicure', 'pedicure', 'sobrancelha', 'depilação', 'massagem', 'facial', 'limpeza', 'hidratação', 'maquiagem', 'perfume', 'creme', 'shampoo', 'condicionador', 'batom', 'base', 'rímel', 'esmalte'
-        ],
-        'pets': [
-          'veterinário', 'ração', 'petshop', 'vacina', 'consulta', 'banho', 'tosa', 'coleira', 'brinquedo', 'casinha', 'cama', 'comedouro', 'bebedouro', 'remédio', 'cachorro', 'gato', 'pássaro', 'peixe', 'hamster'
-        ],
-        'mercado': [
-          'mercado', 'supermercado', 'hipermercado', 'compras', 'mantimentos', 'feira', 'hortifruti', 'atacadão', 'extra', 'carrefour', 'pão-de-açúcar', 'walmart', 'assaí', 'sam'
-        ],
-        'contas': [
-          'luz', 'energia', 'elétrica', 'água', 'saneamento', 'internet', 'wifi', 'telefone', 'celular', 'gás', 'condomínio', 'aluguel', 'iptu', 'financiamento', 'empréstimo', 'cartão', 'fatura', 'boleto', 'conta'
-        ]
-      };
-      
-      for (const [cat, words] of Object.entries(categoryMap)) {
-        const found = words.find(word => textToAnalyze.includes(word));
-        if (found) {
-          categoria = cat;
-          console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${found}) em texto: "${textToAnalyze}"`);
-          break;
-        }
-      }
-      
-      // SE CONECTOU VALOR + CATEGORIA = SUCESSO!
-      if (valor > 0 && categoria) {
-        console.log(`✅ CONEXÃO REALIZADA: R$ ${valor} em ${categoria}`);
-        return {
-          response: `Show! Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! 💰 Tá certo?`,
-          extraction: {
-            valor: valor,
-            categoria: categoria,
-            descricao: `Gasto em ${categoria}`,
-            data: new Date().toISOString().split('T')[0],
-            isValid: false // Aguarda confirmação
-          }
-        };
-      }
-      
+      // PRIORIZAR RESPOSTA DA OpenAI - ELA É INTELIGENTE!
       try {
         // Clean the response to ensure it's valid JSON
         let cleanedResult = result.trim();
@@ -489,15 +352,10 @@ IMPORTANTE:
           if (jsonMatch) {
             cleanedResult = jsonMatch[0];
           } else {
-            console.log('No JSON found, using direct fallback parsing for:', result);
-            // Direct fallback parsing for simple cases like "gastei 20"
-            let valor = 0;
-            let categoria = 'outros';
-            
+            // FALLBACK SIMPLES: só se OpenAI falhar completamente
+            console.log('OpenAI não retornou JSON válido, usando fallback');
             const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
-            if (numberMatch) {
-              valor = parseFloat(numberMatch[0].replace(',', '.'));
-            }
+            const valor = numberMatch ? parseFloat(numberMatch[0].replace(',', '.')) : 0;
             
             return {
               response: valor > 0 ? 
@@ -505,7 +363,7 @@ IMPORTANTE:
                 'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅',
               extraction: {
                 valor: valor,
-                categoria: valor > 0 ? '' : categoria,
+                categoria: '',
                 descricao: valor > 0 ? 'Gasto a categorizar' : 'Gasto',
                 data: new Date().toISOString().split('T')[0],
                 isValid: false
@@ -516,267 +374,28 @@ IMPORTANTE:
         
         const parsed = JSON.parse(cleanedResult);
         
-        // Enhanced validation and value extraction with conversation context
-        let valor = 0;
-        let categoria = '';
-        
-        // First, try to get from parsed response
-        if (parsed.extraction?.valor) {
-          valor = parsed.extraction.valor;
-        }
-        
-        if (parsed.extraction?.categoria) {
-          categoria = parsed.extraction.categoria;
-        }
-        
-        
-        // DETECÇÃO DE CONFIRMAÇÃO: Verificar se usuário está confirmando um gasto anterior
-        const currentMessage = userMessage.toLowerCase();
-        const confirmationWords = ['sim', 'ta sim', 'tá sim', 'certo', 'isso mesmo', 'exato', 'correto', 'confirmo', 'pode ser', 'tá certo', 'é isso', 'isso aí', 'ta certo'];
-        const isConfirmation = confirmationWords.some(word => currentMessage.includes(word.toLowerCase()));
-        
-        if (isConfirmation) {
-          // Buscar o último gasto sugerido pelo bot na conversa
-          const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
-          const lastBotMessage = botMessages[botMessages.length - 1];
-          
-          if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
-            // Extrair valor e categoria da mensagem do bot
-            const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-            const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
-            
-            if (valorMatch && categoriaMatch) {
-              valor = parseFloat(valorMatch[1].replace(',', '.'));
-              categoria = categoriaMatch[1].toLowerCase();
-              
-              // Mapear categorias detectadas no texto para categorias padronizadas
-              if (['hamburg', 'hambúrguer', 'burger', 'churros', 'comida'].includes(categoria)) {
-                categoria = 'alimentação';
-              }
-              
-              return {
-                response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!`,
-                extraction: {
-                  valor: valor,
-                  categoria: categoria,
-                  descricao: `Gasto em ${categoria}`,
-                  data: new Date().toISOString().split('T')[0],
-                  isValid: true // CONFIRMA E REGISTRA
-                },
-                personalityUpdate: parsed.personalityUpdate || ''
-              };
-            }
-          }
-        }
-        
-        // SUPER INTELIGÊNCIA CONTEXTUAL: Analise até 10 mensagens para conexão completa
-        const recentMessages = conversationHistory.slice(-10); // Últimas 10 mensagens para contexto máximo
-        const allUserMessages = recentMessages.filter(msg => msg.type === 'user').map(msg => msg.content).join(' ').toLowerCase();
-        const fullConversationText = allUserMessages + ' ' + currentMessage;
-        
-        // SISTEMA DE MEMÓRIA TEMPORÁRIA: Buscar valor em TODAS as mensagens se não encontrado
-        if (!valor) {
-          // Primeiro tenta a mensagem atual
-          const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
-          if (numberMatch) {
-            valor = parseFloat(numberMatch[0].replace(',', '.'));
-            console.log(`💰 VALOR ENCONTRADO na mensagem atual: R$ ${valor}`);
-          } else {
-            // BUSCA SUPER INTELIGENTE: Procurar qualquer valor nas mensagens do usuário
-            const allUserMessages = conversationHistory.filter(msg => msg.type === 'user');
-            console.log(`🔍 Procurando valor em ${allUserMessages.length} mensagens do usuário...`);
-            
-            for (const msg of allUserMessages.reverse()) {
-              const patterns = [
-                /(?:gastei|paguei|custou|foi|comprei|gasto|valor|)\s*(?:r\$|rs|reais|)\s*(\d+(?:[.,]\d+)?)/i,
-                /(\d+(?:[.,]\d+)?)\s*(?:r\$|rs|reais|)/i,
-                /(\d+(?:[.,]\d+)?)/
-              ];
-              
-              for (const pattern of patterns) {
-                const valueMatch = msg.content.match(pattern);
-                if (valueMatch) {
-                  valor = parseFloat(valueMatch[1].replace(',', '.'));
-                  console.log(`🧠 SUPER CONEXÃO: Valor R$ ${valor} da mensagem: "${msg.content}"`);
-                  break;
-                }
-              }
-              if (valor > 0) break;
-            }
-          }
-        }
-        
-        // Enhanced category detection with conversation context
-        if (!categoria) {
-          const fullContext = fullConversationText;
-          console.log(`🏷️ Procurando categoria em: "${fullContext}"`);
-          
-          const categoryMappings = {
-            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
-            'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'hamburg', 'hamb', 'burger', 'burguer', 'habburg', 'churros', 'churro', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'sanduíche', 'sanduiche', 'food', 'mcdonalds', 'bk', 'subway', 'fastfood'],
-            'tecnologia': ['computador', 'notebook', 'celular', 'smartphone', 'tablet', 'mouse', 'teclado', 'monitor', 'tv', 'televisão', 'playstation', 'xbox', 'nintendo', 'fone', 'headset', 'carregador', 'cabo', 'eletrônicos', 'eletronicos', 'pc', 'mac', 'iphone', 'samsung', 'motorola', 'lg'],
-            'mercado': ['mercado', 'supermercado', 'compras', 'mantimentos'],
-            'transporte': ['uber', 'taxi', 'gasolina', 'posto', 'combustível', 'ônibus', 'metrô', 'passagem'],
-            'lazer': ['cinema', 'festa', 'show', 'teatro', 'jogo', 'parque', 'balada', 'rolê', 'diversão'],
-            'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista'],
-            'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza'],
-            'contas': ['luz', 'água', 'internet', 'telefone', 'energia', 'conta']
-          };
-          
-          for (const [cat, terms] of Object.entries(categoryMappings)) {
-            const foundTerm = terms.find(term => fullContext.includes(term));
-            if (foundTerm) {
-              categoria = cat;
-              console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${foundTerm})`);
-              break;
-            }
-          }
-        }
-        
-        // Smart number words recognition if value still not found
-        if (!valor) {
-          const numberWords: {[key: string]: number} = {
-            'dez': 10, 'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50,
-            'sessenta': 60, 'setenta': 70, 'oitenta': 80, 'noventa': 90, 'cem': 100,
-            'duzentos': 200, 'trezentos': 300, 'quatrocentos': 400, 'quinhentos': 500,
-            'seiscentos': 600, 'setecentos': 700, 'oitocentos': 800, 'novecentos': 900, 'mil': 1000
-          };
-          
-          for (const [word, num] of Object.entries(numberWords)) {
-            if (fullConversationText.includes(word)) {
-              valor = num;
-              break;
-            }
-          }
-        }
-        
-        // Enhanced category detection with conversation context
-        if (!categoria) {
-          const fullContext = fullConversationText;
-          
-          const categoryMappings = {
-            'vestuário': ['camisa', 'calça', 'sapato', 'tênis', 'roupa', 'blusa', 'vestido', 'shorts', 'moda', 'camiseta', 'polo', 'social', 'jaqueta', 'casaco'],
-            'alimentação': ['picanha', 'carne', 'comida', 'almoço', 'jantar', 'lanche', 'restaurante', 'pizza', 'hambúrguer', 'hamburg', 'hamb', 'burger', 'burguer', 'habburg', 'churros', 'churro', 'café', 'bar', 'bebida', 'delivery', 'ifood', 'açougue', 'padaria', 'feira', 'sanduíche', 'sanduiche', 'food', 'mcdonalds', 'bk', 'subway', 'fastfood'],
-            'tecnologia': ['computador', 'notebook', 'celular', 'smartphone', 'tablet', 'mouse', 'teclado', 'monitor', 'tv', 'televisão', 'playstation', 'xbox', 'nintendo', 'fone', 'headset', 'carregador', 'cabo', 'eletrônicos', 'eletronicos', 'pc', 'mac', 'iphone', 'samsung', 'motorola', 'lg'],
-            'mercado': ['mercado', 'supermercado', 'compras', 'mantimentos'],
-            'transporte': ['uber', 'taxi', 'gasolina', 'posto', 'combustível', 'ônibus', 'metrô', 'passagem'],
-            'lazer': ['cinema', 'festa', 'show', 'teatro', 'jogo', 'parque', 'balada', 'rolê', 'diversão'],
-            'saúde': ['remédio', 'médico', 'farmácia', 'hospital', 'dentista'],
-            'casa': ['móvel', 'sofá', 'mesa', 'decoração', 'casa', 'limpeza'],
-            'contas': ['luz', 'água', 'internet', 'telefone', 'energia', 'conta']
-          };
-          
-          for (const [cat, terms] of Object.entries(categoryMappings)) {
-            if (terms.some(term => fullContext.includes(term))) {
-              categoria = cat;
-              break;
-            }
-          }
-        }
-        
-        const isValid = valor > 0 && categoria && categoria.trim() !== '';
-        
-        let response = parsed.response || '';
-        
-        // INTELIGÊNCIA APRIMORADA: Se tem valor E categoria, confirma e registra!
-        if (isValid && !response.includes('registr')) {
-          const celebrations = ["Show demais!", "Massa!", "Fechou!", "Top!", "Mandou bem!", "Dahora!", "Perfeito!"];
-          const randomCelebration = celebrations[Math.floor(Math.random() * celebrations.length)];
-          const categoryEmojis: {[key: string]: string} = {
-            'vestuário': '👕',
-            'alimentação': '🍽️',
-            'tecnologia': '💻',
-            'transporte': '🚗',
-            'mercado': '🛒',
-            'lazer': '🎉',
-            'saúde': '🏥',
-            'casa': '🏠',
-            'contas': '💡'
-          };
-          const emoji = categoryEmojis[categoria] || '💰';
-          response = `${randomCelebration} Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria}! ${emoji} Tá certo?`;
-        }
-        
-        // Fallback responses for incomplete data
-        if (!response || response.length < 10) {
-          if (isValid) {
-            const celebrations = ["Show demais!", "Massa!", "Fechou!", "Top!", "Mandou bem!", "Dahora!", "Perfeito!"];
-            const randomCelebration = celebrations[Math.floor(Math.random() * celebrations.length)];
-            const categoryEmojis: {[key: string]: string} = {
-              'vestuário': '👕',
-              'alimentação': '🍽️',
-              'transporte': '🚗',
-              'mercado': '🛒',
-              'lazer': '🎉',
-              'saúde': '🏥',
-              'casa': '🏠',
-              'contas': '💡'
-            };
-            const emoji = categoryEmojis[categoria] || '💰';
-            response = `${randomCelebration} Registrei aqui: R$ ${valor.toFixed(2)} em ${categoria}! ${emoji}`;
-          } else if (valor > 0 && !categoria) {
-            response = `Opa, R$ ${valor.toFixed(2)} anotado! Mas em que categoria rolou esse gasto? (alimentação, vestuário, transporte...)`;
-          } else if (!valor && categoria) {
-            response = `Beleza, vi que foi em ${categoria}! Mas quanto custou essa parada?`;
-          } else {
-            response = 'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅';
-          }
-        }
-        
+        // USAR DIRETAMENTE A RESPOSTA DA OpenAI - ELA SABE O QUE FAZ!
         return {
-          response: response,
+          response: parsed.response || 'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅',
           extraction: {
-            valor: valor,
-            categoria: categoria,
-            descricao: parsed.extraction?.descricao || (categoria ? `Gasto em ${categoria}` : 'Gasto'),
+            valor: parsed.extraction?.valor || 0,
+            categoria: parsed.extraction?.categoria || '',
+            descricao: parsed.extraction?.descricao || 'Gasto',
             data: parsed.extraction?.data || new Date().toISOString().split('T')[0],
-            isValid: isValid
+            isValid: parsed.extraction?.isValid || false
           },
           personalityUpdate: parsed.personalityUpdate || ''
         };
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
-        console.log('Raw response that failed to parse:', result);
-        
-        // Enhanced fallback with conversation context
-        let valor = 0;
-        let categoria = '';
-        
-        const fullHistory = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
-        const fullText = fullHistory + ' ' + userMessage.toLowerCase();
-        
-        // Extract number from full context
-        const numberMatch = fullText.match(/(?:gastei|paguei|custou|foi)\s+(\d+(?:[.,]\d+)?)/);
-        if (numberMatch) {
-          valor = parseFloat(numberMatch[1].replace(',', '.'));
-        } else {
-          const simpleMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
-          if (simpleMatch) {
-            valor = parseFloat(simpleMatch[0].replace(',', '.'));
-          }
-        }
-        
-        // Simple category detection from full context
-        if (['camisa', 'calça', 'roupa', 'sapato', 'tênis', 'blusa', 'vestido'].some(term => fullText.includes(term))) {
-          categoria = 'vestuário';
-        } else if (['picanha', 'carne', 'comida', 'almoço', 'jantar', 'mercado', 'hambúrguer', 'hamburg', 'pizza', 'lanche'].some(term => fullText.includes(term))) {
-          categoria = 'alimentação';
-        } else if (['uber', 'taxi', 'gasolina', 'posto'].some(term => fullText.includes(term))) {
-          categoria = 'transporte';
-        }
-        
-        const isValid = valor > 0 && categoria !== '';
-        
         return {
-          response: isValid ? 
-            `Show! Conectei as informações e registrei R$ ${valor.toFixed(2)} em ${categoria}! Mandou bem! 💰` : 
-            'Opa, não consegui sacar direito... Pode repetir tipo "gastei R$ 50 em comida"? 😅',
+          response: 'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅',
           extraction: {
-            valor: valor,
-            categoria: categoria,
-            descricao: categoria ? `Gasto em ${categoria}` : 'Gasto',
+            valor: 0,
+            categoria: '',
+            descricao: 'Gasto',
             data: new Date().toISOString().split('T')[0],
-            isValid: isValid
+            isValid: false
           }
         };
       }
