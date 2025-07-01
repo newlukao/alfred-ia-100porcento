@@ -11,6 +11,7 @@ import LoginForm from "@/components/LoginForm";
 import Chat from "@/components/Chat";
 import Dashboard from "@/components/Dashboard";
 import AdminPanel from "@/components/AdminPanel";
+import WhatsAppWebhook from "@/components/WhatsAppWebhook";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const AppContent = () => {
         <Route path="/" element={<Chat />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/whatsapp" element={<WhatsAppWebhook />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
