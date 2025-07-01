@@ -348,6 +348,48 @@ IMPORTANTE:
         };
       }
       
+      // DETECÇÃO DE CONSULTAS DE RELATÓRIO/HISTÓRICO (PRIORITY #2)
+      const reportWords = ['quanto gastei', 'gastos', 'total', 'semana', 'mês', 'mes', 'hoje', 'ontem', 'relatório', 'relatrio', 'histórico', 'historico', 'resumo', 'balanço', 'balanco', 'última semana', 'ultimo mes', 'gasto total', 'quanto foi'];
+      const isReportQuery = reportWords.some(word => currentMessage.includes(word));
+      
+      console.log(`📊 Verificando consulta de relatório para: "${userMessage}"`);
+      console.log(`📊 É consulta de relatório? ${isReportQuery}`);
+      
+      if (isReportQuery) {
+        // Detectar período
+        let periodo = 'total';
+        if (currentMessage.includes('semana') || currentMessage.includes('última semana')) {
+          periodo = 'semana';
+        } else if (currentMessage.includes('mês') || currentMessage.includes('mes') || currentMessage.includes('último mês')) {
+          periodo = 'mes';
+        } else if (currentMessage.includes('hoje')) {
+          periodo = 'hoje';
+        } else if (currentMessage.includes('ontem')) {
+          periodo = 'ontem';
+        }
+        
+        console.log(`📅 Período detectado: ${periodo}`);
+        
+        const reportResponses = [
+          `Opa! Vou buscar seus gastos da ${periodo === 'semana' ? 'última semana' : periodo === 'mes' ? 'último mês' : periodo === 'hoje' ? 'hoje' : periodo === 'ontem' ? 'ontem' : 'geral'}! 📊 Só um segundinho...`,
+          `Show! Deixa eu ver aqui seus gastos ${periodo === 'semana' ? 'da semana' : periodo === 'mes' ? 'do mês' : periodo === 'hoje' ? 'de hoje' : periodo === 'ontem' ? 'de ontem' : 'total'}! 💰`,
+          `Beleza! Vou fazer o levantamento dos seus gastos ${periodo === 'semana' ? 'semanais' : periodo === 'mes' ? 'mensais' : periodo === 'hoje' ? 'do dia' : periodo === 'ontem' ? 'de ontem' : 'gerais'}! 📈`
+        ];
+        
+        const randomResponse = reportResponses[Math.floor(Math.random() * reportResponses.length)];
+        
+        return {
+          response: `${randomResponse}\n\n⚠️ **Recurso em desenvolvimento**: Para ver seus gastos detalhados, clique em "Dashboard" no menu! Lá você encontra gráficos e relatórios completos! 📊`,
+          extraction: {
+            valor: 0,
+            categoria: '',
+            descricao: `Consulta de relatório: ${periodo}`,
+            data: new Date().toISOString().split('T')[0],
+            isValid: false
+          }
+        };
+      }
+      
       // DETECÇÃO DE INTENÇÃO DE GASTO (antes da análise local)
       const expenseIntentWords = ['gastei', 'gasto', 'comprei', 'paguei', 'saiu', 'foi', 'dinheiro', 'real', 'reais', 'muito', 'abessa', 'bastante', 'hoje', 'ontem'];
       const hasExpenseIntent = expenseIntentWords.some(word => currentMessage.includes(word));
