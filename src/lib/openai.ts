@@ -411,6 +411,15 @@ IMPORTANTE:
             break;
           }
         }
+        
+        // LÓGICA ESPECIAL: Se bot perguntou sobre categoria e não há valor na mensagem atual
+        const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+        const lastBotMessage = botMessages[botMessages.length - 1];
+        
+        if (lastBotMessage && lastBotMessage.content.includes('em que categoria rolou esse gasto')) {
+          console.log(`🎯 BOT PERGUNTOU CATEGORIA - analisando resposta de categoria`);
+          // Usuário está respondendo sobre categoria, não precisa de valor na mensagem atual
+        }
       }
       
       // Buscar categoria SOMENTE na mensagem atual se há valor na mensagem atual
@@ -429,8 +438,9 @@ IMPORTANTE:
       
       const categoryMap = {
         'alimentação': [
-          // Comidas
-          'comida', 'almoço', 'jantar', 'lanche', 'café', 'refeição', 'pizza', 'hambúrguer', 'hamburg', 'burger', 'churros', 'açaí', 'sorvete', 'doce', 'bolo', 'sanduíche', 'pão', 'biscoito', 'chocolate', 'picanha', 'carne', 'frango', 'peixe', 'salada', 'sopa', 'macarrão', 'arroz', 'feijão', 'batata', 'ovo', 'queijo', 'presunto', 'frutas', 'verduras', 'legumes',
+          // Comidas específicas - incluindo churrasco
+          'churrasco', 'churras', 'bbq', 'picanha', 'carne', 'frango', 'porco', 'linguiça', 'costela', 'alcatra',
+          'comida', 'almoço', 'jantar', 'lanche', 'café', 'refeição', 'pizza', 'hambúrguer', 'hamburg', 'burger', 'churros', 'açaí', 'sorvete', 'doce', 'bolo', 'sanduíche', 'pão', 'biscoito', 'chocolate', 'peixe', 'salada', 'sopa', 'macarrão', 'arroz', 'feijão', 'batata', 'ovo', 'queijo', 'presunto', 'frutas', 'verduras', 'legumes',
           // Bebidas  
           'bebida', 'água', 'refrigerante', 'suco', 'cerveja', 'vinho', 'caipirinha', 'drink', 'whisky', 'vodka', 'energético', 'isotônico', 'leite', 'café', 'cappuccino', 'expresso',
           // Restaurantes e locais
