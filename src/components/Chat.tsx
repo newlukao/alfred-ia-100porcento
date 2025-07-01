@@ -295,7 +295,7 @@ const Chat: React.FC = () => {
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm whitespace-pre-line">{message.content}</p>
                 <p className="text-xs opacity-70 mt-1">
                   {message.timestamp.toLocaleTimeString()}
                 </p>
