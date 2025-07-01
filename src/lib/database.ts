@@ -29,6 +29,22 @@ export interface Configuration {
   updated_at: string;
 }
 
+export interface UserPersonality {
+  id: string;
+  usuario_id: string;
+  personality_profile: string;
+  conversation_count: number;
+  last_updated: string;
+}
+
+export interface ConversationHistory {
+  id: string;
+  usuario_id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
 class MockDatabase {
   private users: User[] = [
     {
@@ -70,6 +86,9 @@ class MockDatabase {
 
   private configuration: Configuration;
 
+  private userPersonalities: UserPersonality[] = [];
+  private conversationHistories: ConversationHistory[] = [];
+
   constructor() {
     // Load configuration from localStorage or use default
     const savedConfig = localStorage.getItem('app_configuration');
@@ -95,6 +114,18 @@ class MockDatabase {
     if (savedExpenses) {
       this.expenses = JSON.parse(savedExpenses);
     }
+
+    // Load user personalities from localStorage
+    const savedPersonalities = localStorage.getItem('app_user_personalities');
+    if (savedPersonalities) {
+      this.userPersonalities = JSON.parse(savedPersonalities);
+    }
+
+    // Load conversation histories from localStorage
+    const savedHistories = localStorage.getItem('app_conversation_histories');
+    if (savedHistories) {
+      this.conversationHistories = JSON.parse(savedHistories);
+    }
   }
 
   private saveConfiguration() {
@@ -103,6 +134,14 @@ class MockDatabase {
 
   private saveExpenses() {
     localStorage.setItem('app_expenses', JSON.stringify(this.expenses));
+  }
+
+  private saveUserPersonalities() {
+    localStorage.setItem('app_user_personalities', JSON.stringify(this.userPersonalities));
+  }
+
+  private saveConversationHistories() {
+    localStorage.setItem('app_conversation_histories', JSON.stringify(this.conversationHistories));
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
@@ -144,6 +183,64 @@ class MockDatabase {
     };
     this.saveConfiguration();
     return { ...this.configuration };
+  }
+
+  async getUserPersonality(userId: string): Promise<UserPersonality | null> {
+    return this.userPersonalities.find(p => p.usuario_id === userId) || null;
+  }
+
+  async updateUserPersonality(userId: string, personalityUpdate: string): Promise<UserPersonality> {
+    const existing = this.userPersonalities.find(p => p.usuario_id === userId);
+    
+    if (existing) {
+      existing.personality_profile = personalityUpdate;
+      existing.conversation_count += 1;
+      existing.last_updated = new Date().toISOString();
+    } else {
+      const newPersonality: UserPersonality = {
+        id: (this.userPersonalities.length + 1).toString(),
+        usuario_id: userId,
+        personality_profile: personalityUpdate,
+        conversation_count: 1,
+        last_updated: new Date().toISOString()
+      };
+      this.userPersonalities.push(newPersonality);
+    }
+    
+    this.saveUserPersonalities();
+    return this.userPersonalities.find(p => p.usuario_id === userId)!;
+  }
+
+  async addConversationMessage(userId: string, type: 'user' | 'assistant', content: string): Promise<ConversationHistory> {
+    const newMessage: ConversationHistory = {
+      id: (Date.now() + Math.random()).toString(),
+      usuario_id: userId,
+      type,
+      content,
+      timestamp: new Date().toISOString()
+    };
+    
+    this.conversationHistories.push(newMessage);
+    
+    // Keep only last 50 messages per user to avoid memory issues
+    const userMessages = this.conversationHistories.filter(h => h.usuario_id === userId);
+    if (userMessages.length > 50) {
+      const toRemove = userMessages.slice(0, userMessages.length - 50);
+      this.conversationHistories = this.conversationHistories.filter(h => 
+        !toRemove.some(r => r.id === h.id)
+      );
+    }
+    
+    this.saveConversationHistories();
+    return newMessage;
+  }
+
+  async getConversationHistory(userId: string, limit: number = 10): Promise<ConversationHistory[]> {
+    return this.conversationHistories
+      .filter(h => h.usuario_id === userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit)
+      .reverse(); // Return in chronological order
   }
 
   async deleteExpense(id: string): Promise<void> {

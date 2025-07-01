@@ -48,11 +48,27 @@ export class OpenAIService {
     }
   }
 
-  async extractExpenseData(userMessage: string, systemInstructions: string, conversationHistory: any[] = []): Promise<{
+  async extractExpenseData(
+    userMessage: string, 
+    systemInstructions: string, 
+    conversationHistory: any[] = [],
+    userPersonality?: string
+  ): Promise<{
     response: string;
     extraction: ExpenseExtraction;
+    personalityUpdate?: string;
   }> {
+    
+    const personalityContext = userPersonality ? `
+PERFIL DO USUÁRIO (aprenda e se adapte):
+${userPersonality}
+
+Com base no perfil, adapte seu jeito de falar para ficar mais próximo do usuário.
+` : '';
+
     const extractionPrompt = `Você é um assistente financeiro brasileiro MUITO ESPERTO e descontraído! Use gírias, seja natural e divertido.
+
+${personalityContext}
 
 PERSONALIDADE:
 - Fale como um brasileiro jovem e descontraído
@@ -61,6 +77,7 @@ PERSONALIDADE:
 - Use emojis com moderação
 - Seja MUITO INTELIGENTE e conecte informações entre mensagens
 - NÃO seja burro - se o usuário falou um valor antes, LEMBRE!
+- APRENDA com cada interação para ficar mais próximo do usuário
 
 HISTÓRICO DA CONVERSA:
 ${conversationHistory.map(msg => `${msg.type}: ${msg.content}`).join('\n')}
@@ -85,6 +102,7 @@ REGRAS IMPORTANTES (seja MUITO esperto):
 5. Se achar VALOR E CATEGORIA (mesmo em mensagens separadas), processe e marque isValid: true
 6. CONFIRME sempre de forma animada quando registrar
 7. Seja esperto com números por extenso: trezentos = 300, cinquenta = 50, etc.
+8. APRENDA o jeito do usuário falar e se adapte (formal/informal, gírias preferidas, etc)
 
 NÚMEROS POR EXTENSO:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
@@ -92,35 +110,25 @@ NÚMEROS POR EXTENSO:
 - duzentos = 200, trezentos = 300, quatrocentos = 400, quinhentos = 500
 - seiscentos = 600, setecentos = 700, oitocentos = 800, novecentos = 900, mil = 1000
 
-EXEMPLOS DE INTELIGÊNCIA:
-- Usuário: "gastei 300" depois "comprei camisa" = R$ 300 em vestuário (CONECTAR!)
-- Usuário: "trezentos reais" depois "foi no mercado" = R$ 300 em mercado
-- Usuário: "cinquenta" depois "uber" = R$ 50 em transporte
-
-RESPOSTAS HUMANIZADAS:
-- Sucesso: "Show demais! Registrei aqui: R$ 300 em vestuário pela camisa! Mandou bem! 👕"
-- Falta categoria: "Opa, R$ 300 anotado! Mas em que categoria rolou esse gasto?"
-- Falta valor: "Beleza, vi que foi em vestuário! Mas quanto custou?"
-- Erro: "Opa, não consegui sacar direito... Pode falar tipo 'gastei R$ 50 no mercado'?"
-
 FORMATO OBRIGATÓRIO (JSON):
 {
-  "response": "resposta_humanizada_com_girias_e_descontracao",
+  "response": "resposta_humanizada_com_girias_e_descontracao_adaptada_ao_usuario",
   "extraction": {
     "valor": numero_ou_0,
     "categoria": "categoria_ou_vazio",
     "descricao": "descrição_natural_do_gasto",
     "data": "YYYY-MM-DD",
     "isValid": true_se_valor_E_categoria_identificados
-  }
+  },
+  "personalityUpdate": "observacoes_sobre_o_jeito_do_usuario_falar_para_aprender_ex_usa_girias_formais_informal_etc"
 }
 
 IMPORTANTE: 
 - Seja MUITO ESPERTO - conecte informações de mensagens anteriores!
 - Use o histórico da conversa para pegar valores mencionados antes
 - SEMPRE JSON válido
-- Respostas HUMANIZADAS com gírias brasileiras
-- Não seja robô burro - seja inteligente!`;
+- Respostas HUMANIZADAS com gírias brasileiras adaptadas ao usuário
+- APRENDA com cada interação!`;
 
     try {
       const messages: ChatMessage[] = [
@@ -161,6 +169,7 @@ IMPORTANTE:
         // Enhanced context analysis - look at conversation history
         const allMessages = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
         const currentMessage = userMessage.toLowerCase();
+        const fullText = allMessages + ' ' + currentMessage;
         
         // Smart value extraction from current message or history
         if (!valor) {
@@ -170,8 +179,7 @@ IMPORTANTE:
             valor = parseFloat(numberMatch[0].replace(',', '.'));
           } else {
             // Try conversation history for recent values
-            const historyText = allMessages + ' ' + currentMessage;
-            const historyNumberMatch = historyText.match(/(?:gastei|paguei|custou|foi)\s+(\d+(?:[.,]\d+)?)/);
+            const historyNumberMatch = fullText.match(/(?:gastei|paguei|custou|foi)\s+(\d+(?:[.,]\d+)?)/);
             if (historyNumberMatch) {
               valor = parseFloat(historyNumberMatch[1].replace(',', '.'));
             }
@@ -185,7 +193,6 @@ IMPORTANTE:
             'seiscentos': 600, 'setecentos': 700, 'oitocentos': 800, 'novecentos': 900, 'mil': 1000
           };
           
-          const fullText = historyText + ' ' + currentMessage;
           for (const [word, num] of Object.entries(numberWords)) {
             if (fullText.includes(word)) {
               valor = num;
@@ -255,7 +262,8 @@ IMPORTANTE:
             descricao: parsed.extraction?.descricao || (categoria ? `Gasto em ${categoria}` : 'Gasto'),
             data: parsed.extraction?.data || new Date().toISOString().split('T')[0],
             isValid: isValid
-          }
+          },
+          personalityUpdate: parsed.personalityUpdate || ''
         };
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);

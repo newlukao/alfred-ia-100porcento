@@ -19,14 +19,7 @@ interface Message {
 const Chat: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'assistant',
-      content: '👋 E aí! Beleza? Sou seu assistente financeiro e tô aqui pra te ajudar a organizar seus gastos! Manda aí o que você gastou que eu anoto tudo certinho! 💰',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
@@ -43,7 +36,43 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     checkApiKeyConfiguration();
-  }, []);
+    if (user) {
+      loadConversationHistory();
+    }
+  }, [user]);
+
+  const loadConversationHistory = async () => {
+    if (!user) return;
+    
+    try {
+      const history = await database.getConversationHistory(user.id, 20);
+      
+      if (history.length === 0) {
+        // First time user - show welcome message
+        const welcomeMessage: Message = {
+          id: '1',
+          type: 'assistant',
+          content: '👋 E aí! Beleza? Sou seu assistente financeiro pessoal e tô aqui pra te ajudar a organizar seus gastos! Vou aprender seu jeito de falar pra ficar cada vez melhor! Manda aí o que você gastou! 💰',
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+        
+        // Save welcome message to history
+        await database.addConversationMessage(user.id, 'assistant', welcomeMessage.content);
+      } else {
+        // Load existing conversation
+        const loadedMessages: Message[] = history.map(h => ({
+          id: h.id,
+          type: h.type,
+          content: h.content,
+          timestamp: new Date(h.timestamp)
+        }));
+        setMessages(loadedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading conversation history:', error);
+    }
+  };
 
   const checkApiKeyConfiguration = async () => {
     setIsCheckingConfig(true);
@@ -78,6 +107,10 @@ const Chat: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    
+    // Save user message to history
+    await database.addConversationMessage(user.id, 'user', inputValue);
+    
     setInputValue('');
     setIsLoading(true);
 
@@ -85,9 +118,17 @@ const Chat: React.FC = () => {
       const config = await database.getConfiguration();
       const openAI = new OpenAIService(config.openai_api_key);
       
+      // Get user's personality profile
+      const userPersonality = await database.getUserPersonality(user.id);
+      
       // Pass conversation history to make the AI smarter
-      const conversationHistory = messages.slice(-4); // Last 4 messages for context
-      const result = await openAI.extractExpenseData(inputValue, config.instrucoes_personalizadas, conversationHistory);
+      const conversationHistory = messages.slice(-6); // Last 6 messages for context
+      const result = await openAI.extractExpenseData(
+        inputValue, 
+        config.instrucoes_personalizadas, 
+        conversationHistory,
+        userPersonality?.personality_profile
+      );
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -97,6 +138,15 @@ const Chat: React.FC = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Save assistant message to history
+      await database.addConversationMessage(user.id, 'assistant', result.response);
+      
+      // Update user personality if AI learned something new
+      if (result.personalityUpdate && result.personalityUpdate.trim().length > 0) {
+        await database.updateUserPersonality(user.id, result.personalityUpdate);
+        console.log('Personality updated:', result.personalityUpdate);
+      }
 
       // Save expense if valid
       if (result.extraction.isValid && result.extraction.valor > 0) {
@@ -136,6 +186,9 @@ const Chat: React.FC = () => {
       };
 
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Save error message to history
+      await database.addConversationMessage(user.id, 'assistant', errorMessage.content);
       
       toast({
         title: "Eita!",
