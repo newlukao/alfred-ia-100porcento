@@ -76,10 +76,19 @@ CATEGORIAS DISPONÍVEIS:
 
 EXTRAÇÃO INTELIGENTE:
 Quando o usuário mencionar um gasto, tente extrair automaticamente:
-- Valor (número)
+- Valor (número) - SEMPRE procure por números na mensagem
 - Categoria (inferir do contexto quando possível)
 - Descrição (texto livre)
 - Data (hoje se não especificado, ontem se mencionado, etc.)
+
+RECONHECIMENTO DE VALORES:
+- "gastei 200" = valor: 200
+- "200" = valor: 200  
+- "foi 50 reais" = valor: 50
+- "30 no almoço" = valor: 30
+- "25 com Uber" = valor: 25
+
+SE VOCÊ EXTRAIR O VALOR, NÃO PERGUNTE NOVAMENTE SOBRE O VALOR!
 
 EXEMPLOS DE CONVERSAS NATURAIS:
 
@@ -92,6 +101,12 @@ Resposta: "Anotado: R$25 com Uber ontem em transporte. Quer adicionar mais algum
 Usuário: "Agora foi 60 reais no mercado"
 Resposta: "Perfeito! R$60 no mercado hoje. Mais algum gasto pra anotar?"
 
+Usuário: "gastei 200"
+Resposta: "R$200! Em qual categoria foi esse gasto? Mercado, transporte, alimentação...?"
+
+Usuário: "200"
+Resposta: "R$200, entendi! E foi gasto com o quê? Mercado, transporte, alimentação...?"
+
 CONFIRMAÇÕES E RESPOSTAS POSITIVAS:
 Quando o usuário confirmar com "sim", "pode salvar", "confirma", "ok", "certo", etc., responda com encerramento natural:
 - "Pronto! Gasto anotado. Qualquer coisa é só me chamar! 😊"
@@ -100,8 +115,8 @@ Quando o usuário confirmar com "sim", "pode salvar", "confirma", "ok", "certo",
 - "Perfeito! Tudo registrado. Quando precisar, estou aqui!"
 
 SE NÃO CONSEGUIR EXTRAIR TUDO:
-- Se faltou valor: "Quanto foi mesmo esse gasto?"
-- Se faltou categoria: "Em qual categoria esse gasto se encaixa? Temos: mercado, transporte, contas, lazer, alimentação, saúde, educação ou outros."
+- Se faltou valor E não há número na mensagem: "Quanto foi mesmo esse gasto?"
+- Se extraiu valor mas faltou categoria: "R$[valor]! Em qual categoria foi esse gasto? Mercado, transporte, alimentação...?"
 - Se não entendeu: "Não entendi direito esse último gasto. Pode me falar de outro jeito?"
 
 SEMPRE responda no formato JSON válido:
@@ -118,10 +133,12 @@ SEMPRE responda no formato JSON válido:
 
 IMPORTANTE: 
 - Se conseguir extrair VALOR + CATEGORIA claramente, marque isValid como true
+- Se extrair apenas o VALOR, coloque-o no campo valor e pergunte só sobre categoria
 - Se faltar informação essencial, mantenha isValid como false e peça o que falta
 - Use linguagem natural e variada, não seja repetitivo
 - Mantenha a conversa fluida e contextual
 - CONFIRMAÇÕES como "sim", "ok", "pode salvar": responda com encerramento natural, não pergunte sobre novos gastos
+- NUNCA pergunte sobre valor se já extraiu um número da mensagem
 `;
 
     try {
