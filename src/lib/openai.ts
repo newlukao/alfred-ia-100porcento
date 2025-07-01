@@ -147,7 +147,28 @@ IMPORTANTE:
           if (jsonMatch) {
             cleanedResult = jsonMatch[0];
           } else {
-            throw new Error('No JSON found in response');
+            console.log('No JSON found, using direct fallback parsing for:', result);
+            // Direct fallback parsing for simple cases like "gastei 20"
+            let valor = 0;
+            let categoria = 'outros';
+            
+            const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
+            if (numberMatch) {
+              valor = parseFloat(numberMatch[0].replace(',', '.'));
+            }
+            
+            return {
+              response: valor > 0 ? 
+                `Opa, R$ ${valor.toFixed(2)} anotado! Mas em que categoria rolou esse gasto? (alimentação, vestuário, transporte...)` :
+                'Opa, não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅',
+              extraction: {
+                valor: valor,
+                categoria: valor > 0 ? '' : categoria,
+                descricao: valor > 0 ? 'Gasto a categorizar' : 'Gasto',
+                data: new Date().toISOString().split('T')[0],
+                isValid: false
+              }
+            };
           }
         }
         
