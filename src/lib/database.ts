@@ -22,6 +22,12 @@ export interface Configuration {
   instrucoes_personalizadas: string;
   modelo_usado: string;
   openai_api_key: string;
+  criterios_sucesso: string;
+  situacoes_interrupcao: string;
+  contexto_geral: string;
+  instrucoes_individuais: string;
+  mensagem_inicial: string;
+  webhook_url: string;
   updated_at: string;
 }
 
@@ -77,6 +83,12 @@ class MockDatabase {
         instrucoes_personalizadas: 'Você é um assistente financeiro amigável e motivacional. Use emojis e seja positivo ao ajudar os usuários a organizarem seus gastos. Sempre parabenize quando eles registrarem gastos e dê dicas financeiras úteis.',
         modelo_usado: 'gpt-3.5-turbo',
         openai_api_key: '',
+        criterios_sucesso: 'O usuário confirmou que suas dúvidas foram esclarecidas, expressou satisfação com as informações recebidas, ou indicou que não precisa de mais ajuda no momento.',
+        situacoes_interrupcao: 'Usuário solicita falar com atendente humano, apresenta problema técnico complexo, demonstra insatisfação extrema, ou faz perguntas fora do escopo do assistente.',
+        contexto_geral: 'Somos uma empresa de tecnologia focada em soluções financeiras inovadoras. Ajudamos pessoas a organizarem melhor seus gastos e tomarem decisões financeiras mais inteligentes.',
+        instrucoes_individuais: 'Personalize a conversa com base no histórico do usuário: {{nome_usuario}}, {{historico_gastos}}, {{categoria_preferida}}.',
+        mensagem_inicial: '👋 Olá! Sou seu assistente financeiro pessoal. Estou aqui para ajudar você a organizar seus gastos e melhorar sua vida financeira. Como posso te ajudar hoje?',
+        webhook_url: '',
         updated_at: new Date().toISOString()
       };
     }

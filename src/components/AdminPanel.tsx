@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Settings, Activity, Database, Key } from 'lucide-react';
+import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, AlertCircle, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, User, Expense, Configuration } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
@@ -191,16 +191,20 @@ const AdminPanel: React.FC = () => {
       {/* Tabs */}
       <Tabs defaultValue="config" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="config">Configurações</TabsTrigger>
+          <TabsTrigger value="config">Configurações Básicas</TabsTrigger>
+          <TabsTrigger value="bot">Configurações do Bot</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="logs">Logs & Estatísticas</TabsTrigger>
         </TabsList>
 
-        {/* Configuration Tab */}
+        {/* Basic Configuration Tab */}
         <TabsContent value="config" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Configurações do Sistema</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <Key className="h-5 w-5" />
+                <span>Configurações Básicas do Sistema</span>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
@@ -246,20 +250,20 @@ const AdminPanel: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Instruções Personalizadas para o Assistente IA
+                  URL do Webhook
                 </label>
-                <Textarea
-                  value={config?.instrucoes_personalizadas || ''}
+                <Input
+                  type="url"
+                  value={config?.webhook_url || ''}
                   onChange={(e) => setConfig(prev => prev ? {
                     ...prev,
-                    instrucoes_personalizadas: e.target.value
+                    webhook_url: e.target.value
                   } : null)}
-                  placeholder="Ex: Você é um assistente financeiro amigável. Use emojis e seja motivacional..."
-                  rows={6}
+                  placeholder="https://seu-site.com/webhook"
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Estas instruções serão enviadas como system message para o ChatGPT em todas as conversas.
+                  URL para onde as respostas do bot serão enviadas via webhook.
                 </p>
               </div>
 
@@ -268,7 +272,152 @@ const AdminPanel: React.FC = () => {
                 disabled={isSaving}
                 className="w-full"
               >
-                {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                {isSaving ? 'Salvando...' : 'Salvar Configurações Básicas'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Bot Configuration Tab */}
+        <TabsContent value="bot" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MessageSquare className="h-5 w-5" />
+                <span>Configurações do Assistente IA</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  💬 Mensagem Inicial
+                </label>
+                <Textarea
+                  value={config?.mensagem_inicial || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    mensagem_inicial: e.target.value
+                  } : null)}
+                  placeholder="Ex: 👋 Olá! Sou seu assistente financeiro..."
+                  rows={3}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Primeira mensagem que o bot envia para o usuário no WhatsApp.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  📋 Instruções Personalizadas
+                </label>
+                <Textarea
+                  value={config?.instrucoes_personalizadas || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    instrucoes_personalizadas: e.target.value
+                  } : null)}
+                  placeholder="Ex: Você é um assistente financeiro amigável..."
+                  rows={4}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Instruções gerais sobre como o assistente deve se comportar.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  🌐 Contexto Geral da Empresa
+                </label>
+                <Textarea
+                  value={config?.contexto_geral || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    contexto_geral: e.target.value
+                  } : null)}
+                  placeholder="Ex: Somos uma empresa de tecnologia focada em..."
+                  rows={3}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Informações sobre sua empresa que o assistente deve conhecer.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  👤 Instruções Individuais (Variáveis Dinâmicas)
+                </label>
+                <Textarea
+                  value={config?.instrucoes_individuais || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    instrucoes_individuais: e.target.value
+                  } : null)}
+                  placeholder="Ex: Personalize com {{nome_usuario}}, {{historico_gastos}}..."
+                  rows={3}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use variáveis como {'{{nome_usuario}}'} para personalizar a conversa.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5" />
+                <span>Critérios de Controle da Conversa</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  ✅ Critérios de Sucesso
+                </label>
+                <Textarea
+                  value={config?.criterios_sucesso || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    criterios_sucesso: e.target.value
+                  } : null)}
+                  placeholder="Ex: Usuário confirmou que suas dúvidas foram esclarecidas..."
+                  rows={4}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Defina quando o assistente deve considerar a conversa bem-sucedida e finalizada.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  ⚠️ Situações de Interrupção
+                </label>
+                <Textarea
+                  value={config?.situacoes_interrupcao || ''}
+                  onChange={(e) => setConfig(prev => prev ? {
+                    ...prev,
+                    situacoes_interrupcao: e.target.value
+                  } : null)}
+                  placeholder="Ex: Usuário solicita falar com atendente humano..."
+                  rows={4}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Defina quando o assistente deve interromper a conversa e transferir para atendimento humano.
+                </p>
+              </div>
+
+              <Button 
+                onClick={handleSaveConfig}
+                disabled={isSaving}
+                className="w-full"
+              >
+                {isSaving ? 'Salvando...' : 'Salvar Configurações do Bot'}
               </Button>
             </CardContent>
           </Card>
