@@ -150,12 +150,60 @@ IMPORTANTE:
       const result = await this.chatCompletion(messages);
       console.log('OpenAI raw response:', result);
       
-      // FORÇAR ANÁLISE LOCAL SE OpenAI FALHAR
-      console.log('🔧 INICIANDO ANÁLISE LOCAL FORÇADA...');
-      console.log('📝 Mensagem do usuário:', userMessage);
-      console.log('📚 Histórico da conversa:', conversationHistory);
+      // SISTEMA DE CONFIRMAÇÃO (PRIORITY #1)
+      const currentMessage = userMessage.toLowerCase();
+      const confirmationWords = ['sim', 'ta sim', 'tá sim', 'certo', 'isso mesmo', 'exato', 'correto', 'confirmo', 'pode ser', 'tá certo', 'é isso', 'isso aí', 'ta certo'];
+      const isConfirmation = confirmationWords.some(word => currentMessage.includes(word));
       
-      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM)
+      console.log(`❓ Verificando confirmação para: "${userMessage}"`);
+      console.log(`✅ É confirmação? ${isConfirmation}`);
+      
+      if (isConfirmation) {
+        // Buscar a última mensagem do bot que pediu confirmação
+        const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+        const lastBotMessage = botMessages[botMessages.length - 1];
+        
+        console.log(`🤖 Última mensagem do bot: "${lastBotMessage?.content}"`);
+        
+        if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
+          // Extrair valor e categoria da mensagem do bot
+          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+(\w+)/i);
+          
+          console.log(`💰 Valor extraído: ${valorMatch?.[1]}`);
+          console.log(`🏷️ Categoria extraída: ${categoriaMatch?.[1]}`);
+          
+          if (valorMatch && categoriaMatch) {
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            let categoria = categoriaMatch[1].toLowerCase();
+            
+            // Mapear categorias
+            if (['tecnologia', 'alimentação', 'vestuário', 'transporte', 'mercado', 'lazer', 'saúde', 'casa', 'contas'].includes(categoria)) {
+              // Categoria já está correta
+            } else {
+              categoria = 'outros';
+            }
+            
+            console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria}`);
+            
+            return {
+              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉 Gasto salvo com sucesso!`,
+              extraction: {
+                valor: valor,
+                categoria: categoria,
+                descricao: `Gasto em ${categoria}`,
+                data: new Date().toISOString().split('T')[0],
+                isValid: true // CONFIRMA E REGISTRA!
+              }
+            };
+          }
+        }
+      }
+      
+      // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO
+      console.log('🔧 INICIANDO ANÁLISE LOCAL...');
+      console.log('📝 Mensagem do usuário:', userMessage);
+      
       let valor = 0;
       let categoria = '';
       
