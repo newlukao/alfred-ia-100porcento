@@ -348,6 +348,40 @@ IMPORTANTE:
         };
       }
       
+      // DETECÇÃO DE INTENÇÃO DE GASTO (antes da análise local)
+      const expenseIntentWords = ['gastei', 'gasto', 'comprei', 'paguei', 'saiu', 'foi', 'dinheiro', 'real', 'reais', 'muito', 'abessa', 'bastante', 'hoje', 'ontem'];
+      const hasExpenseIntent = expenseIntentWords.some(word => currentMessage.includes(word));
+      
+      console.log(`💡 Verificando intenção de gasto para: "${userMessage}"`);
+      console.log(`💡 Tem intenção de gasto? ${hasExpenseIntent}`);
+      
+      if (hasExpenseIntent) {
+        // Se detectou intenção de gasto mas não tem valor específico, perguntar
+        const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
+        if (!numberMatch) {
+          const helpfulResponses = [
+            'Opa! Vi que você gastou! 💰 Me conta quanto foi? Tipo: "gastei R$ 100" ou "foram R$ 50"!',
+            'Show! Rolou um gasto aí! 😊 Qual foi o valor? Me fala tipo: "saiu R$ 80" ou "gastei R$ 30"!',
+            'Beleza! Então você gastou hoje! 🤑 Quanto que foi? Pode ser: "paguei R$ 25" ou "foram R$ 60"!',
+            'Massa! Vamos anotar esse gasto! 📝 Me diz o valor: "gastei R$ 40" ou "saiu R$ 90"!',
+            'Top! Vi que rolou uma despesa! 💸 Qual foi a quantia? Tipo: "gastei R$ 15" ou "paguei R$ 120"!'
+          ];
+          
+          const randomResponse = helpfulResponses[Math.floor(Math.random() * helpfulResponses.length)];
+          
+          return {
+            response: randomResponse,
+            extraction: {
+              valor: 0,
+              categoria: '',
+              descricao: '',
+              data: new Date().toISOString().split('T')[0],
+              isValid: false
+            }
+          };
+        }
+      }
+      
       // ANÁLISE LOCAL INTELIGENTE (BACKUP SYSTEM) - SÓ RODA SE NÃO FOR CONFIRMAÇÃO, NEGATIVA, SAUDAÇÃO OU CONVERSACIONAL
       console.log('🔧 INICIANDO ANÁLISE LOCAL...');
       console.log('📝 Mensagem do usuário:', userMessage);
