@@ -213,8 +213,8 @@ IMPORTANTE:
       }
       
       // DETECÇÃO DE RESPOSTAS NEGATIVAS (não tem mais gastos)
-      const negativeWords = ['nao', 'não', 'nada', 'sem', 'rolou nao', 'rolou não', 'não rolou', 'nao rolou', 'por hoje não', 'hoje não', 'sem mais', 'acabou', 'só isso'];
-      const isNegative = negativeWords.some(word => currentMessage.includes(word));
+      const negativeWords = ['não', 'nada', 'sem mais', 'rolou não', 'não rolou', 'por hoje não', 'hoje não', 'acabou', 'só isso', 'nenhum'];
+      const isNegative = negativeWords.some(word => currentMessage.includes(word)) && !currentMessage.includes('última') && !currentMessage.includes('gastei');
       
       console.log(`❌ Verificando negativa para: "${userMessage}"`);
       console.log(`❌ É negativa? ${isNegative}`);
