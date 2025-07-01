@@ -177,16 +177,20 @@ IMPORTANTE:
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
             let categoria = categoriaMatch[1].toLowerCase();
             
-            // Mapear categorias corretamente - não sobrescrever!
+            // Mapear categorias corretamente
             console.log(`🔧 Categoria original detectada: "${categoria}"`);
             
-            // Manter a categoria como foi detectada inicialmente
-            if (!['tecnologia', 'alimentação', 'vestuário', 'transporte', 'mercado', 'lazer', 'saúde', 'casa', 'contas'].includes(categoria)) {
-              // Se não for uma categoria válida, tentar mapear
+            // Validar se é uma categoria válida ou mapear para a correta
+            const validCategories = ['tecnologia', 'alimentação', 'vestuário', 'transporte', 'mercado', 'lazer', 'saúde', 'casa', 'contas', 'educação', 'beleza', 'pets'];
+            
+            if (!validCategories.includes(categoria)) {
+              // Mapear para categoria correta
               if (categoria.includes('aliment') || categoria.includes('hamburg') || categoria.includes('comida')) {
                 categoria = 'alimentação';
               } else if (categoria.includes('tecnolog') || categoria.includes('computador')) {
                 categoria = 'tecnologia';
+              } else if (categoria.includes('pet') || categoria.includes('veterinar')) {
+                categoria = 'pets';
               } else {
                 categoria = 'outros';
               }
@@ -457,7 +461,7 @@ IMPORTANTE:
         const found = words.find(word => textToAnalyze.includes(word));
         if (found) {
           categoria = cat;
-          console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${found})`);
+          console.log(`🎯 CATEGORIA ENCONTRADA: ${categoria} (palavra: ${found}) em texto: "${textToAnalyze}"`);
           break;
         }
       }
