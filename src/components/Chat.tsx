@@ -85,7 +85,9 @@ const Chat: React.FC = () => {
       const config = await database.getConfiguration();
       const openAI = new OpenAIService(config.openai_api_key);
       
-      const result = await openAI.extractExpenseData(inputValue, config.instrucoes_personalizadas);
+      // Pass conversation history to make the AI smarter
+      const conversationHistory = messages.slice(-4); // Last 4 messages for context
+      const result = await openAI.extractExpenseData(inputValue, config.instrucoes_personalizadas, conversationHistory);
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -110,7 +112,9 @@ const Chat: React.FC = () => {
           "Massa! Gasto registrado! 💰",
           "Show! Anotado no sistema! 🎉",
           "Top! Registrado com sucesso! ✨",
-          "Fechou! Mais um gasto no controle! 📊"
+          "Fechou! Mais um gasto no controle! 📊",
+          "Mandou bem! Gasto salvo! 🚀",
+          "Dahora! Tudo anotado! 💪"
         ];
         
         const randomMessage = successMessages[Math.floor(Math.random() * successMessages.length)];
