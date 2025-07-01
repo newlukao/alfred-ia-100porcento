@@ -401,14 +401,19 @@ IMPORTANTE:
             return expenseDate >= startDate && expenseDate <= endDate;
           });
           
+          console.log(`📅 Período: ${periodo}`);
+          console.log(`📅 Data início: ${startDate.toISOString()}`);
+          console.log(`📅 Data fim: ${endDate.toISOString()}`);
           console.log(`📅 Gastos filtrados para ${periodo}: ${filteredExpenses.length}`);
+          console.log(`📋 Todos os gastos do usuário:`, userExpenses.map(e => ({ data: e.data, valor: e.valor, categoria: e.categoria })));
+          console.log(`📋 Gastos filtrados:`, filteredExpenses.map(e => ({ data: e.data, valor: e.valor, categoria: e.categoria })));
           
           if (filteredExpenses.length === 0) {
             const motivadores = ['Beleza!', 'Tranquilo!', 'Show!', 'Massa!'];
             const motivador = motivadores[Math.floor(Math.random() * motivadores.length)];
             
             return {
-              response: `${motivador} Não achei gastos ${periodo === 'total' ? 'registrados ainda' : `da ${periodo}`}! 🤷‍♂️\n\n💡 **Bora começar?** Fala aí qualquer gasto: "gastei R$ 50 no almoço" ou "paguei R$ 30 no uber"!\n\n✨ Quanto mais você registrar, melhor vou te ajudar a controlar as finanças! 😊`,
+              response: `${motivador} Não achei gastos ${periodo === 'total' ? 'registrados ainda' : `da ${periodo}`}! 🤷‍♂️\n\n💡 Bora começar? Fala aí qualquer gasto: "gastei R$ 50 no almoço" ou "paguei R$ 30 no uber"!\n\n✨ Quanto mais você registrar, melhor vou te ajudar a controlar as finanças! 😊`,
               extraction: {
                 valor: 0,
                 categoria: '',
