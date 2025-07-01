@@ -188,7 +188,7 @@ IMPORTANTE:
         if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
           // Extrair valor e categoria da mensagem do bot
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
           
           console.log(`💰 Valor extraído: ${valorMatch?.[1]}`);
           console.log(`🏷️ Categoria extraída: ${categoriaMatch?.[1]}`);
@@ -239,7 +239,7 @@ IMPORTANTE:
         // NOVO: Detectar entrada de data específica
         if (lastBotMessage && lastBotMessage.content.includes('quando foi esse gasto')) {
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
           
           if (valorMatch && categoriaMatch) {
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
@@ -334,7 +334,7 @@ IMPORTANTE:
         // NOVO: Confirmação final da data específica
         if (lastBotMessage && lastBotMessage.content.includes('Então foi dia') && lastBotMessage.content.includes('pra confirmar')) {
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
           const dataMatch = lastBotMessage.content.match(/no dia (.+?)\./);
           
           if (valorMatch && categoriaMatch && dataMatch) {
@@ -364,7 +364,7 @@ IMPORTANTE:
         if (lastBotMessage && lastBotMessage.content.includes('foi hoje')) {
           // Buscar dados do gasto pendente na mensagem do bot
           const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
           
           if (valorMatch && categoriaMatch) {
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
@@ -394,7 +394,7 @@ IMPORTANTE:
         
         // Buscar dados do gasto pendente na mensagem do bot
         const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-        const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+        const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
         
         if (valorMatch && categoriaMatch) {
           const valor = parseFloat(valorMatch[1].replace(',', '.'));
@@ -560,10 +560,21 @@ IMPORTANTE:
       const reportWords = ['quanto gastei', 'gastos', 'total', 'semana', 'mês', 'mes', 'hoje', 'ontem', 'relatório', 'relatrio', 'histórico', 'historico', 'resumo', 'balanço', 'balanco', 'última semana', 'ultimo mes', 'gasto total', 'quanto foi'];
       const isReportQuery = reportWords.some(word => currentMessage.includes(word));
       
+      // VERIFICAR SE NÃO ESTÁ NO MEIO DE UM FLUXO DE CADASTRO DE GASTO
+      const allBotMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+      const mostRecentBotMessage = allBotMessages[allBotMessages.length - 1];
+      const isInExpenseFlow = mostRecentBotMessage && (
+        mostRecentBotMessage.content.includes('quando foi esse gasto') ||
+        mostRecentBotMessage.content.includes('foi hoje') ||
+        mostRecentBotMessage.content.includes('Tá certo?') ||
+        mostRecentBotMessage.content.includes('Em que categoria')
+      );
+      
       console.log(`📊 Verificando consulta de relatório para: "${userMessage}"`);
       console.log(`📊 É consulta de relatório? ${isReportQuery}`);
+      console.log(`📊 Está em fluxo de gasto? ${isInExpenseFlow}`);
       
-      if (isReportQuery && userId) {
+      if (isReportQuery && userId && !isInExpenseFlow) {
         console.log(`📊 Executando consulta de relatório para usuário: ${userId}`);
         
         try {
@@ -988,7 +999,7 @@ IMPORTANTE:
           if (lastBotMessage && lastBotMessage.content.includes('Tá certo?')) {
             // Extrair valor e categoria da mensagem do bot
             const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-            const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*)/i);
+            const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
             
             if (valorMatch && categoriaMatch) {
               valor = parseFloat(valorMatch[1].replace(',', '.'));
