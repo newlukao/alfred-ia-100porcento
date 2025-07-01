@@ -276,12 +276,28 @@ IMPORTANTE:
       console.log(`💬 É conversacional? ${isConversational}`);
       
       if (isConversational) {
-        // Verificar se a mensagem anterior do bot foi uma saudação
+        // Verificar se a mensagem anterior do bot foi uma saudação OU pergunta sobre mais gastos
         const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
         const lastBotMessage = botMessages[botMessages.length - 1];
         
-        if (lastBotMessage && (lastBotMessage.content.includes('Pronto pra anotar') || lastBotMessage.content.includes('Vamos registrar'))) {
+        console.log(`🤖 Última mensagem do bot para conversacional: "${lastBotMessage?.content}"`);
+        
+        // Check if bot was asking about expenses, greeting, or asking for more expenses
+        if (lastBotMessage && (
+          lastBotMessage.content.includes('Pronto pra anotar') || 
+          lastBotMessage.content.includes('Vamos registrar') ||
+          lastBotMessage.content.includes('mais algum gasto') ||
+          lastBotMessage.content.includes('organizar as finanças') ||
+          lastBotMessage.content.includes('anotar uns gastos') ||
+          lastBotMessage.content.includes('Bora organizar') ||
+          lastBotMessage.content.includes('Show de bola') ||
+          lastBotMessage.content.includes('Fala aí qualquer gasto') ||
+          lastBotMessage.content.includes('💰') // Any message with money emoji is likely asking for expenses
+        )) {
+          console.log(`✅ CONVERSACIONAL DETECTADO - retornando resposta apropriada`);
+          
           const readyResponses = [
+            'Beleza! Tô aqui pra ajudar a organizar suas finanças! Fala aí, já teve algum gasto que você quer anotar? Pode ser qualquer coisa, tipo "gastei R$ 100 na internet" ou "gastei R$ 50 no cinema"! 🎉',
             'Show! 🎉 Então me fala aí, qual foi o último gasto que você fez? Pode ser qualquer coisa: comida, roupa, transporte... 💰',
             'Massa! 😊 Vamos lá então! Me conta, gastou com o quê hoje? Almoço? Uber? Compras? 🛒',
             'Dahora! 🚀 Bora anotar! Qual foi a última vez que você abriu a carteira? Me fala aí! 💳',
@@ -301,6 +317,8 @@ IMPORTANTE:
               isValid: false
             }
           };
+        } else {
+          console.log(`❌ CONVERSACIONAL não correspondeu ao contexto esperado`);
         }
       }
       
