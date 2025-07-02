@@ -154,9 +154,9 @@ const LoginForm: React.FC = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="w-full">
                 <TabsTrigger value="login">Entrar</TabsTrigger>
-                <TabsTrigger value="register">Registrar</TabsTrigger>
+                {/* <TabsTrigger value="register">Registrar</TabsTrigger> */}
               </TabsList>
               
               <TabsContent value="login">
@@ -192,7 +192,7 @@ const LoginForm: React.FC = () => {
               </Button>
             </form>
               </TabsContent>
-              
+              {/*
               <TabsContent value="register">
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -252,21 +252,11 @@ const LoginForm: React.FC = () => {
                   </Button>
                 </form>
               </TabsContent>
+              */}
             </Tabs>
 
             {/* Demo Alert - apenas na aba login */}
-            {activeTab === 'login' && (
-            <Alert className="mt-4">
-              <AlertDescription>
-                <div className="space-y-2">
-                    <p className="font-medium">🧪 Ambiente de desenvolvimento:</p>
-                    <div className="text-sm">
-                      <p>Crie sua conta ou use: <strong>teste@exemplo.com</strong> / <strong>123456</strong></p>
-                  </div>
-                </div>
-              </AlertDescription>
-            </Alert>
-            )}
+            {/* Removido alerta de ambiente de desenvolvimento */}
           </CardContent>
         </Card>
 

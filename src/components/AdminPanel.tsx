@@ -10,6 +10,8 @@ import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, A
 import { useAuth } from '@/contexts/AuthContext';
 import { database, User, Expense, Configuration } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { authService } from '@/lib/supabase-auth';
 
 const AdminPanel: React.FC = () => {
   const { user } = useAuth();
@@ -31,6 +33,19 @@ const AdminPanel: React.FC = () => {
     recent_notifications: []
   });
   const [isSendingNotification, setIsSendingNotification] = useState(false);
+
+  // New state for user search
+  const [userSearch, setUserSearch] = useState("");
+
+  // No início do componente AdminPanel:
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ nome: '', email: '', senha: '', plano: 'none' });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  // New state for user edit
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editUser, setEditUser] = useState<any>(null);
+  const [isEditingUser, setIsEditingUser] = useState(false);
 
   useEffect(() => {
     if (user?.is_admin) {
@@ -184,6 +199,67 @@ const AdminPanel: React.FC = () => {
 
   const clearUserSelection = () => {
     setSelectedUsers([]);
+  };
+
+  // Função para criar usuário
+  const handleCreateUser = async () => {
+    setIsCreatingUser(true);
+    try {
+      const userPayload = {
+        nome: newUser.nome,
+        email: newUser.email,
+        is_admin: false,
+        plan_type: newUser.plano === 'none' ? null : newUser.plano,
+        data_criacao: new Date().toISOString().split('T')[0]
+      };
+      const created = await database.createUser(userPayload);
+      if (!created) {
+        toast({ title: 'Erro', description: 'Erro ao criar usuário', variant: 'destructive' });
+        setIsCreatingUser(false);
+        return;
+      }
+      setIsCreateUserOpen(false);
+      setNewUser({ nome: '', email: '', senha: '', plano: 'none' });
+      await loadAdminData();
+      toast({ title: 'Usuário criado!', description: 'Usuário cadastrado com sucesso.' });
+    } catch (err) {
+      toast({ title: 'Erro', description: 'Erro ao criar usuário', variant: 'destructive' });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  // Função para abrir modal de edição
+  const openEditUser = (userData: any) => {
+    setEditUser({ ...userData, senha: '' });
+    setIsEditUserOpen(true);
+  };
+
+  // Função para salvar edição
+  const handleEditUser = async () => {
+    if (!editUser) return;
+    setIsEditingUser(true);
+    try {
+      // Atualizar nome (diretamente na tabela users)
+      await database.createUser({
+        id: editUser.id,
+        nome: editUser.nome,
+        is_admin: editUser.is_admin,
+        plan_type: editUser.plano === 'none' ? null : editUser.plano,
+        email: editUser.email,
+        data_criacao: editUser.data_criacao
+      });
+      // Atualizar plano
+      await database.updateUserPlan(editUser.id, editUser.plano === 'none' ? null : editUser.plano);
+      setIsEditUserOpen(false);
+      setEditUser(null);
+      await loadAdminData();
+      toast({ title: 'Usuário atualizado!', description: 'Dados salvos com sucesso.' });
+    } catch (err) {
+      toast({ title: 'Erro', description: 'Erro ao editar usuário', variant: 'destructive' });
+    } finally {
+      setIsEditingUser(false);
+    }
   };
 
   if (!user?.is_admin) {
@@ -750,19 +826,6 @@ const AdminPanel: React.FC = () => {
                   <div>
                     <h3 className="font-medium mb-3">Performance</h3>
                     <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Taxa de Leitura</span>
-                          <span>{notificationStats.read_rate.toFixed(1)}%</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${notificationStats.read_rate}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      
                       <div className="text-sm text-muted-foreground">
                         {notificationStats.read_rate > 80 ? (
                           <span className="text-green-600">📈 Excelente engajamento!</span>
@@ -783,12 +846,25 @@ const AdminPanel: React.FC = () => {
         {/* Users Tab */}
         <TabsContent value="users" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Usuários e Atividade</CardTitle>
+              <Button onClick={() => setIsCreateUserOpen(true)} variant="default">Novo Usuário</Button>
             </CardHeader>
             <CardContent>
+              {/* Campo de busca por email */}
+              <div className="mb-4">
+                <Input
+                  type="text"
+                  placeholder="Buscar por email..."
+                  value={userSearch || ''}
+                  onChange={e => setUserSearch(e.target.value)}
+                  className="w-full max-w-md"
+                />
+              </div>
               <div className="space-y-4">
-                {userExpenseStats.map((userData) => (
+                {(userExpenseStats.filter(userData =>
+                  !userSearch || userData.email.toLowerCase().includes(userSearch.toLowerCase())
+                )).map((userData) => (
                   <div
                     key={userData.id}
                     className="flex items-center justify-between p-4 border border-border rounded-lg"
@@ -809,6 +885,9 @@ const AdminPanel: React.FC = () => {
                         {userData.is_admin && (
                           <Badge variant="destructive">Admin</Badge>
                         )}
+                        <Button size="sm" variant="outline" onClick={() => openEditUser(userData)}>
+                          Editar
+                        </Button>
                       </div>
                       <p className="text-sm font-medium">
                         Total: R$ {userData.totalSpent.toFixed(2)}
@@ -819,6 +898,94 @@ const AdminPanel: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Modal de criação de usuário */}
+          <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Usuário</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome"
+                  value={newUser.nome}
+                  onChange={e => setNewUser(u => ({ ...u, nome: e.target.value }))}
+                />
+                <Input
+                  placeholder="E-mail"
+                  type="email"
+                  value={newUser.email}
+                  onChange={e => setNewUser(u => ({ ...u, email: e.target.value }))}
+                />
+                <Input
+                  placeholder="Senha"
+                  type="password"
+                  value={newUser.senha}
+                  onChange={e => setNewUser(u => ({ ...u, senha: e.target.value }))}
+                />
+                <Select value={newUser.plano} onValueChange={plano => setNewUser(u => ({ ...u, plano }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione o plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem Plano</SelectItem>
+                    <SelectItem value="bronze">Bronze</SelectItem>
+                    <SelectItem value="ouro">Ouro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreateUser} disabled={isCreatingUser}>
+                  {isCreatingUser ? 'Criando...' : 'Criar Usuário'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de edição de usuário */}
+          <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Usuário</DialogTitle>
+              </DialogHeader>
+              {editUser && (
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Nome"
+                    value={editUser.nome}
+                    onChange={e => setEditUser((u: any) => ({ ...u, nome: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="E-mail"
+                    type="email"
+                    value={editUser.email}
+                    onChange={e => setEditUser((u: any) => ({ ...u, email: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Nova Senha (opcional)"
+                    type="password"
+                    value={editUser.senha}
+                    onChange={e => setEditUser((u: any) => ({ ...u, senha: e.target.value }))}
+                  />
+                  <Select value={editUser.plano || 'none'} onValueChange={plano => setEditUser((u: any) => ({ ...u, plano }))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione o plano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem Plano</SelectItem>
+                      <SelectItem value="bronze">Bronze</SelectItem>
+                      <SelectItem value="ouro">Ouro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <DialogFooter>
+                <Button onClick={handleEditUser} disabled={isEditingUser}>
+                  {isEditingUser ? 'Salvando...' : 'Salvar Alterações'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Logs Tab */}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { useDevice } from '@/hooks/use-device';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useToast } from '@/hooks/use-toast';
 import { database } from '../lib/database';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -46,6 +47,9 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   // Estados para badges
   const [todayAppointmentsCount, setTodayAppointmentsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('');
 
   const getInitials = (name: string) => {
     return name
@@ -95,6 +99,21 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     };
     loadBadges();
   }, [user]);
+
+  React.useEffect(() => {
+    if (user && (!user.plan_type)) {
+      setIsPlanModalOpen(true);
+    } else {
+      setIsPlanModalOpen(false);
+    }
+  }, [user]);
+
+  const handleSavePlan = async () => {
+    if (selectedPlan !== 'bronze' && selectedPlan !== 'ouro') return;
+    await database.updateUserPlan(user.id, selectedPlan as 'bronze' | 'ouro');
+    setIsPlanModalOpen(false);
+    window.location.reload();
+  };
 
   const baseNavigationItems = [
     { 
@@ -577,8 +596,33 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
               </DialogTitle>
             </DialogHeader>
             <div className="py-2 px-1">
-              {user && <UserPlanInfo user={user} />}
+              <UserPlanInfo user={user} />
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de escolha de plano */}
+        <Dialog open={isPlanModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Escolha seu Plano</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Select value={selectedPlan} onValueChange={setSelectedPlan}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o plano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bronze">Bronze</SelectItem>
+                  <SelectItem value="ouro">Ouro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSavePlan} disabled={!selectedPlan}>
+                Salvar Plano
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
