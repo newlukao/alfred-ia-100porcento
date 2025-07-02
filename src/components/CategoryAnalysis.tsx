@@ -3,50 +3,52 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TrendingUp, TrendingDown, Calendar, Target, AlertCircle, Crown } from 'lucide-react';
-import { Expense } from '@/lib/database';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart } from 'recharts';
+import { Expense, Income } from '@/lib/database';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart, ComposedChart } from 'recharts';
 
 interface CategoryAnalysisProps {
   expenses: Expense[];
+  incomes?: Income[];
 }
 
-const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
-  const categories = [
+const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses, incomes = [] }) => {
+  const expenseCategories = [
     'mercado', 'transporte', 'contas', 'lazer', 'alimentação', 
     'saúde', 'educação', 'outros'
   ];
 
+  const incomeCategories = [
+    'salario', 'freelance', 'investimento', 'vendas', 'bonus', 
+    'aluguel', 'dividendos', 'outros'
+  ];
+
   const categoryColors = {
-    mercado: '#10b981',
+    // Expense categories
+    mercado: '#ef4444',
     transporte: '#3b82f6',
     contas: '#f59e0b',
     lazer: '#8b5cf6',
-    alimentação: '#ef4444',
+    alimentação: '#f97316',
     saúde: '#06b6d4',
     educação: '#84cc16',
-    outros: '#6b7280'
+    outros: '#6b7280',
+    // Income categories
+    salario: '#22c55e',
+    freelance: '#10b981',
+    investimento: '#14b8a6',
+    vendas: '#16a34a',
+    bonus: '#15803d',
+    aluguel: '#166534',
+    dividendos: '#14532d',
   };
 
   // Análise detalhada por categoria
   const categoryAnalysis = useMemo(() => {
-    const analysis = categories.map(category => {
+    const expenseAnalysis = expenseCategories.map(category => {
       const categoryExpenses = expenses.filter(e => e.categoria === category);
       
       if (categoryExpenses.length === 0) {
-        return {
-          categoria: category,
-          total: 0,
-          count: 0,
-          average: 0,
-          trend: 0,
-          monthlyData: [],
-          lastMonthTotal: 0,
-          currentMonthTotal: 0,
-          percentageChange: 0,
-          maxExpense: 0,
-          minExpense: 0,
-          frequency: 0
-        };
+        return null;
       }
 
       const total = categoryExpenses.reduce((sum, e) => sum + e.valor, 0);
@@ -57,7 +59,6 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
       const now = new Date();
       const currentMonth = now.toISOString().substring(0, 7);
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
-      const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().substring(0, 7);
       
       const currentMonthTotal = categoryExpenses
         .filter(e => e.data.startsWith(currentMonth))
@@ -65,10 +66,6 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
       
       const lastMonthTotal = categoryExpenses
         .filter(e => e.data.startsWith(lastMonth))
-        .reduce((sum, e) => sum + e.valor, 0);
-      
-      const twoMonthsAgoTotal = categoryExpenses
-        .filter(e => e.data.startsWith(twoMonthsAgo))
         .reduce((sum, e) => sum + e.valor, 0);
 
       const percentageChange = lastMonthTotal > 0 ? ((currentMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0;
@@ -99,6 +96,7 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
 
       return {
         categoria: category,
+        tipo: 'saida' as const,
         total,
         count,
         average,
@@ -106,14 +104,80 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
         lastMonthTotal,
         currentMonthTotal,
         percentageChange,
-        maxExpense,
-        minExpense,
+        maxValue: maxExpense,
+        minValue: minExpense,
         frequency
       };
-    }).filter(item => item.total > 0);
+    }).filter(item => item !== null);
 
-    return analysis.sort((a, b) => b.total - a.total);
-  }, [expenses]);
+    const incomeAnalysis = incomeCategories.map(category => {
+      const categoryIncomes = incomes.filter(i => i.category === category);
+      
+      if (categoryIncomes.length === 0) {
+        return null;
+      }
+
+      const total = categoryIncomes.reduce((sum, i) => sum + i.amount, 0);
+      const count = categoryIncomes.length;
+      const average = total / count;
+      
+      // Calcular tendência dos últimos 3 meses
+      const now = new Date();
+      const currentMonth = now.toISOString().substring(0, 7);
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+      
+      const currentMonthTotal = categoryIncomes
+        .filter(i => i.date.startsWith(currentMonth))
+        .reduce((sum, i) => sum + i.amount, 0);
+      
+      const lastMonthTotal = categoryIncomes
+        .filter(i => i.date.startsWith(lastMonth))
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const percentageChange = lastMonthTotal > 0 ? ((currentMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0;
+      
+      // Dados mensais para gráfico
+      const monthlyMap = new Map();
+      categoryIncomes.forEach(income => {
+        const month = income.date.substring(0, 7);
+        monthlyMap.set(month, (monthlyMap.get(month) || 0) + income.amount);
+      });
+      
+      const monthlyData = Array.from(monthlyMap.entries())
+        .map(([month, total]) => ({
+          month: new Date(month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+          total,
+          monthKey: month
+        }))
+        .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+        .slice(-6);
+
+      const values = categoryIncomes.map(i => i.amount);
+      const maxIncome = Math.max(...values);
+      const minIncome = Math.min(...values);
+      
+      // Frequência (recebimentos por mês)
+      const monthsWithIncomes = new Set(categoryIncomes.map(i => i.date.substring(0, 7))).size;
+      const frequency = count / Math.max(monthsWithIncomes, 1);
+
+      return {
+        categoria: category,
+        tipo: 'entrada' as const,
+        total,
+        count,
+        average,
+        monthlyData,
+        lastMonthTotal,
+        currentMonthTotal,
+        percentageChange,
+        maxValue: maxIncome,
+        minValue: minIncome,
+        frequency
+      };
+    }).filter(item => item !== null);
+
+    return [...expenseAnalysis, ...incomeAnalysis].sort((a, b) => b.total - a.total);
+  }, [expenses, incomes]);
 
   // Top insights por categoria
   const categoryInsights = useMemo(() => {
@@ -198,6 +262,7 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
 
   const getCategoryIcon = (category: string) => {
     const icons = {
+      // Expense categories
       mercado: '🛒',
       transporte: '🚗',
       contas: '📄',
@@ -205,9 +270,25 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
       alimentação: '🍕',
       saúde: '🏥',
       educação: '📚',
-      outros: '📦'
+      outros: '📦',
+      // Income categories
+      salario: '💰',
+      freelance: '💻',
+      investimento: '📈',
+      vendas: '🛍️',
+      bonus: '🎁',
+      aluguel: '🏠',
+      dividendos: '💎',
     };
     return icons[category as keyof typeof icons] || '📦';
+  };
+
+  const getTypeLabel = (tipo: string) => {
+    return tipo === 'entrada' ? 'Entrada' : 'Saída';
+  };
+
+  const getTypeColor = (tipo: string) => {
+    return tipo === 'entrada' ? 'text-green-600' : 'text-red-600';
   };
 
   return (
@@ -248,12 +329,15 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
       {/* Análise Detalhada por Categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {categoryAnalysis.map((category) => (
-          <Card key={category.categoria}>
+          <Card key={`${category.tipo}-${category.categoria}`}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span>{getCategoryIcon(category.categoria)}</span>
                   <span className="capitalize">{category.categoria}</span>
+                  <Badge variant="outline" className={`text-xs ${getTypeColor(category.tipo)}`}>
+                    {getTypeLabel(category.tipo)}
+                  </Badge>
                 </div>
                 <Badge 
                   variant="outline"
@@ -270,16 +354,16 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
               {/* Estatísticas Básicas */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Total de gastos</p>
+                  <p className="text-muted-foreground">Total de {category.tipo === 'entrada' ? 'recebimentos' : 'gastos'}</p>
                   <p className="font-semibold">{category.count}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Gasto médio</p>
+                  <p className="text-muted-foreground">{category.tipo === 'entrada' ? 'Recebimento' : 'Gasto'} médio</p>
                   <p className="font-semibold">R$ {category.average.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Maior gasto</p>
-                  <p className="font-semibold">R$ {category.maxExpense.toFixed(2)}</p>
+                  <p className="text-muted-foreground">Maior {category.tipo === 'entrada' ? 'recebimento' : 'gasto'}</p>
+                  <p className="font-semibold">R$ {category.maxValue.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Frequência</p>
@@ -294,11 +378,15 @@ const CategoryAnalysis: React.FC<CategoryAnalysisProps> = ({ expenses }) => {
                     <span>Variação mensal</span>
                     <div className="flex items-center space-x-1">
                       {category.percentageChange > 0 ? (
-                        <TrendingUp className="h-3 w-3 text-red-500" />
+                        <TrendingUp className={`h-3 w-3 ${category.tipo === 'entrada' ? 'text-green-500' : 'text-red-500'}`} />
                       ) : (
-                        <TrendingDown className="h-3 w-3 text-green-500" />
+                        <TrendingDown className={`h-3 w-3 ${category.tipo === 'entrada' ? 'text-red-500' : 'text-green-500'}`} />
                       )}
-                      <span className={`font-semibold ${category.percentageChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                      <span className={`font-semibold ${
+                        (category.tipo === 'entrada' && category.percentageChange > 0) || 
+                        (category.tipo === 'saida' && category.percentageChange < 0) 
+                          ? 'text-green-500' : 'text-red-500'
+                      }`}>
                         {Math.abs(category.percentageChange).toFixed(1)}%
                       </span>
                     </div>

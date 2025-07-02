@@ -40,9 +40,8 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="ghost" size="sm">
           {getThemeIcon()}
-          <span className="ml-2 hidden sm:inline">{getThemeLabel()}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

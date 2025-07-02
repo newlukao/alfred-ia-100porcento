@@ -3,74 +3,111 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, Calendar, Clock, Target, AlertTriangle, CheckCircle, BarChart3, Tags } from 'lucide-react';
-import { Expense } from '@/lib/database';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from 'recharts';
+import { TrendingUp, TrendingDown, Calendar, Clock, Target, AlertTriangle, CheckCircle, BarChart3, Tags, DollarSign, PiggyBank } from 'lucide-react';
+import { Expense, Income } from '@/lib/database';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart, ComposedChart } from 'recharts';
 import CategoryAnalysis from './CategoryAnalysis';
 import TemporalAnalysis from './TemporalAnalysis';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AdvancedAnalyticsProps {
   expenses: Expense[];
+  incomes?: Income[];
 }
 
-const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
+const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses, incomes = [] }) => {
+  const { user } = useAuth();
   
-  // Análise comparativa mensal
+  // Análise comparativa mensal de fluxo de caixa
   const monthlyComparison = useMemo(() => {
     const now = new Date();
     const currentMonth = now.toISOString().substring(0, 7);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
     
-    const currentMonthTotal = expenses
+    const currentMonthExpenses = expenses
       .filter(e => e.data.startsWith(currentMonth))
       .reduce((sum, e) => sum + e.valor, 0);
     
-    const lastMonthTotal = expenses
+    const lastMonthExpenses = expenses
       .filter(e => e.data.startsWith(lastMonth))
       .reduce((sum, e) => sum + e.valor, 0);
+
+    const currentMonthIncomes = incomes
+      .filter(i => i.date.startsWith(currentMonth))
+      .reduce((sum, i) => sum + i.amount, 0);
     
-    const difference = currentMonthTotal - lastMonthTotal;
-    const percentageChange = lastMonthTotal > 0 ? (difference / lastMonthTotal) * 100 : 0;
+    const lastMonthIncomes = incomes
+      .filter(i => i.date.startsWith(lastMonth))
+      .reduce((sum, i) => sum + i.amount, 0);
+    
+    const currentBalance = currentMonthIncomes - currentMonthExpenses;
+    const lastBalance = lastMonthIncomes - lastMonthExpenses;
+    const balanceDifference = currentBalance - lastBalance;
+    const balancePercentageChange = lastBalance !== 0 ? (balanceDifference / Math.abs(lastBalance)) * 100 : 0;
     
     return {
-      currentMonth: currentMonthTotal,
-      lastMonth: lastMonthTotal,
-      difference,
-      percentageChange,
-      isIncrease: difference > 0
+      currentMonth: {
+        expenses: currentMonthExpenses,
+        incomes: currentMonthIncomes,
+        balance: currentBalance
+      },
+      lastMonth: {
+        expenses: lastMonthExpenses,
+        incomes: lastMonthIncomes,
+        balance: lastBalance
+      },
+      difference: {
+        expenses: currentMonthExpenses - lastMonthExpenses,
+        incomes: currentMonthIncomes - lastMonthIncomes,
+        balance: balanceDifference
+      },
+      percentageChange: {
+        balance: balancePercentageChange
+      },
+      isBalanceImproving: balanceDifference > 0
     };
-  }, [expenses]);
+  }, [expenses, incomes]);
 
-  // Análise por dia da semana
+  // Análise de fluxo de caixa por dia da semana
   const weekdayAnalysis = useMemo(() => {
     const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const weekdayTotals = Array(7).fill(0);
-    const weekdayCounts = Array(7).fill(0);
+    const weekdayData = Array(7).fill(null).map(() => ({ expenses: 0, incomes: 0, balance: 0, count: 0 }));
     
     expenses.forEach(expense => {
       const date = new Date(expense.data);
       const dayOfWeek = date.getDay();
-      weekdayTotals[dayOfWeek] += expense.valor;
-      weekdayCounts[dayOfWeek]++;
+      weekdayData[dayOfWeek].expenses += expense.valor;
+      weekdayData[dayOfWeek].count++;
+    });
+
+    incomes.forEach(income => {
+      const date = new Date(income.date);
+      const dayOfWeek = date.getDay();
+      weekdayData[dayOfWeek].incomes += income.amount;
     });
     
-    const maxSpendingDay = weekdayTotals.indexOf(Math.max(...weekdayTotals));
-    const minSpendingDay = weekdayTotals.indexOf(Math.min(...weekdayTotals.filter(t => t > 0)));
+    weekdayData.forEach((day, index) => {
+      day.balance = day.incomes - day.expenses;
+    });
+
+    const maxBalanceDay = weekdayData.indexOf(weekdayData.reduce((max, day) => day.balance > max.balance ? day : max));
+    const minBalanceDay = weekdayData.indexOf(weekdayData.reduce((min, day) => day.balance < min.balance ? day : min));
     
     return {
       data: weekdays.map((day, index) => ({
         day,
-        total: weekdayTotals[index],
-        average: weekdayCounts[index] > 0 ? weekdayTotals[index] / weekdayCounts[index] : 0,
-        count: weekdayCounts[index]
+        expenses: weekdayData[index].expenses,
+        incomes: weekdayData[index].incomes,
+        balance: weekdayData[index].balance,
+        count: weekdayData[index].count
       })),
-      maxSpendingDay: weekdays[maxSpendingDay],
-      minSpendingDay: weekdays[minSpendingDay],
-      maxAmount: weekdayTotals[maxSpendingDay]
+      bestDay: weekdays[maxBalanceDay],
+      worstDay: weekdays[minBalanceDay],
+      bestBalance: weekdayData[maxBalanceDay].balance
     };
-  }, [expenses]);
+  }, [expenses, incomes]);
 
-  // Previsão de gastos do mês
+  // Previsão de fluxo de caixa do mês
   const monthlyForecast = useMemo(() => {
     const now = new Date();
     const currentMonth = now.toISOString().substring(0, 7);
@@ -78,59 +115,75 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     
     const currentMonthExpenses = expenses.filter(e => e.data.startsWith(currentMonth));
-    const totalSoFar = currentMonthExpenses.reduce((sum, e) => sum + e.valor, 0);
+    const currentMonthIncomes = incomes.filter(i => i.date.startsWith(currentMonth));
     
-    const dailyAverage = totalSoFar / dayOfMonth;
-    const projectedTotal = dailyAverage * daysInMonth;
+    const totalExpensesSoFar = currentMonthExpenses.reduce((sum, e) => sum + e.valor, 0);
+    const totalIncomesSoFar = currentMonthIncomes.reduce((sum, i) => sum + i.amount, 0);
+    const balanceSoFar = totalIncomesSoFar - totalExpensesSoFar;
+    
+    const dailyExpenseAverage = totalExpensesSoFar / dayOfMonth;
+    const dailyIncomeAverage = totalIncomesSoFar / dayOfMonth;
+    
+    const projectedExpenses = dailyExpenseAverage * daysInMonth;
+    const projectedIncomes = dailyIncomeAverage * daysInMonth;
+    const projectedBalance = projectedIncomes - projectedExpenses;
+    
     const remainingDays = daysInMonth - dayOfMonth;
-    const projectedRemaining = dailyAverage * remainingDays;
+    const projectedRemainingExpenses = dailyExpenseAverage * remainingDays;
+    const projectedRemainingIncomes = dailyIncomeAverage * remainingDays;
     
     return {
-      totalSoFar,
-      dailyAverage,
-      projectedTotal,
-      projectedRemaining,
+      totalExpensesSoFar,
+      totalIncomesSoFar,
+      balanceSoFar,
+      dailyExpenseAverage,
+      dailyIncomeAverage,
+      projectedExpenses,
+      projectedIncomes,
+      projectedBalance,
+      projectedRemainingExpenses,
+      projectedRemainingIncomes,
       remainingDays,
       progressPercentage: (dayOfMonth / daysInMonth) * 100
     };
-  }, [expenses]);
+  }, [expenses, incomes]);
 
   // Insights inteligentes
   const insights = useMemo(() => {
     const insights = [];
     
     // Insight sobre mudança mensal
-    if (Math.abs(monthlyComparison.percentageChange) > 10) {
+    if (Math.abs(monthlyComparison.percentageChange.balance) > 10) {
       insights.push({
-        type: monthlyComparison.isIncrease ? 'warning' : 'success',
-        icon: monthlyComparison.isIncrease ? TrendingUp : TrendingDown,
-        title: monthlyComparison.isIncrease ? 'Gastos Aumentaram' : 'Gastos Diminuíram',
-        description: `${Math.abs(monthlyComparison.percentageChange).toFixed(1)}% ${monthlyComparison.isIncrease ? 'mais' : 'menos'} que o mês passado`,
-        value: `R$ ${Math.abs(monthlyComparison.difference).toFixed(2)}`
+        type: monthlyComparison.isBalanceImproving ? 'warning' : 'success',
+        icon: monthlyComparison.isBalanceImproving ? TrendingUp : TrendingDown,
+        title: monthlyComparison.isBalanceImproving ? 'Saldo Melhorou' : 'Saldo Piorou',
+        description: `${Math.abs(monthlyComparison.percentageChange.balance).toFixed(1)}% ${monthlyComparison.isBalanceImproving ? 'melhorou' : 'piorou'} que o mês passado`,
+        value: `R$ ${Math.abs(monthlyComparison.difference.balance).toFixed(2)}`
       });
     }
     
     // Insight sobre dia da semana
-    if (weekdayAnalysis.maxAmount > 0) {
+    if (weekdayAnalysis.bestBalance > 0) {
       insights.push({
         type: 'info',
         icon: Calendar,
-        title: 'Dia de Maior Gasto',
-        description: `Você gasta mais às ${weekdayAnalysis.maxSpendingDay.toLowerCase()}s`,
-        value: `R$ ${weekdayAnalysis.maxAmount.toFixed(2)}`
+        title: 'Dia de Melhor Saldo',
+        description: `Você teve o melhor saldo às ${weekdayAnalysis.bestDay.toLowerCase()}s`,
+        value: `R$ ${weekdayAnalysis.bestBalance.toFixed(2)}`
       });
     }
     
-    // Insight sobre previsão
-    if (monthlyForecast.projectedTotal > monthlyForecast.totalSoFar * 1.5) {
-      insights.push({
-        type: 'warning',
-        icon: AlertTriangle,
-        title: 'Previsão de Gastos Alta',
-        description: `No ritmo atual, você pode gastar R$ ${monthlyForecast.projectedTotal.toFixed(2)} este mês`,
-        value: `+R$ ${monthlyForecast.projectedRemaining.toFixed(2)}`
-      });
-    }
+         // Insight sobre previsão
+     if (monthlyForecast.projectedBalance < 0) {
+       insights.push({
+         type: 'warning',
+         icon: AlertTriangle,
+         title: 'Previsão de Déficit',
+         description: `No ritmo atual, você pode ter déficit de R$ ${Math.abs(monthlyForecast.projectedBalance).toFixed(2)} este mês`,
+         value: `Atenção!`
+       });
+     }
     
     // Insight sobre consistência
     const last7Days = expenses.filter(e => {
@@ -145,13 +198,13 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
         type: 'success',
         icon: CheckCircle,
         title: 'Registro Consistente',
-        description: `Você registrou gastos em ${last7Days.length} dos últimos 7 dias`,
+        description: `Você registrou gastos e receitas em ${last7Days.length} dos últimos 7 dias`,
         value: 'Parabéns!'
       });
     }
     
     return insights;
-  }, [expenses, monthlyComparison, weekdayAnalysis, monthlyForecast]);
+  }, [expenses, incomes, monthlyComparison, weekdayAnalysis, monthlyForecast]);
 
   // Dados para gráfico de tendência mensal
   const monthlyTrend = useMemo(() => {
@@ -235,31 +288,35 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
             <CardTitle>Comparativo Mensal</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Mês Atual</span>
-                <span className="font-semibold">R$ {monthlyComparison.currentMonth.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Mês Anterior</span>
-                <span className="font-semibold">R$ {monthlyComparison.lastMonth.toFixed(2)}</span>
-              </div>
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Diferença</span>
-                  <div className="flex items-center space-x-2">
-                    {monthlyComparison.isIncrease ? (
-                      <TrendingUp className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4 text-green-500" />
-                    )}
-                    <span className={`font-semibold ${monthlyComparison.isIncrease ? 'text-red-500' : 'text-green-500'}`}>
-                      {Math.abs(monthlyComparison.percentageChange).toFixed(1)}%
-                    </span>
+                          <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Saldo Atual</span>
+                  <span className={`font-semibold ${monthlyComparison.currentMonth.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {monthlyComparison.currentMonth.balance.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Saldo mês anterior</span>
+                  <span className={`font-semibold ${monthlyComparison.lastMonth.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {monthlyComparison.lastMonth.balance.toFixed(2)}
+                  </span>
+                </div>
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Diferença no Saldo</span>
+                    <div className="flex items-center space-x-2">
+                      {monthlyComparison.isBalanceImproving ? (
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={`font-semibold ${monthlyComparison.isBalanceImproving ? 'text-green-500' : 'text-red-500'}`}>
+                        R$ {Math.abs(monthlyComparison.difference.balance).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -270,12 +327,18 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Gasto até agora</span>
-                <span className="font-semibold">R$ {monthlyForecast.totalSoFar.toFixed(2)}</span>
+                <span className="text-sm text-muted-foreground">Saldo até agora</span>
+                <span className={`font-semibold ${monthlyForecast.balanceSoFar >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  R$ {monthlyForecast.balanceSoFar.toFixed(2)}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Média diária</span>
-                <span className="font-semibold">R$ {monthlyForecast.dailyAverage.toFixed(2)}</span>
+                <span className="text-sm text-muted-foreground">Receitas até agora</span>
+                <span className="font-semibold text-green-600">R$ {monthlyForecast.totalIncomesSoFar.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Gastos até agora</span>
+                <span className="font-semibold text-red-600">R$ {monthlyForecast.totalExpensesSoFar.toFixed(2)}</span>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -286,9 +349,9 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
               </div>
               <div className="pt-2 border-t">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Projeção total</span>
-                  <span className="font-semibold text-orange-600">
-                    R$ {monthlyForecast.projectedTotal.toFixed(2)}
+                  <span className="text-sm font-medium">Projeção de Saldo</span>
+                  <span className={`font-semibold ${monthlyForecast.projectedBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {monthlyForecast.projectedBalance.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -318,17 +381,22 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Gastos por Dia da Semana</CardTitle>
+            <CardTitle>Fluxo de Caixa por Dia da Semana</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weekdayAnalysis.data}>
+              <ComposedChart data={weekdayAnalysis.data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Total']} />
-                <Bar dataKey="total" fill="#3b82f6" />
-              </BarChart>
+                <Tooltip formatter={(value, name) => [
+                  `R$ ${Number(value).toFixed(2)}`, 
+                  name === 'expenses' ? 'Gastos' : name === 'incomes' ? 'Receitas' : 'Saldo'
+                ]} />
+                <Bar dataKey="expenses" fill="#ef4444" name="Gastos" />
+                <Bar dataKey="incomes" fill="#22c55e" name="Receitas" />
+                <Line dataKey="balance" stroke="#000000" strokeWidth={2} name="Saldo" />
+              </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -336,11 +404,11 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({ expenses }) => {
       </TabsContent>
 
       <TabsContent value="categories" className="space-y-6">
-        <CategoryAnalysis expenses={expenses} />
+        <CategoryAnalysis expenses={expenses} incomes={incomes} />
       </TabsContent>
 
       <TabsContent value="temporal" className="space-y-6">
-        <TemporalAnalysis expenses={expenses} />
+        <TemporalAnalysis expenses={expenses} incomes={incomes} />
       </TabsContent>
     </Tabs>
   );

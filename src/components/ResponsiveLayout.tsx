@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
   Menu, X, Home, BarChart3, TrendingUp, Trophy, 
   Bell, MessageCircle, Settings, User, LogOut,
-  Plus, Search, Filter
+  Plus, Search, Filter, Crown, Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/hooks/use-device';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useToast } from '@/hooks/use-toast';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -25,8 +29,48 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   unreadNotifications = 0 
 }) => {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const device = useDevice();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // States para controlar os dialogs
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    nome: user?.nome || '',
+    email: user?.email || '',
+    telefone: '(11) 99999-9999' // Telefone fixo apenas para visualização
+  });
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleProfileSave = async () => {
+    // TODO: Implementar salvamento do perfil
+    toast({
+      title: "Perfil atualizado! ✨",
+      description: "Suas informações foram salvas com sucesso."
+    });
+    setIsProfileDialogOpen(false);
+    setIsMobileMenuOpen(false);
+  };
+
+  // Atualizar formulário quando usuário mudar
+  React.useEffect(() => {
+    if (user) {
+      setProfileForm({
+        nome: user.nome || '',
+        email: user.email || '',
+        telefone: '(11) 99999-9999'
+      });
+    }
+  }, [user]);
 
   const navigationItems = [
     { 
@@ -49,13 +93,6 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
       icon: BarChart3, 
       mobileIcon: BarChart3,
       color: 'text-green-500' 
-    },
-    { 
-      id: 'goals', 
-      label: 'Metas', 
-      icon: Trophy, 
-      mobileIcon: Trophy,
-      color: 'text-yellow-500' 
     },
     { 
       id: 'notifications', 
@@ -137,24 +174,77 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-80 p-0">
-                  <div className="flex flex-col h-full">
+                <SheetContent side="right" className="w-[85vw] sm:w-80 p-0 max-h-screen overflow-hidden">
+                  <div className="flex flex-col h-full max-h-screen">
                     {/* User Info */}
-                    <div className="bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 p-6 text-white">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                          <User className="h-6 w-6 text-white" />
+                    <div className="bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 p-4 text-white shrink-0">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-white" />
                         </div>
-                        <div>
-                          <p className="font-bold text-lg">{user?.nome || 'Usuário'}</p>
-                          <p className="text-white/80 text-sm">{user?.email}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-base truncate">{user?.nome || 'Usuário'}</p>
+                          <p className="text-white/80 text-xs truncate">{user?.email}</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Navigation */}
-                    <div className="flex-1 py-6 px-4">
-                      <div className="space-y-3">
+                    {/* Navigation - Scrollable */}
+                    <div className="flex-1 overflow-y-auto py-4 px-3">
+                      {/* Menu Items do Dropdown */}
+                      <div className="space-y-2 mb-4">
+                        <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2">Menu Principal</h3>
+                        
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start h-10 rounded-lg hover:bg-muted/50"
+                          onClick={() => {
+                            onPageChange('overview');
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                            <Home className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <span className="text-sm font-medium">Início</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start h-10 rounded-lg hover:bg-muted/50"
+                          onClick={() => {
+                            setIsProfileDialogOpen(true);
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center mr-3">
+                            <User className="h-4 w-4 text-green-600" />
+                          </div>
+                          <span className="text-sm font-medium">Meu Perfil</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start h-10 rounded-lg hover:bg-muted/50"
+                          onClick={() => {
+                            setIsPlanDialogOpen(true);
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center mr-3">
+                            {user?.plan_type === 'ouro' ? (
+                              <Crown className="h-4 w-4 text-yellow-600" />
+                            ) : (
+                              <Shield className="h-4 w-4 text-gray-600" />
+                            )}
+                          </div>
+                          <span className="text-sm font-medium">Meu Plano</span>
+                        </Button>
+                      </div>
+
+                      {/* Navigation Items Originais */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-semibold text-muted-foreground px-2 mb-2">Páginas</h3>
                         {navigationItems.map((item) => {
                           const Icon = item.icon;
                           const isActive = currentPage === item.id;
@@ -163,20 +253,20 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                             <Button
                               key={item.id}
                               variant={isActive ? "secondary" : "ghost"}
-                              className={`w-full justify-start h-14 rounded-xl transition-all duration-200 ${
+                              className={`w-full justify-start h-11 rounded-lg transition-all duration-200 ${
                                 isActive 
                                   ? 'bg-primary/10 border border-primary/20 shadow-sm' 
                                   : 'hover:bg-muted/50'
                               }`}
                               onClick={() => handleNavigation(item.id)}
                             >
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
                                 isActive ? 'bg-primary/20' : 'bg-muted/50'
                               }`}>
-                                <Icon className={`h-5 w-5 ${isActive ? item.color : 'text-muted-foreground'}`} />
+                                <Icon className={`h-4 w-4 ${isActive ? item.color : 'text-muted-foreground'}`} />
                               </div>
                               <div className="flex-1 text-left">
-                                <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>
+                                <span className={`text-sm font-medium ${isActive ? 'text-primary' : ''}`}>
                                   {item.label}
                                 </span>
                               </div>
@@ -192,21 +282,24 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="border-t bg-muted/30 p-4 space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                        <span className="text-sm font-medium">Tema</span>
+                    <div className="border-t bg-muted/30 p-3 space-y-2 shrink-0">
+                      <div className="flex items-center justify-between p-2 bg-background rounded-lg border">
+                        <span className="text-xs font-medium">Tema</span>
                         <ThemeToggle />
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full justify-start h-12 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        onClick={logout}
+                        className="w-full justify-start h-10 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        onClick={() => {
+                          logout();
+                          setIsMobileMenuOpen(false);
+                        }}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center mr-3">
-                          <LogOut className="h-4 w-4 text-red-500" />
+                        <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center mr-3">
+                          <LogOut className="h-3 w-3 text-red-500" />
                         </div>
-                        <span className="font-medium">Sair</span>
+                        <span className="text-sm font-medium">Sair</span>
                       </Button>
                     </div>
                   </div>
@@ -258,6 +351,77 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
             })}
           </div>
         </nav>
+
+        {/* Dialogs para Mobile */}
+        {/* Profile Dialog */}
+        <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg">✏️ Editar Perfil</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 px-1">
+              <div>
+                <Label htmlFor="nome" className="text-sm">Nome</Label>
+                <Input
+                  id="nome"
+                  value={profileForm.nome}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, nome: e.target.value }))}
+                  placeholder="Seu nome completo"
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="email" className="text-sm">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="seu@email.com"
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="telefone" className="text-sm">Telefone</Label>
+                <Input
+                  id="telefone"
+                  value={profileForm.telefone}
+                  disabled
+                  className="bg-muted mt-1"
+                  placeholder="Telefone não pode ser alterado"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  📱 Telefone não pode ser alterado
+                </p>
+              </div>
+              
+              <div className="flex flex-col space-y-2 pt-2">
+                <Button onClick={handleProfileSave} className="w-full">
+                  Salvar Alterações
+                </Button>
+                <Button variant="outline" onClick={() => setIsProfileDialogOpen(false)} className="w-full">
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Plan Dialog */}
+        <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-lg mx-auto max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg">
+                {user?.plan_type === 'ouro' ? '👑 Meu Plano Ouro' : '🛡️ Meu Plano Bronze'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 px-1">
+              {user && <UserPlanInfo user={user} />}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -363,6 +527,157 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
           {children}
         </div>
       </main>
+    </div>
+  );
+};
+
+// Componente para informações do plano (simplificado para mobile)
+const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
+  const { toast } = useToast();
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setIsUpgrading(true);
+    // Simular upgrade - aqui você implementaria a lógica real
+    setTimeout(() => {
+      toast({
+        title: "🎉 Upgrade realizado!",
+        description: "Seu plano foi atualizado para Ouro!"
+      });
+      setIsUpgrading(false);
+    }, 2000);
+  };
+
+  const planFeatures = {
+    bronze: [
+      "📊 Controle de gastos",
+      "🤖 Chat IA para gastos",
+      "📈 Relatórios básicos",
+      "💾 Backup automático"
+    ],
+    ouro: [
+      "📊 Controle de gastos",
+      "💰 Controle de recebimentos", 
+      "🤖 Chat IA completo",
+      "📈 Relatórios avançados",
+      "🎯 Metas e orçamentos",
+      "📱 Acesso prioritário",
+      "💾 Backup premium",
+      "🏆 Conquistas exclusivas"
+    ]
+  };
+
+  const currentPlan = user?.plan_type === 'ouro' ? 'ouro' : 'bronze';
+  const features = planFeatures[currentPlan] || planFeatures.bronze;
+
+  return (
+    <div className="space-y-4">
+      {/* Plan Header */}
+      <div className={`p-4 rounded-lg border-2 ${
+        currentPlan === 'ouro' 
+          ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-400' 
+          : 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300'
+      }`}>
+        <div className="flex items-center space-x-3">
+          {currentPlan === 'ouro' ? (
+            <Crown className="h-8 w-8 text-yellow-600" />
+          ) : (
+            <Shield className="h-8 w-8 text-gray-600" />
+          )}
+          <div>
+            <h2 className="text-lg font-bold">
+              Plano {currentPlan === 'ouro' ? 'Ouro' : 'Bronze'}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {currentPlan === 'ouro' 
+                ? 'Acesso completo' 
+                : 'Funcionalidades básicas'
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Features List */}
+      <div>
+        <h3 className="font-semibold mb-3">✨ Suas funcionalidades:</h3>
+        <div className="space-y-2">
+          {features.map((feature, index) => (
+            <div 
+              key={index}
+              className="flex items-center space-x-2 p-2 bg-muted/50 rounded-lg"
+            >
+              <span className="text-sm">{feature}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Upgrade Section for Bronze */}
+      {currentPlan === 'bronze' && (
+        <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <Crown className="h-5 w-5 text-yellow-600 mt-1" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-800">
+                💎 Upgrade para Ouro!
+              </h3>
+              <p className="text-sm text-yellow-700 mb-3">
+                Controle completo das suas finanças!
+              </p>
+              
+              <div className="space-y-1 mb-3">
+                <div className="flex items-center text-xs text-yellow-700">
+                  <span className="mr-2">🆕</span>
+                  <span>Controle de recebimentos</span>
+                </div>
+                <div className="flex items-center text-xs text-yellow-700">
+                  <span className="mr-2">🤖</span>
+                  <span>Chat IA completo</span>
+                </div>
+                <div className="flex items-center text-xs text-yellow-700">
+                  <span className="mr-2">📊</span>
+                  <span>Análise de fluxo de caixa</span>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleUpgrade}
+                disabled={isUpgrading}
+                size="sm"
+                className="w-full bg-yellow-600 hover:bg-yellow-700"
+              >
+                {isUpgrading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="h-3 w-3 mr-2" />
+                    Upgrade Grátis!
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gold Plan Benefits */}
+      {currentPlan === 'ouro' && (
+        <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <Crown className="h-5 w-5 text-yellow-600" />
+            <h3 className="font-semibold text-yellow-800">
+              🎉 Você tem o Plano Ouro!
+            </h3>
+          </div>
+          <p className="text-sm text-yellow-700 mt-1">
+            Acesso completo a todas as funcionalidades.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -27,7 +27,7 @@ const getSystemTheme = (): 'light' | 'dark' => {
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('system');
+  const [theme, setThemeState] = useState<Theme>('light');
   const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
@@ -35,8 +35,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (storedTheme) {
       setThemeState(storedTheme);
     } else {
-      // Default to system theme
-      setThemeState('system');
+      // Default to light theme instead of system
+      setThemeState('light');
     }
   }, []);
 

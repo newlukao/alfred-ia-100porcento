@@ -3,7 +3,20 @@ export interface User {
   nome: string;
   email: string;
   is_admin: boolean;
+  plan_type: 'bronze' | 'ouro';
   data_criacao: string;
+}
+
+export interface Income {
+  id: string;
+  user_id: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Expense {
@@ -58,7 +71,7 @@ export interface Budget {
 export interface Goal {
   id: string;
   usuario_id: string;
-  tipo: 'economia' | 'reduzir_categoria' | 'limite_mensal' | 'frequencia';
+  tipo: 'economia' | 'reduzir_categoria' | 'limite_mensal' | 'frequencia' | 'temporal' | 'saldo_positivo' | 'diversificacao' | 'fluxo_caixa';
   titulo: string;
   descricao: string;
   valor_meta: number;
@@ -68,6 +81,11 @@ export interface Goal {
   status: 'ativa' | 'concluida' | 'falhada';
   created_at: string;
   completed_at?: string;
+  sugerida_ia: boolean; // Se foi sugerida pela IA
+  periodo_temporal?: 'manha' | 'tarde' | 'noite' | 'madrugada' | 'fim_semana' | 'dia_semana';
+  adaptativa: boolean; // Se a meta se adapta automaticamente
+  dificuldade: 'facil' | 'medio' | 'dificil';
+  pontos_bonus: number; // Pontos extras por completar
 }
 
 export interface Achievement {
@@ -81,6 +99,9 @@ export interface Achievement {
   desbloqueado: boolean;
   data_desbloqueio?: string;
   created_at: string;
+  categoria: 'basico' | 'economista' | 'investidor' | 'organizador' | 'social' | 'temporal' | 'premium';
+  raridade: 'comum' | 'raro' | 'epico' | 'lendario';
+  requisitos?: string; // JSON com requisitos específicos
 }
 
 export interface UserStats {
@@ -94,6 +115,16 @@ export interface UserStats {
   conquistas_desbloqueadas: number;
   created_at: string;
   updated_at: string;
+  // Novos campos para gamificação avançada
+  trilha_economista: number;
+  trilha_investidor: number;
+  trilha_organizador: number;
+  desafios_semanais_completados: number;
+  metas_sugeridas_aceitas: number;
+  analises_temporais_visualizadas: number;
+  orcamentos_criados: number;
+  conversas_ia: number;
+  badges: string[]; // Array de IDs de badges conquistadas
 }
 
 export interface NotificationSettings {
@@ -125,6 +156,46 @@ export interface NotificationHistory {
   data_leitura?: string;
 }
 
+export interface MetaSugerida {
+  id: string;
+  usuario_id: string;
+  tipo: Goal['tipo'];
+  titulo: string;
+  descricao: string;
+  valor_meta: number;
+  categoria?: string;
+  justificativa: string; // Por que a IA sugeriu
+  baseada_em: 'gastos_historicos' | 'padroes_temporais' | 'analise_categorias' | 'comportamento_usuario';
+  pontuacao_confianca: number; // 0-100
+  aceita: boolean;
+  created_at: string;
+}
+
+export interface DesafioSemanal {
+  id: string;
+  usuario_id: string;
+  titulo: string;
+  descricao: string;
+  tipo: 'economia' | 'organizacao' | 'analise' | 'conversa';
+  objetivo: number;
+  progresso_atual: number;
+  pontos_recompensa: number;
+  data_inicio: string;
+  data_fim: string;
+  completado: boolean;
+  created_at: string;
+}
+
+export interface Badge {
+  id: string;
+  nome: string;
+  descricao: string;
+  icone: string;
+  categoria: Achievement['categoria'];
+  raridade: Achievement['raridade'];
+  condicoes: string; // JSON com as condições para desbloquear
+}
+
 class MockDatabase {
   private static instance: MockDatabase;
   
@@ -134,6 +205,7 @@ class MockDatabase {
       nome: 'Demo User',
       email: 'demo@exemplo.com',
       is_admin: false,
+      plan_type: 'bronze',
       data_criacao: new Date().toISOString()
     },
     {
@@ -141,6 +213,7 @@ class MockDatabase {
       nome: 'Admin User',
       email: 'admin@exemplo.com',
       is_admin: true,
+      plan_type: 'ouro',
       data_criacao: new Date().toISOString()
     }
   ];
@@ -176,9 +249,73 @@ class MockDatabase {
   private userStats: UserStats[] = [];
   private notificationSettings: NotificationSettings[] = [];
   private notificationHistory: NotificationHistory[] = [];
+  private incomes: Income[] = [];
 
   private constructor() {
     console.log('⚠️ MockDatabase - Backup instance (not used)');
+  }
+
+  // Income methods (Plano Ouro apenas)
+  async getIncomesByUser(userId: string): Promise<Income[]> {
+    const user = this.users.find(u => u.id === userId);
+    if (!user || user.plan_type !== 'ouro') {
+      return [];
+    }
+    return this.incomes.filter(income => income.user_id === userId);
+  }
+
+  async addIncome(income: Omit<Income, 'id' | 'created_at' | 'updated_at'>): Promise<Income | null> {
+    const user = this.users.find(u => u.id === income.user_id);
+    if (!user || user.plan_type !== 'ouro') {
+      return null;
+    }
+
+    const newIncome: Income = {
+      ...income,
+      id: (this.incomes.length + 1).toString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    this.incomes.push(newIncome);
+    return newIncome;
+  }
+
+  async updateIncome(id: string, updates: Partial<Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Income | null> {
+    const index = this.incomes.findIndex(income => income.id === id);
+    if (index > -1) {
+      this.incomes[index] = {
+        ...this.incomes[index],
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+      return this.incomes[index];
+    }
+    return null;
+  }
+
+  async deleteIncome(id: string): Promise<void> {
+    const index = this.incomes.findIndex(income => income.id === id);
+    if (index > -1) {
+      this.incomes.splice(index, 1);
+    }
+  }
+
+  async getUserById(userId: string): Promise<User | null> {
+    return this.users.find(u => u.id === userId) || null;
+  }
+
+  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro'): Promise<User | null> {
+    const index = this.users.findIndex(u => u.id === userId);
+    if (index > -1) {
+      this.users[index].plan_type = planType;
+      return this.users[index];
+    }
+    return null;
+  }
+
+  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | null> {
+    const user = this.users.find(u => u.id === userId);
+    return user?.plan_type || null;
   }
 
   public static getInstance(): MockDatabase {
@@ -497,7 +634,17 @@ class MockDatabase {
         metas_concluidas: 0,
         conquistas_desbloqueadas: 0,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        // Novos campos para gamificação avançada
+        trilha_economista: 0,
+        trilha_investidor: 0,
+        trilha_organizador: 0,
+        desafios_semanais_completados: 0,
+        metas_sugeridas_aceitas: 0,
+        analises_temporais_visualizadas: 0,
+        orcamentos_criados: 0,
+        conversas_ia: 0,
+        badges: []
       };
       
       this.userStats.push(userStats);
@@ -511,6 +658,14 @@ class MockDatabase {
     metas_concluidas?: number; 
     conquistas_desbloqueadas?: number;
     streak_dias?: number;
+    trilha_economista?: number;
+    trilha_investidor?: number;
+    trilha_organizador?: number;
+    desafios_semanais_completados?: number;
+    metas_sugeridas_aceitas?: number;
+    analises_temporais_visualizadas?: number;
+    orcamentos_criados?: number;
+    conversas_ia?: number;
   }): Promise<UserStats> {
     let userStats = await this.getUserStats(userId);
     const index = this.userStats.findIndex(stats => stats.usuario_id === userId);
@@ -526,6 +681,31 @@ class MockDatabase {
     }
     if (updates.streak_dias !== undefined) {
       userStats.streak_dias = updates.streak_dias;
+    }
+    // Novos campos
+    if (updates.trilha_economista) {
+      userStats.trilha_economista += updates.trilha_economista;
+    }
+    if (updates.trilha_investidor) {
+      userStats.trilha_investidor += updates.trilha_investidor;
+    }
+    if (updates.trilha_organizador) {
+      userStats.trilha_organizador += updates.trilha_organizador;
+    }
+    if (updates.desafios_semanais_completados) {
+      userStats.desafios_semanais_completados += updates.desafios_semanais_completados;
+    }
+    if (updates.metas_sugeridas_aceitas) {
+      userStats.metas_sugeridas_aceitas += updates.metas_sugeridas_aceitas;
+    }
+    if (updates.analises_temporais_visualizadas) {
+      userStats.analises_temporais_visualizadas += updates.analises_temporais_visualizadas;
+    }
+    if (updates.orcamentos_criados) {
+      userStats.orcamentos_criados += updates.orcamentos_criados;
+    }
+    if (updates.conversas_ia) {
+      userStats.conversas_ia += updates.conversas_ia;
     }
     
     // Calculate level based on points
@@ -680,6 +860,324 @@ class MockDatabase {
     }
     
     return notifications;
+  }
+
+  // Novos métodos para funcionalidades avançadas
+  private metasSugeridas: MetaSugerida[] = [];
+  private desafiosSemanais: DesafioSemanal[] = [];
+  private badges: Badge[] = [
+    { id: 'analista', nome: 'Analista Financeiro', descricao: 'Visualizou análises temporais 10 vezes', icone: '📊', categoria: 'temporal', raridade: 'comum', condicoes: JSON.stringify({ analises_temporais: 10 }) },
+    { id: 'organizador', nome: 'Organizador Master', descricao: 'Criou orçamentos para todas as categorias', icone: '📋', categoria: 'organizador', raridade: 'raro', condicoes: JSON.stringify({ orcamentos_completos: true }) },
+    { id: 'conversa_ia', nome: 'Consultor IA', descricao: 'Teve 50 conversas com a IA', icone: '🤖', categoria: 'social', raridade: 'comum', condicoes: JSON.stringify({ conversas_ia: 50 }) },
+    { id: 'plano_ouro', nome: 'Premium Member', descricao: 'Upgrade para o Plano Ouro', icone: '👑', categoria: 'premium', raridade: 'epico', condicoes: JSON.stringify({ plano: 'ouro' }) },
+    { id: 'equilibrista', nome: 'Equilibrista Financeiro', descricao: 'Manteve saldo positivo por 3 meses', icone: '⚖️', categoria: 'investidor', raridade: 'lendario', condicoes: JSON.stringify({ saldo_positivo_meses: 3 }) }
+  ];
+
+  // Metas Sugeridas pela IA
+  async gerarMetasSugeridaIA(userId: string): Promise<MetaSugerida[]> {
+    const expenses = await this.getExpensesByUser(userId);
+    const userStats = await this.getUserStats(userId);
+    const metas: MetaSugerida[] = [];
+
+    // Análise de gastos dos últimos 3 meses
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const lastMonths = [0, 1, 2].map(i => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return date.toISOString().substring(0, 7);
+    });
+
+    const monthlyExpenses = lastMonths.map(month => ({
+      month,
+      expenses: expenses.filter(e => e.data.startsWith(month))
+    }));
+
+    // Meta baseada em categoria dominante
+    const categorySpending = expenses.reduce((acc, expense) => {
+      acc[expense.categoria] = (acc[expense.categoria] || 0) + expense.valor;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const dominantCategory = Object.entries(categorySpending).reduce((a, b) => 
+      categorySpending[a[0]] > categorySpending[b[0]] ? a : b
+    );
+
+    if (dominantCategory && dominantCategory[1] > 0) {
+      const avgMonthly = dominantCategory[1] / 3;
+      const reductionTarget = avgMonthly * 0.15; // 15% de redução
+
+      metas.push({
+        id: `meta_${Date.now()}_1`,
+        usuario_id: userId,
+        tipo: 'reduzir_categoria',
+        titulo: `Reduzir gastos com ${dominantCategory[0]}`,
+        descricao: `Reduza 15% dos gastos em ${dominantCategory[0]} este mês`,
+        valor_meta: reductionTarget,
+        categoria: dominantCategory[0],
+        justificativa: `Você gasta em média R$ ${avgMonthly.toFixed(2)} com ${dominantCategory[0]}. Uma redução de 15% pode gerar uma economia significativa.`,
+        baseada_em: 'analise_categorias',
+        pontuacao_confianca: 85,
+        aceita: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    // Meta de economia baseada no padrão atual
+    const avgMonthlyTotal = expenses.reduce((sum, e) => sum + e.valor, 0) / 3;
+    if (avgMonthlyTotal > 0) {
+      const savingsTarget = avgMonthlyTotal * 0.1; // 10% de economia
+
+      metas.push({
+        id: `meta_${Date.now()}_2`,
+        usuario_id: userId,
+        tipo: 'economia',
+        titulo: 'Meta de Economia Mensal',
+        descricao: 'Economize 10% dos seus gastos habituais',
+        valor_meta: savingsTarget,
+        justificativa: `Baseado no seu padrão de gastos (R$ ${avgMonthlyTotal.toFixed(2)}/mês), economizar 10% é uma meta realista e impactante.`,
+        baseada_em: 'gastos_historicos',
+        pontuacao_confianca: 80,
+        aceita: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    return metas;
+  }
+
+  async aceitarMetaSugerida(metaId: string): Promise<Goal | null> {
+    const metaSugerida = this.metasSugeridas.find(m => m.id === metaId);
+    if (!metaSugerida) return null;
+
+    const novaGoal: Goal = {
+      id: (this.goals.length + 1).toString(),
+      usuario_id: metaSugerida.usuario_id,
+      tipo: metaSugerida.tipo,
+      titulo: metaSugerida.titulo,
+      descricao: metaSugerida.descricao,
+      valor_meta: metaSugerida.valor_meta,
+      categoria: metaSugerida.categoria,
+      prazo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
+      valor_atual: 0,
+      status: 'ativa',
+      created_at: new Date().toISOString(),
+      sugerida_ia: true,
+      adaptativa: false,
+      dificuldade: 'medio',
+      pontos_bonus: 25
+    };
+
+    this.goals.push(novaGoal);
+    metaSugerida.aceita = true;
+
+    // Atualizar stats do usuário
+    await this.updateUserStats(metaSugerida.usuario_id, { 
+      pontos_totais: 10 // Pontos por aceitar sugestão da IA
+    });
+
+    return novaGoal;
+  }
+
+  // Desafios Semanais
+  async gerarDesafioSemanal(userId: string): Promise<DesafioSemanal | null> {
+    const userStats = await this.getUserStats(userId);
+    const expenses = await this.getExpensesByUser(userId);
+    
+    const today = new Date();
+    const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+    const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+
+    // Verifica se já tem desafio ativo esta semana
+    const activeChallenge = this.desafiosSemanais.find(d => 
+      d.usuario_id === userId && 
+      !d.completado && 
+      new Date(d.data_inicio) <= new Date() && 
+      new Date(d.data_fim) >= new Date()
+    );
+
+    if (activeChallenge) return activeChallenge;
+
+    // Gerar novo desafio baseado no histórico
+    const desafios = [
+      {
+        titulo: 'Semana da Economia',
+        descricao: 'Gaste 20% menos que a semana passada',
+        tipo: 'economia' as const,
+        objetivo: 20,
+        pontos: 50
+      },
+      {
+        titulo: 'Organizador da Semana',
+        descricao: 'Registre pelo menos 5 gastos',
+        tipo: 'organizacao' as const,
+        objetivo: 5,
+        pontos: 30
+      },
+      {
+        titulo: 'Analista Financeiro',
+        descricao: 'Visualize suas análises 3 vezes',
+        tipo: 'analise' as const,
+        objetivo: 3,
+        pontos: 25
+      }
+    ];
+
+    const randomDesafio = desafios[Math.floor(Math.random() * desafios.length)];
+
+    const novoDesafio: DesafioSemanal = {
+      id: (this.desafiosSemanais.length + 1).toString(),
+      usuario_id: userId,
+      titulo: randomDesafio.titulo,
+      descricao: randomDesafio.descricao,
+      tipo: randomDesafio.tipo,
+      objetivo: randomDesafio.objetivo,
+      progresso_atual: 0,
+      pontos_recompensa: randomDesafio.pontos,
+      data_inicio: startOfWeek.toISOString(),
+      data_fim: endOfWeek.toISOString(),
+      completado: false,
+      created_at: new Date().toISOString()
+    };
+
+    this.desafiosSemanais.push(novoDesafio);
+    return novoDesafio;
+  }
+
+  async atualizarProgressoDesafio(userId: string, tipo: DesafioSemanal['tipo'], incremento: number = 1): Promise<DesafioSemanal | null> {
+    const desafioAtivo = this.desafiosSemanais.find(d => 
+      d.usuario_id === userId && 
+      d.tipo === tipo &&
+      !d.completado && 
+      new Date(d.data_inicio) <= new Date() && 
+      new Date(d.data_fim) >= new Date()
+    );
+
+    if (!desafioAtivo) return null;
+
+    desafioAtivo.progresso_atual += incremento;
+
+    if (desafioAtivo.progresso_atual >= desafioAtivo.objetivo) {
+      desafioAtivo.completado = true;
+      
+      // Dar pontos de recompensa
+      await this.updateUserStats(userId, { 
+        pontos_totais: desafioAtivo.pontos_recompensa,
+        desafios_semanais_completados: 1
+      });
+
+      // Notificar usuário
+      await this.addNotificationHistory({
+        usuario_id: userId,
+        tipo: 'achievement',
+        titulo: '🎉 Desafio Completado!',
+        mensagem: `Você completou: ${desafioAtivo.titulo}`,
+        icone: '🏆',
+        lida: false
+      });
+    }
+
+    return desafioAtivo;
+  }
+
+  // Sistema de Badges
+  async verificarNovasBadges(userId: string): Promise<Badge[]> {
+    const userStats = await this.getUserStats(userId);
+    const user = await this.getUserById(userId);
+    const novasBadges: Badge[] = [];
+
+    for (const badge of this.badges) {
+      // Verificar se usuário já tem esta badge
+      if (userStats.badges.includes(badge.id)) continue;
+
+      const condicoes = JSON.parse(badge.condicoes);
+      let deveDesbloquear = false;
+
+      switch (badge.id) {
+        case 'analista':
+          deveDesbloquear = userStats.analises_temporais_visualizadas >= condicoes.analises_temporais;
+          break;
+        case 'organizador':
+          const userBudgets = await this.getBudgetsByUser(userId, new Date().toISOString().substring(0, 7));
+          deveDesbloquear = userBudgets.length >= 5; // Assumindo 5+ categorias
+          break;
+        case 'conversa_ia':
+          deveDesbloquear = userStats.conversas_ia >= condicoes.conversas_ia;
+          break;
+        case 'plano_ouro':
+          deveDesbloquear = user?.plan_type === 'ouro';
+          break;
+        case 'equilibrista':
+          // Lógica mais complexa - verificar saldo positivo por 3 meses
+          const incomes = user?.plan_type === 'ouro' ? await this.getIncomesByUser(userId) : [];
+          const expenses = await this.getExpensesByUser(userId);
+          
+          const last3Months = [0, 1, 2].map(i => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            return date.toISOString().substring(0, 7);
+          });
+
+          const monthlyBalances = last3Months.map(month => {
+            const monthIncomes = incomes.filter(i => i.date.startsWith(month)).reduce((sum, i) => sum + i.amount, 0);
+            const monthExpenses = expenses.filter(e => e.data.startsWith(month)).reduce((sum, e) => sum + e.valor, 0);
+            return monthIncomes - monthExpenses;
+          });
+
+          deveDesbloquear = monthlyBalances.every(balance => balance > 0) && monthlyBalances.length === 3;
+          break;
+      }
+
+      if (deveDesbloquear) {
+        // Adicionar badge ao usuário
+        userStats.badges.push(badge.id);
+        novasBadges.push(badge);
+
+        // Notificar
+        await this.addNotificationHistory({
+          usuario_id: userId,
+          tipo: 'achievement',
+          titulo: '🏅 Nova Badge Desbloqueada!',
+          mensagem: `${badge.nome}: ${badge.descricao}`,
+          icone: badge.icone,
+          lida: false
+        });
+      }
+    }
+
+    return novasBadges;
+  }
+
+  // Metas Adaptativas
+  async ajustarMetaAdaptativa(goalId: string): Promise<Goal | null> {
+    const goal = this.goals.find(g => g.id === goalId && g.adaptativa);
+    if (!goal) return null;
+
+    const expenses = await this.getExpensesByUser(goal.usuario_id);
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const monthlyExpenses = expenses.filter(e => e.data.startsWith(currentMonth));
+
+    // Analisar progresso atual
+    const progressPercentage = (goal.valor_atual / goal.valor_meta) * 100;
+    const daysIntoMonth = new Date().getDate();
+    const expectedProgress = (daysIntoMonth / 30) * 100; // Progresso esperado baseado nos dias
+
+    // Se estiver muito abaixo do esperado, ajustar meta
+    if (progressPercentage < expectedProgress * 0.5) {
+      const newTarget = goal.valor_meta * 0.8; // Reduzir meta em 20%
+      
+      goal.valor_meta = newTarget;
+      
+      await this.addNotificationHistory({
+        usuario_id: goal.usuario_id,
+        tipo: 'goal_progress',
+        titulo: '🎯 Meta Ajustada',
+        mensagem: `Sua meta "${goal.titulo}" foi ajustada para ser mais realista: R$ ${newTarget.toFixed(2)}`,
+        icone: '⚙️',
+        lida: false
+      });
+    }
+
+    return goal;
   }
 
   async getAdminNotificationStats(): Promise<{

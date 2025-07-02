@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, database } from '@/lib/database';
+import { authService, AppUser } from '@/lib/supabase-auth';
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  user: AppUser | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, nome: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -19,73 +20,108 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // LIMPEZA FORÇADA - Remove dados antigos com IDs incorretos
-    const storedUser = localStorage.getItem('auth_user');
-    if (storedUser) {
+    console.log('🚀 AuthContext - Inicializando com Supabase Auth');
+          
+    // Verificar se já existe um usuário logado
+    const initializeAuth = async () => {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        // Se o ID não é um UUID válido, remove do localStorage
-        if (!parsedUser.id || parsedUser.id.length < 30) {
-          console.log('🔧 Removendo usuário com ID inválido:', parsedUser.id);
-          localStorage.removeItem('auth_user');
-          setUser(null);
+        console.log('🔍 AuthContext - Verificando usuário atual...');
+        const currentUser = await authService.getCurrentUser();
+        
+        if (currentUser) {
+          console.log('✅ AuthContext - Usuário encontrado:', currentUser);
+          setUser(currentUser);
         } else {
-          setUser(parsedUser);
+          console.log('ℹ️ AuthContext - Nenhum usuário logado');
         }
       } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('auth_user');
+        console.error('❌ Erro ao inicializar auth:', error);
+      } finally {
+        console.log('🏁 AuthContext - Finalizando inicialização');
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    initializeAuth();
+
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = authService.onAuthStateChange((user) => {
+      console.log('🔄 AuthContext - Estado mudou:', user ? `Usuário: ${user.email}` : 'Logout');
+      setUser(user);
+      setIsLoading(false);
+    });
+
+    return () => {
+      console.log('🧹 AuthContext - Cleanup subscription');
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Simple auth - usando UUIDs corretos para compatibilidade com Supabase
-      let foundUser: User | null = null;
+      console.log('🔐 AuthContext - Fazendo login:', email);
       
-      if (email === 'demo@exemplo.com' && password === 'demo') {
-        foundUser = {
-          id: '550e8400-e29b-41d4-a716-446655440001', // UUID correto para Demo User
-          nome: 'Demo User',
-          email: 'demo@exemplo.com',
-          is_admin: false,
-          data_criacao: new Date().toISOString()
-        };
-      } else if (email === 'admin@exemplo.com' && password === 'admin') {
-        foundUser = {
-          id: '550e8400-e29b-41d4-a716-446655440002', // UUID correto para Admin User
-          nome: 'Admin User',
-          email: 'admin@exemplo.com',
-          is_admin: true,
-          data_criacao: new Date().toISOString()
-        };
-      }
+      const { user: loggedUser, error } = await authService.signIn(email, password);
       
-      if (foundUser) {
-        setUser(foundUser);
-        localStorage.setItem('auth_user', JSON.stringify(foundUser));
-        return true;
+      if (error) {
+        console.error('❌ AuthContext - Erro no login:', error);
+        return { success: false, error };
       }
-      return false;
+
+      if (loggedUser) {
+        console.log('✅ AuthContext - Login bem-sucedido:', loggedUser);
+        setUser(loggedUser);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Credenciais inválidas' };
     } catch (error) {
-      console.error('Login error:', error);
-      return false;
+      console.error('❌ AuthContext - Erro no login:', error);
+      return { success: false, error: 'Erro interno do sistema' };
     }
   };
 
-  const logout = () => {
+  const register = async (email: string, password: string, nome: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log('📝 AuthContext - Registrando usuário:', email, nome);
+      
+      const { user: newUser, error } = await authService.signUp(email, password, nome);
+      
+      if (error) {
+        console.error('❌ AuthContext - Erro no registro:', error);
+        return { success: false, error };
+      }
+      
+      if (newUser) {
+        console.log('✅ AuthContext - Registro bem-sucedido:', newUser);
+        setUser(newUser);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Falha ao registrar usuário' };
+    } catch (error) {
+      console.error('❌ AuthContext - Erro no registro:', error);
+      return { success: false, error: 'Erro interno do sistema' };
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      console.log('🚪 AuthContext - Fazendo logout');
+      await authService.signOut();
     setUser(null);
-    localStorage.removeItem('auth_user');
+      console.log('✅ AuthContext - Logout realizado');
+    } catch (error) {
+      console.error('❌ AuthContext - Erro no logout:', error);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

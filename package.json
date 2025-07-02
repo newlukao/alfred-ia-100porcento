@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "clean": "rm -rf node_modules/.cache && rm -rf .vite && rm -rf dist",
+    "dev:clean": "npm run clean && bun dev",
+    "fresh": "rm -rf node_modules/.cache && rm -rf .vite && rm -rf dist && bun install && bun dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

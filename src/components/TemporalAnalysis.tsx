@@ -1,15 +1,16 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Calendar, Sun, Moon, Coffee, Utensils, Sunset, Star } from 'lucide-react';
-import { Expense } from '@/lib/database';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { Clock, Calendar, Sun, Moon, Coffee, Utensils, Sunset, Star, TrendingUp, TrendingDown } from 'lucide-react';
+import { Expense, Income } from '@/lib/database';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart } from 'recharts';
 
 interface TemporalAnalysisProps {
   expenses: Expense[];
+  incomes?: Income[];
 }
 
-const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses }) => {
+const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses, incomes = [] }) => {
   
   // Análise por hora do dia (simulada - baseada em padrões típicos)
   const hourlyAnalysis = useMemo(() => {
@@ -69,25 +70,34 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses }) => {
     const weekdayData = weekdays.map((day, index) => ({
       day,
       shortDay: day.substring(0, 3),
-      total: 0,
-      count: 0,
-      average: 0,
+      expenses: 0,
+      incomes: 0,
+      balance: 0,
+      expenseCount: 0,
+      incomeCount: 0,
       isWeekend: index === 0 || index === 6
     }));
 
     expenses.forEach(expense => {
       const date = new Date(expense.data);
       const dayOfWeek = date.getDay();
-      weekdayData[dayOfWeek].total += expense.valor;
-      weekdayData[dayOfWeek].count++;
+      weekdayData[dayOfWeek].expenses += expense.valor;
+      weekdayData[dayOfWeek].expenseCount++;
+    });
+
+    incomes.forEach(income => {
+      const date = new Date(income.date);
+      const dayOfWeek = date.getDay();
+      weekdayData[dayOfWeek].incomes += income.amount;
+      weekdayData[dayOfWeek].incomeCount++;
     });
 
     weekdayData.forEach(day => {
-      day.average = day.count > 0 ? day.total / day.count : 0;
+      day.balance = day.incomes - day.expenses;
     });
 
     return weekdayData;
-  }, [expenses]);
+  }, [expenses, incomes]);
 
   // Análise por período do dia (simulada baseada em categorias)
   const periodAnalysis = useMemo(() => {
@@ -178,38 +188,49 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses }) => {
       });
     }
 
-    // Dia da semana preferido
-    const maxWeekday = weekdayAnalysis.reduce((max, day) => 
-      day.total > max.total ? day : max, weekdayAnalysis[0]
+    // Dia da semana de melhor saldo
+    const maxBalanceDay = weekdayAnalysis.reduce((max, day) => 
+      day.balance > max.balance ? day : max, weekdayAnalysis[0]
     );
 
-    if (maxWeekday && maxWeekday.total > 0) {
+    if (maxBalanceDay && Math.abs(maxBalanceDay.balance) > 0) {
       insights.push({
-        type: maxWeekday.isWeekend ? 'warning' : 'info',
-        icon: Calendar,
-        title: 'Dia de Maior Gasto',
-        description: `${maxWeekday.day}: R$ ${maxWeekday.total.toFixed(2)}`,
-        value: `${maxWeekday.count} gastos`
+        type: maxBalanceDay.balance > 0 ? 'success' : 'warning',
+        icon: maxBalanceDay.balance > 0 ? TrendingUp : TrendingDown,
+        title: maxBalanceDay.balance > 0 ? 'Melhor Dia (Saldo)' : 'Pior Dia (Saldo)',
+        description: `${maxBalanceDay.day}: ${maxBalanceDay.balance > 0 ? '+' : ''}R$ ${maxBalanceDay.balance.toFixed(2)}`,
+        value: `${maxBalanceDay.expenseCount + maxBalanceDay.incomeCount} transações`
       });
     }
 
     // Padrão de fim de semana vs semana
-    const weekendTotal = weekdayAnalysis
+    const weekendExpenses = weekdayAnalysis
       .filter(day => day.isWeekend)
-      .reduce((sum, day) => sum + day.total, 0);
+      .reduce((sum, day) => sum + day.expenses, 0);
     
-    const weekdayTotal = weekdayAnalysis
+    const weekdayExpenses = weekdayAnalysis
       .filter(day => !day.isWeekend)
-      .reduce((sum, day) => sum + day.total, 0);
+      .reduce((sum, day) => sum + day.expenses, 0);
 
-    if (weekendTotal > 0 && weekdayTotal > 0) {
-      const weekendPercentage = (weekendTotal / (weekendTotal + weekdayTotal)) * 100;
+    const weekendIncomes = weekdayAnalysis
+      .filter(day => day.isWeekend)
+      .reduce((sum, day) => sum + day.incomes, 0);
+    
+    const weekdayIncomes = weekdayAnalysis
+      .filter(day => !day.isWeekend)
+      .reduce((sum, day) => sum + day.incomes, 0);
+
+    const weekendBalance = weekendIncomes - weekendExpenses;
+    const weekdayBalance = weekdayIncomes - weekdayExpenses;
+
+    if (weekendExpenses > 0 && weekdayExpenses > 0) {
+      const weekendPercentage = (weekendExpenses / (weekendExpenses + weekdayExpenses)) * 100;
       insights.push({
         type: weekendPercentage > 40 ? 'warning' : 'success',
         icon: Calendar,
         title: 'Gastos de Fim de Semana',
         description: `${weekendPercentage.toFixed(1)}% dos gastos ocorrem nos fins de semana`,
-        value: `R$ ${weekendTotal.toFixed(2)}`
+        value: `Saldo: R$ ${weekendBalance.toFixed(2)}`
       });
     }
 
@@ -319,23 +340,28 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses }) => {
       {/* Análise por Dia da Semana */}
       <Card>
         <CardHeader>
-          <CardTitle>Gastos por Dia da Semana</CardTitle>
+          <CardTitle>Fluxo de Caixa por Dia da Semana</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={weekdayAnalysis}>
+            <ComposedChart data={weekdayAnalysis}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="shortDay" />
               <YAxis />
               <Tooltip 
-                formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Total']}
+                formatter={(value, name) => [
+                  `R$ ${Number(value).toFixed(2)}`, 
+                  name === 'expenses' ? 'Gastos' : name === 'incomes' ? 'Receitas' : 'Saldo'
+                ]}
                 labelFormatter={(label) => {
                   const day = weekdayAnalysis.find(d => d.shortDay === label);
                   return day ? day.day : label;
                 }}
               />
-              <Bar dataKey="total" fill="#3b82f6" />
-            </BarChart>
+              <Bar dataKey="expenses" fill="#ef4444" name="expenses" />
+              <Bar dataKey="incomes" fill="#22c55e" name="incomes" />
+              <Line dataKey="balance" stroke="#3b82f6" strokeWidth={3} name="balance" type="monotone" />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -392,12 +418,12 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ expenses }) => {
               <h4 className="font-medium mb-3">📅 Padrões Semanais</h4>
               <div className="space-y-2 text-sm">
                 {weekdayAnalysis
-                  .sort((a, b) => b.total - a.total)
+                  .sort((a, b) => b.expenses - a.expenses)
                   .slice(0, 3)
                   .map((day, index) => (
                     <div key={day.day} className="flex justify-between">
                       <span>{index + 1}º {day.day}</span>
-                      <span className="font-semibold">R$ {day.total.toFixed(2)}</span>
+                      <span className="font-semibold">R$ {day.expenses.toFixed(2)}</span>
                     </div>
                   ))}
               </div>

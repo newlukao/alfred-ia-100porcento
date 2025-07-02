@@ -3,8 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Log das variáveis para debug
+console.log('🔧 SUPABASE CONFIG DEBUG:', {
+  url: supabaseUrl ? 'CONFIGURADO' : 'FALTANDO',
+  key: supabaseAnonKey ? 'CONFIGURADO' : 'FALTANDO',
+  urlValue: supabaseUrl,
+  keyValue: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined'
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env.local file.');
+  console.error('❌ SUPABASE NÃO CONFIGURADO!');
+  console.error('📋 Crie um arquivo .env.local na raiz do projeto com:');
+  console.error('VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co');
+  console.error('VITE_SUPABASE_ANON_KEY=SUA_CHAVE_AQUI');
+  throw new Error('❌ Missing Supabase environment variables. Please check your .env.local file.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -25,6 +37,7 @@ export interface Database {
           nome: string;
           email: string;
           is_admin: boolean;
+          plan_type: 'bronze' | 'ouro';
           data_criacao: string;
           updated_at: string;
         };
@@ -33,6 +46,7 @@ export interface Database {
           nome: string;
           email: string;
           is_admin?: boolean;
+          plan_type?: 'bronze' | 'ouro';
           data_criacao?: string;
           updated_at?: string;
         };
@@ -41,6 +55,7 @@ export interface Database {
           nome?: string;
           email?: string;
           is_admin?: boolean;
+          plan_type?: 'bronze' | 'ouro';
           data_criacao?: string;
           updated_at?: string;
         };
@@ -73,6 +88,41 @@ export interface Database {
           categoria?: string;
           descricao?: string;
           data?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      incomes: {
+        Row: {
+          id: string;
+          user_id: string;
+          description: string;
+          amount: number;
+          category: string;
+          date: string;
+          tags: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          description: string;
+          amount: number;
+          category: string;
+          date: string;
+          tags?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          description?: string;
+          amount?: number;
+          category?: string;
+          date?: string;
+          tags?: string[];
           created_at?: string;
           updated_at?: string;
         };

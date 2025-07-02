@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Expense, NotificationSettings, NotificationHistory } from './database';
+import { User, Expense, Income, NotificationSettings, NotificationHistory } from './database';
 
 export class SupabaseDatabase {
   private static instance: SupabaseDatabase;
@@ -178,6 +178,152 @@ export class SupabaseDatabase {
       console.log('✅ Expense deleted from Supabase:', id);
     } catch (error) {
       console.error('Error deleting expense:', error);
+    }
+  }
+
+  // ============================================================================
+  // INCOME METHODS (PLANO OURO APENAS)
+  // ============================================================================
+
+  async getIncomesByUser(userId: string): Promise<Income[]> {
+    try {
+      console.log('💰 getIncomesByUser - Buscando recebimentos para usuário:', userId);
+      
+      // First check if user has gold plan
+      const user = await this.getUserById(userId);
+      if (!user || user.plan_type !== 'ouro') {
+        console.log('🚫 Usuário não tem plano ouro, retornando array vazio');
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('incomes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      
+      console.log('✅ Recebimentos encontrados:', data?.length || 0);
+      return data as Income[];
+    } catch (error) {
+      console.error('Error getting user incomes:', error);
+      return [];
+    }
+  }
+
+  async addIncome(income: Omit<Income, 'id' | 'created_at' | 'updated_at'>): Promise<Income | null> {
+    try {
+      console.log('💰 addIncome - Adicionando recebimento:', income);
+      
+      // Check if user has gold plan
+      const user = await this.getUserById(income.user_id);
+      if (!user || user.plan_type !== 'ouro') {
+        console.log('🚫 Usuário não tem plano ouro, recebimento negado');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('incomes')
+        .insert([income])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ Recebimento adicionado ao Supabase:', data);
+      return data as Income;
+    } catch (error) {
+      console.error('Error adding income:', error);
+      return null;
+    }
+  }
+
+  async updateIncome(id: string, updates: Partial<Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Income | null> {
+    try {
+      const { data, error } = await supabase
+        .from('incomes')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Income;
+    } catch (error) {
+      console.error('Error updating income:', error);
+      return null;
+    }
+  }
+
+  async deleteIncome(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('incomes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      console.log('✅ Income deleted from Supabase:', id);
+    } catch (error) {
+      console.error('Error deleting income:', error);
+    }
+  }
+
+  async getUserById(userId: string): Promise<User | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        throw error;
+      }
+
+      return data as User;
+    } catch (error) {
+      console.error('Error getting user by id:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // PLAN METHODS
+  // ============================================================================
+
+  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro'): Promise<User | null> {
+    try {
+      console.log(`📋 updateUserPlan - Atualizando usuário ${userId} para plano ${planType}`);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .update({ plan_type: planType })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      console.log('✅ Plano atualizado com sucesso:', data);
+      return data as User;
+    } catch (error) {
+      console.error('Error updating user plan:', error);
+      return null;
+    }
+  }
+
+  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | null> {
+    try {
+      const user = await this.getUserById(userId);
+      return user?.plan_type || null;
+    } catch (error) {
+      console.error('Error getting user plan:', error);
+      return null;
     }
   }
 

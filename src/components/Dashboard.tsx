@@ -8,26 +8,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, TrendingDown, Calendar, Filter, Trash2, Download, Edit, Target, BarChart3, TrendingUp, Trophy, Bell, BookTemplate } from 'lucide-react';
+import { Plus, TrendingDown, TrendingUp, Calendar, Filter, Trash2, Download, Edit, Target, BarChart3, Trophy, Bell, BookTemplate, Crown, Shield, DollarSign, PiggyBank } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { database, Expense, Budget } from '@/lib/database';
+import { database, Expense, Budget, Income } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, ComposedChart, Area, AreaChart } from 'recharts';
 import { Progress } from '@/components/ui/progress';
 import AdvancedAnalytics from './AdvancedAnalytics';
-import GoalsAndAchievements from './GoalsAndAchievements';
 import NotificationCenter from './NotificationCenter';
 import AdvancedSearch from './AdvancedSearch';
 import SimpleExpenseTemplates from './SimpleExpenseTemplates';
+import PlanBasedDashboard from './PlanBasedDashboard';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [filteredIncomes, setFilteredIncomes] = useState<Income[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isIncomeDialogOpen, setIsIncomeDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -48,6 +51,15 @@ const Dashboard: React.FC = () => {
     data: new Date().toISOString().split('T')[0]
   });
 
+  // New income form
+  const [newIncome, setNewIncome] = useState({
+    amount: '',
+    category: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0],
+    tags: ''
+  });
+
   // Edit expense form
   const [editExpense, setEditExpense] = useState({
     valor: '',
@@ -62,12 +74,18 @@ const Dashboard: React.FC = () => {
     valor_orcamento: ''
   });
 
-  const categories = [
+  const expenseCategories = [
     'mercado', 'transporte', 'contas', 'lazer', 'alimentação', 
     'saúde', 'educação', 'outros'
   ];
 
+  const incomeCategories = [
+    'salario', 'freelance', 'investimento', 'vendas', 'bonus', 
+    'aluguel', 'dividendos', 'outros'
+  ];
+
   const categoryColors = {
+    // Expense categories
     mercado: '#10b981',
     transporte: '#3b82f6',
     contas: '#f59e0b',
@@ -75,36 +93,54 @@ const Dashboard: React.FC = () => {
     alimentação: '#ef4444',
     saúde: '#06b6d4',
     educação: '#84cc16',
-    outros: '#6b7280'
+    outros: '#6b7280',
+    // Income categories
+    salario: '#22c55e',
+    freelance: '#3b82f6',
+    investimento: '#8b5cf6',
+    vendas: '#f59e0b',
+    bonus: '#06b6d4',
+    aluguel: '#10b981',
+    dividendos: '#84cc16'
   };
 
   useEffect(() => {
-    loadExpenses();
-    loadBudgets();
+    loadData();
   }, [user]);
 
   useEffect(() => {
     applyFilters();
-  }, [expenses, dateFilter, categoryFilter, minValue, maxValue]);
+  }, [expenses, incomes, dateFilter, categoryFilter, minValue, maxValue]);
 
-  const loadExpenses = async () => {
+  const loadData = async () => {
     if (!user) return;
     
     setIsLoading(true);
     try {
-      console.log('📊 Dashboard - Carregando gastos para usuário:', user.id);
-      console.log('📊 Dashboard - Tipo de database:', database.constructor.name);
+      console.log('📊 Dashboard - Carregando dados para usuário:', user.id);
       
+      // Load expenses
       const userExpenses = await database.getExpensesByUser(user.id);
-      console.log('📊 Dashboard - Gastos carregados:', userExpenses.length);
-      console.log('📊 Dashboard - Gastos:', userExpenses);
-      
       setExpenses(userExpenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      
+      // Load incomes (for gold plan users)
+      if (user.plan_type === 'ouro' && database.getIncomesByUser) {
+        const userIncomes = await database.getIncomesByUser(user.id);
+        setIncomes(userIncomes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      }
+      
+      // Load budgets
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      if (database.getBudgetsByUser) {
+        const userBudgets = await database.getBudgetsByUser(user.id, currentMonth);
+        setBudgets(userBudgets);
+      }
+      
     } catch (error) {
-      console.error('❌ Dashboard - Error loading expenses:', error);
+      console.error('❌ Dashboard - Error loading data:', error);
       toast({
         title: "Erro",
-        description: "Falha ao carregar gastos",
+        description: "Falha ao carregar dados",
         variant: "destructive"
       });
     } finally {
@@ -112,38 +148,32 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const loadBudgets = async () => {
-    if (!user) return;
-    
-    try {
-      const currentMonth = new Date().toISOString().substring(0, 7); // "2025-01"
-      const userBudgets = await database.getBudgetsByUser(user.id, currentMonth);
-      setBudgets(userBudgets);
-    } catch (error) {
-      console.error('Error loading budgets:', error);
-    }
-  };
-
   const applyFilters = () => {
-    let filtered = [...expenses];
+    let filteredExp = [...expenses];
+    let filteredInc = [...incomes];
 
     if (dateFilter) {
-      filtered = filtered.filter(expense => expense.data === dateFilter);
+      filteredExp = filteredExp.filter(expense => expense.data === dateFilter);
+      filteredInc = filteredInc.filter(income => income.date === dateFilter);
     }
 
     if (categoryFilter !== 'all') {
-      filtered = filtered.filter(expense => expense.categoria === categoryFilter);
+      filteredExp = filteredExp.filter(expense => expense.categoria === categoryFilter);
+      filteredInc = filteredInc.filter(income => income.category === categoryFilter);
     }
 
     if (minValue) {
-      filtered = filtered.filter(expense => expense.valor >= parseFloat(minValue));
+      filteredExp = filteredExp.filter(expense => expense.valor >= parseFloat(minValue));
+      filteredInc = filteredInc.filter(income => income.amount >= parseFloat(minValue));
     }
 
     if (maxValue) {
-      filtered = filtered.filter(expense => expense.valor <= parseFloat(maxValue));
+      filteredExp = filteredExp.filter(expense => expense.valor <= parseFloat(maxValue));
+      filteredInc = filteredInc.filter(income => income.amount <= parseFloat(maxValue));
     }
 
-    setFilteredExpenses(filtered);
+    setFilteredExpenses(filteredExp);
+    setFilteredIncomes(filteredInc);
   };
 
   const handleAddExpense = async () => {
@@ -177,7 +207,7 @@ const Dashboard: React.FC = () => {
         data: new Date().toISOString().split('T')[0]
       });
       setIsDialogOpen(false);
-      loadExpenses();
+      loadData();
     } catch (error) {
       console.error('Error adding expense:', error);
       toast({
@@ -195,7 +225,7 @@ const Dashboard: React.FC = () => {
         title: "Sucesso",
         description: "Gasto removido com sucesso"
       });
-      loadExpenses();
+      loadData();
     } catch (error) {
       console.error('Error deleting expense:', error);
       toast({
@@ -242,7 +272,7 @@ const Dashboard: React.FC = () => {
 
       setIsEditDialogOpen(false);
       setEditingExpense(null);
-      loadExpenses();
+      loadData();
     } catch (error) {
       console.error('Error updating expense:', error);
       toast({
@@ -253,43 +283,140 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleAddIncome = async () => {
+    if (!user || !newIncome.amount || !newIncome.category || !newIncome.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (user.plan_type !== 'ouro') {
+      toast({
+        title: "Upgrade Necessário! 🥇",
+        description: "Para registrar recebimentos, você precisa do Plano Ouro!",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await database.addIncome({
+        user_id: user.id,
+        amount: parseFloat(newIncome.amount),
+        category: newIncome.category,
+        description: newIncome.description,
+        date: newIncome.date,
+        tags: newIncome.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      });
+
+      toast({
+        title: "Sucesso! 💰",
+        description: "Recebimento adicionado com sucesso"
+      });
+
+      setNewIncome({
+        amount: '',
+        category: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0],
+        tags: ''
+      });
+      setIsIncomeDialogOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error adding income:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao adicionar recebimento",
+        variant: "destructive"
+      });
+    }
+  };
+
   const exportData = () => {
+    // Export both expenses and incomes
+    const expensesData = filteredExpenses.map(expense => [
+      expense.data,
+      'SAÍDA',
+      expense.categoria,
+      expense.descricao,
+      `-${expense.valor.toString()}`
+    ]);
+
+    const incomesData = filteredIncomes.map(income => [
+      income.date,
+      'ENTRADA',
+      income.category,
+      income.description,
+      income.amount.toString()
+    ]);
+
     const csvContent = [
-      ['Data', 'Categoria', 'Descrição', 'Valor'],
-      ...filteredExpenses.map(expense => [
-        expense.data,
-        expense.categoria,
-        expense.descricao,
-        expense.valor.toString()
-      ])
+      ['Data', 'Tipo', 'Categoria', 'Descrição', 'Valor'],
+      ...expensesData,
+      ...incomesData
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gastos-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `fluxo-caixa-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  // Calculate statistics
+  // Calculate comprehensive statistics
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.valor, 0);
+  const totalIncomes = filteredIncomes.reduce((sum, income) => sum + income.amount, 0);
+  const netBalance = totalIncomes - totalExpenses;
   const averageExpense = filteredExpenses.length > 0 ? totalExpenses / filteredExpenses.length : 0;
+  const averageIncome = filteredIncomes.length > 0 ? totalIncomes / filteredIncomes.length : 0;
   
-  // Calculate current month expenses for budget comparison
+  // Calculate current month data for unified analysis
   const currentMonth = new Date().toISOString().substring(0, 7);
   const currentMonthExpenses = expenses.filter(expense => expense.data.startsWith(currentMonth));
-  
-  const categoryTotals = categories.map(category => ({
-    name: category,
-    value: currentMonthExpenses
-      .filter(expense => expense.categoria === category)
-      .reduce((sum, expense) => sum + expense.valor, 0)
-  })).filter(item => item.value > 0);
+  const currentMonthIncomes = incomes.filter(income => income.date.startsWith(currentMonth));
+  const monthlyBalance = currentMonthIncomes.reduce((sum, i) => sum + i.amount, 0) - 
+                        currentMonthExpenses.reduce((sum, e) => sum + e.valor, 0);
+
+  // Cash flow data for chart
+  const cashFlowData = React.useMemo(() => {
+    const monthlyData = new Map();
+    
+    // Process expenses
+    filteredExpenses.forEach(expense => {
+      const month = expense.data.substring(0, 7);
+      if (!monthlyData.has(month)) {
+        monthlyData.set(month, { month, expenses: 0, incomes: 0, balance: 0 });
+      }
+      monthlyData.get(month).expenses += expense.valor;
+    });
+    
+    // Process incomes
+    filteredIncomes.forEach(income => {
+      const month = income.date.substring(0, 7);
+      if (!monthlyData.has(month)) {
+        monthlyData.set(month, { month, expenses: 0, incomes: 0, balance: 0 });
+      }
+      monthlyData.get(month).incomes += income.amount;
+    });
+    
+    // Calculate balance and format
+    return Array.from(monthlyData.values())
+      .map(data => ({
+        ...data,
+        balance: data.incomes - data.expenses,
+        monthName: new Date(data.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }, [filteredExpenses, filteredIncomes]);
 
   // Calculate budget progress
-  const budgetProgress = categories.map(category => {
+  const budgetProgress = expenseCategories.map(category => {
     const budget = budgets.find(b => b.categoria === category);
     const spent = currentMonthExpenses
       .filter(expense => expense.categoria === category)
@@ -342,7 +469,7 @@ const Dashboard: React.FC = () => {
 
       setBudgetForm({ categoria: '', valor_orcamento: '' });
       setIsBudgetDialogOpen(false);
-      loadBudgets();
+      loadData();
     } catch (error) {
       console.error('Error setting budget:', error);
       toast({
@@ -390,11 +517,15 @@ const Dashboard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">📊 Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral dos seus gastos</p>
+          <p className="text-muted-foreground">
+            {user?.plan_type === 'ouro' 
+              ? 'Controle completo do seu fluxo de caixa' 
+              : 'Visão geral dos seus gastos'}
+          </p>
         </div>
         
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadExpenses}>
+          <Button variant="outline" onClick={loadData}>
             🔄 Recarregar
           </Button>
           
@@ -417,6 +548,85 @@ const Dashboard: React.FC = () => {
             <Target size={16} className="mr-2" />
             Orçamentos
           </Button>
+          
+          {user?.plan_type === 'ouro' && (
+            <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
+                  <TrendingUp size={16} className="mr-2" />
+                  Nova Entrada
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Adicionar Novo Recebimento</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="income-amount">Valor (R$)</Label>
+                    <Input
+                      id="income-amount"
+                      type="number"
+                      step="0.01"
+                      value={newIncome.amount}
+                      onChange={(e) => setNewIncome(prev => ({ ...prev, amount: e.target.value }))}
+                      placeholder="0,00"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="income-category">Categoria</Label>
+                    <Select value={newIncome.category} onValueChange={(value) => setNewIncome(prev => ({ ...prev, category: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {incomeCategories.map(category => (
+                          <SelectItem key={category} value={category}>
+                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="income-description">Descrição</Label>
+                    <Textarea
+                      id="income-description"
+                      value={newIncome.description}
+                      onChange={(e) => setNewIncome(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descreva o recebimento..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="income-date">Data</Label>
+                    <Input
+                      id="income-date"
+                      type="date"
+                      value={newIncome.date}
+                      onChange={(e) => setNewIncome(prev => ({ ...prev, date: e.target.value }))}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="income-tags">Tags (separadas por vírgula)</Label>
+                    <Input
+                      id="income-tags"
+                      value={newIncome.tags}
+                      onChange={(e) => setNewIncome(prev => ({ ...prev, tags: e.target.value }))}
+                      placeholder="trabalho, extra, mensal..."
+                    />
+                  </div>
+                  
+                  <Button onClick={handleAddIncome} className="w-full bg-green-600 hover:bg-green-700">
+                    Adicionar Recebimento
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -449,7 +659,7 @@ const Dashboard: React.FC = () => {
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map(category => (
+                      {expenseCategories.map(category => (
                         <SelectItem key={category} value={category}>
                           {category.charAt(0).toUpperCase() + category.slice(1)}
                         </SelectItem>
@@ -534,7 +744,7 @@ const Dashboard: React.FC = () => {
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
             <span>Visão Geral</span>
@@ -543,10 +753,6 @@ const Dashboard: React.FC = () => {
             <TrendingUp className="h-4 w-4" />
             <span>Análises Avançadas</span>
           </TabsTrigger>
-          <TabsTrigger value="goals" className="flex items-center space-x-2">
-            <Trophy className="h-4 w-4" />
-            <span>Metas & Conquistas</span>
-          </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center space-x-2">
             <Bell className="h-4 w-4" />
             <span>Notificações</span>
@@ -554,41 +760,70 @@ const Dashboard: React.FC = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Unified Cash Flow Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Gastos</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total de Entradas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
+            <div className="text-2xl font-bold text-green-600">
+              R$ {totalIncomes.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {filteredIncomes.length} recebimentos
+            </p>
+            {user?.plan_type !== 'ouro' && (
+              <p className="text-xs text-yellow-600 mt-1">
+                🥇 Upgrade para Ouro para registrar
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Saídas</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
               R$ {totalExpenses.toFixed(2)}
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gasto Médio</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {averageExpense.toFixed(2)}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Quantidade</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+            <p className="text-xs text-muted-foreground">
               {filteredExpenses.length} gastos
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo Líquido</CardTitle>
+            <DollarSign className={`h-4 w-4 ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {netBalance.toFixed(2)}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {netBalance >= 0 ? 'Superávit' : 'Déficit'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
+            <PiggyBank className={`h-4 w-4 ${monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {monthlyBalance.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {new Date().toLocaleDateString('pt-BR', { month: 'long' })}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -662,7 +897,7 @@ const Dashboard: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {categories.map(category => (
+                  {expenseCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </SelectItem>
@@ -711,31 +946,29 @@ const Dashboard: React.FC = () => {
       </Card>
 
       {/* Charts */}
-      {categoryTotals.length > 0 && (
+      {cashFlowData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Gastos por Categoria</CardTitle>
+              <CardTitle>Fluxo de Caixa</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={categoryTotals}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {categoryTotals.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={categoryColors[entry.name as keyof typeof categoryColors]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Total']} />
-                </PieChart>
+                <ComposedChart data={cashFlowData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="monthName" />
+                  <YAxis />
+                  <Tooltip labelFormatter={(value) => {
+                    const data = cashFlowData.find(d => d.month === value.dataKey);
+                    return [
+                      `Data: ${data?.monthName}`,
+                      `Saldo: R$ ${data?.balance.toFixed(2)}`
+                    ];
+                  }} />
+                  <Bar dataKey="expenses" fill="#ef4444" />
+                  <Bar dataKey="incomes" fill="#22c55e" />
+                  <Area dataKey="balance" type="monotone" stroke="#000000" fill="#ff7373" />
+                </ComposedChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -761,64 +994,101 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Expenses List */}
+      {/* Unified Transactions List */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Gastos ({filteredExpenses.length})</CardTitle>
+          <CardTitle>
+            {user?.plan_type === 'ouro' 
+              ? `Fluxo de Caixa (${filteredExpenses.length + filteredIncomes.length} transações)`
+              : `Lista de Gastos (${filteredExpenses.length})`
+            }
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredExpenses.length === 0 ? (
+          {(filteredExpenses.length === 0 && filteredIncomes.length === 0) ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhum gasto encontrado com os filtros aplicados.</p>
+              <p>Nenhuma transação encontrada com os filtros aplicados.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredExpenses.map((expense) => (
-                <div
-                  key={expense.id}
-                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Badge 
-                        variant="outline"
-                        style={{ 
-                          borderColor: categoryColors[expense.categoria as keyof typeof categoryColors],
-                          color: categoryColors[expense.categoria as keyof typeof categoryColors]
-                        }}
-                      >
-                        {expense.categoria}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(expense.data).toLocaleDateString('pt-BR')}
-                      </span>
+              {/* Combine and sort all transactions */}
+              {[
+                ...filteredExpenses.map(expense => ({
+                  ...expense,
+                  type: 'expense' as const,
+                  amount: expense.valor,
+                  date: expense.data,
+                  category: expense.categoria,
+                  description: expense.descricao
+                })),
+                ...filteredIncomes.map(income => ({
+                  ...income,
+                  type: 'income' as const,
+                  amount: income.amount,
+                  date: income.date,
+                  category: income.category,
+                  description: income.description
+                }))
+              ]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .map((transaction) => (
+                  <div
+                    key={`${transaction.type}-${transaction.id}`}
+                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Badge 
+                          variant={transaction.type === 'expense' ? 'destructive' : 'default'}
+                          className={transaction.type === 'expense' ? '' : 'bg-green-100 text-green-800 border-green-200'}
+                        >
+                          {transaction.type === 'expense' ? '📤 Saída' : '📥 Entrada'}
+                        </Badge>
+                        <Badge 
+                          variant="outline"
+                          style={{ 
+                            borderColor: categoryColors[transaction.category as keyof typeof categoryColors],
+                            color: categoryColors[transaction.category as keyof typeof categoryColors]
+                          }}
+                        >
+                          {transaction.category}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                      <p className="font-medium">{transaction.description}</p>
                     </div>
-                    <p className="font-medium">{expense.descricao}</p>
+                    
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-lg font-bold ${
+                        transaction.type === 'expense' ? 'text-red-500' : 'text-green-500'
+                      }`}>
+                        {transaction.type === 'expense' ? '-' : '+'}R$ {transaction.amount.toFixed(2)}
+                      </span>
+                      {transaction.type === 'expense' && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditExpense(transaction as Expense)}
+                            className="text-blue-500 hover:text-blue-600"
+                          >
+                            <Edit size={16} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteExpense(transaction.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-red-500">
-                      R$ {expense.valor.toFixed(2)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditExpense(expense)}
-                      className="text-blue-500 hover:text-blue-600"
-                    >
-                      <Edit size={16} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteExpense(expense.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>
@@ -850,7 +1120,7 @@ const Dashboard: React.FC = () => {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(category => (
+                  {expenseCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </SelectItem>
@@ -905,7 +1175,7 @@ const Dashboard: React.FC = () => {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(category => (
+                  {expenseCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </SelectItem>
@@ -940,11 +1210,10 @@ const Dashboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <AdvancedAnalytics expenses={expenses} />
-        </TabsContent>
-
-        <TabsContent value="goals" className="space-y-6">
-          <GoalsAndAchievements />
+          <AdvancedAnalytics 
+            expenses={expenses} 
+            incomes={user?.plan_type === 'ouro' ? incomes : []} 
+          />
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6">

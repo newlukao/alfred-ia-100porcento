@@ -20,6 +20,59 @@ import { useToast } from '@/hooks/use-toast';
 const GoalsAndAchievements: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // 🥇 ACESSO EXCLUSIVO PLANO OURO
+  if (!user || user.plan_type !== 'ouro') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50">
+        <Card className="max-w-md mx-auto text-center border-2 border-yellow-300">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <Crown className="h-16 w-16 text-yellow-600" />
+            </div>
+            <CardTitle className="text-2xl text-yellow-800">
+              🏆 Metas & Conquistas
+            </CardTitle>
+            <p className="text-yellow-700">
+              Funcionalidade exclusiva do <strong>Plano Ouro</strong>
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-yellow-100 p-4 rounded-lg border border-yellow-200">
+              <h4 className="font-semibold text-yellow-800 mb-2">
+                🎯 O que você terá acesso:
+              </h4>
+              <ul className="text-sm text-yellow-700 space-y-1 text-left">
+                <li>• 🤖 Metas sugeridas por IA</li>
+                <li>• 🏅 Sistema de conquistas e badges</li>
+                <li>• 📊 Análise preditiva de metas</li>
+                <li>• ⚡ Metas adaptativas inteligentes</li>
+                <li>• 🎮 Desafios semanais</li>
+                <li>• 🎯 Metas temporais avançadas</li>
+                <li>• 👑 Gamificação premium</li>
+              </ul>
+            </div>
+            
+            <Button 
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+              onClick={() => window.location.href = '/'}
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Fazer Upgrade para Ouro
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => window.location.href = '/'}
+            >
+              Voltar ao Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   const [goals, setGoals] = useState<Goal[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -27,6 +80,19 @@ const GoalsAndAchievements: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 🚀 FASE 1 - Melhorias Imediatas
+  const [metasSugeridas, setMetasSugeridas] = useState<any[]>([]);
+  const [desafioSemanal, setDesafioSemanal] = useState<any>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // 🚀 FASE 2 - Funcionalidades Avançadas  
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [badges, setBadges] = useState<any[]>([]);
+  
+  // 🚀 FASE 3 - Inovações
+  const [previsaoSucesso, setPrevisaoSucesso] = useState<any>(null);
+  const [trilhaAtiva, setTrilhaAtiva] = useState<'economista' | 'investidor' | 'organizador'>('economista');
 
   const [newGoal, setNewGoal] = useState({
     tipo: 'economia' as Goal['tipo'],
@@ -51,20 +117,91 @@ const GoalsAndAchievements: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const [userGoals, userAchievements, stats, userExpenses] = await Promise.all([
-        database.getGoalsByUser(user.id),
-        database.getUserAchievements(user.id),
-        database.getUserStats(user.id),
-        database.getExpensesByUser(user.id)
-      ]);
-
-      setGoals(userGoals);
-      setAchievements(userAchievements);
-      setUserStats(stats);
+      // Carregar dados básicos
+      const userExpenses = await database.getExpensesByUser(user.id);
       setExpenses(userExpenses);
 
-      // Check for new achievements
-      await checkAchievements(user.id, userExpenses, userGoals, userAchievements);
+      // Simular dados para demonstração (já que nem todos os métodos estão implementados no Supabase)
+      const mockGoals: Goal[] = [
+        {
+          id: '1',
+          usuario_id: user.id,
+          tipo: 'economia',
+          titulo: 'Economizar R$ 500 este mês',
+          descricao: 'Meta de economia para viagem',
+          valor_meta: 500,
+          valor_atual: 150,
+          status: 'ativa',
+          prazo: '2024-02-29',
+          created_at: new Date().toISOString(),
+          sugerida_ia: true,
+          adaptativa: false,
+          dificuldade: 'medio',
+          pontos_bonus: 50
+        }
+      ];
+
+      const mockAchievements = [
+        {
+          id: '1',
+          usuario_id: user.id,
+          tipo: 'primeiro_gasto',
+          titulo: 'Primeiro Passo',
+          descricao: 'Registrou seu primeiro gasto',
+          icone: '🎯',
+          pontos: 10,
+          desbloqueado: userExpenses.length > 0,
+          created_at: new Date().toISOString(),
+          categoria: 'basico' as const,
+          raridade: 'comum' as const
+        },
+        {
+          id: '2',
+          usuario_id: user.id,
+          tipo: 'plano_ouro',
+          titulo: 'Premium Member',
+          descricao: 'Upgrade para o Plano Ouro',
+          icone: '👑',
+          pontos: 100,
+          desbloqueado: user.plan_type === 'ouro',
+          created_at: new Date().toISOString(),
+          categoria: 'premium' as const,
+          raridade: 'epico' as const
+        }
+      ];
+
+      const mockStats = {
+        id: '1',
+        usuario_id: user.id,
+        nivel: Math.floor((userExpenses.length * 10) / 100) + 1,
+        pontos_totais: userExpenses.length * 10 + (user.plan_type === 'ouro' ? 100 : 0),
+        streak_dias: 3,
+        ultima_atividade: new Date().toISOString(),
+        metas_concluidas: 0,
+        conquistas_desbloqueadas: mockAchievements.filter(a => a.desbloqueado).length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        trilha_economista: 25,
+        trilha_investidor: 15,
+        trilha_organizador: 30,
+        desafios_semanais_completados: 2,
+        metas_sugeridas_aceitas: 1,
+        analises_temporais_visualizadas: 5,
+        orcamentos_criados: 3,
+        conversas_ia: 12,
+        badges: ['plano_ouro']
+      };
+
+      setGoals(mockGoals);
+      setAchievements(mockAchievements);
+      setUserStats(mockStats);
+
+      // 🚀 FASE 1: Carregar funcionalidades avançadas
+      loadMetasSugeridasIA();
+      loadDesafioSemanal();
+      loadBadges();
+      calcularPrevisaoSucesso();
+
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -75,6 +212,152 @@ const GoalsAndAchievements: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 🚀 FASE 1: Funções para Metas Sugeridas pela IA
+  const loadMetasSugeridasIA = () => {
+    // Simular análise inteligente baseada nos gastos do usuário
+    const categorySpending = expenses.reduce((acc, expense) => {
+      acc[expense.categoria] = (acc[expense.categoria] || 0) + expense.valor;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const suggestions = [];
+    
+    // Sugestão baseada na categoria dominante
+    const dominantCategory = Object.entries(categorySpending).reduce((a, b) => 
+      categorySpending[a[0]] > categorySpending[b[0]] ? a : b, ['outros', 0]
+    );
+
+    if (dominantCategory[1] > 100) {
+      suggestions.push({
+        id: 'meta_ia_1',
+        titulo: `Reduzir gastos com ${dominantCategory[0]}`,
+        descricao: `A IA detectou que você gasta muito com ${dominantCategory[0]}. Que tal reduzir 15%?`,
+        valor_meta: dominantCategory[1] * 0.15,
+        categoria: dominantCategory[0],
+        tipo: 'reduzir_categoria',
+        confianca: 85,
+        justificativa: `Baseado no seu padrão, uma redução de 15% em ${dominantCategory[0]} geraria uma economia de R$ ${(dominantCategory[1] * 0.15).toFixed(2)}`
+      });
+    }
+
+    // Sugestão de economia geral
+    const totalGastos = Object.values(categorySpending).reduce((sum, val) => sum + val, 0);
+    if (totalGastos > 200) {
+      suggestions.push({
+        id: 'meta_ia_2',
+        titulo: 'Meta de Economia Inteligente',
+        descricao: 'A IA calculou uma meta de economia realista para você',
+        valor_meta: totalGastos * 0.1,
+        tipo: 'economia',
+        confianca: 80,
+        justificativa: `Com base no seu histórico de R$ ${totalGastos.toFixed(2)}, economizar 10% é uma meta realista e impactante`
+      });
+    }
+
+    setMetasSugeridas(suggestions);
+  };
+
+  // 🚀 FASE 1: Função para Desafio Semanal
+  const loadDesafioSemanal = () => {
+    const desafios = [
+      {
+        titulo: '📊 Semana do Analista',
+        descricao: 'Visualize suas análises temporais e de categorias 3 vezes',
+        progresso: 1,
+        meta: 3,
+        pontos: 50,
+        tipo: 'analise'
+      },
+      {
+        titulo: '💰 Economista da Semana',
+        descricao: 'Registre todos os gastos sem exceção',
+        progresso: 3,
+        meta: 7,
+        pontos: 75,
+        tipo: 'economia'
+      },
+      {
+        titulo: '🎯 Organizador Master',
+        descricao: 'Configure orçamentos para 3 categorias diferentes',
+        progresso: 1,
+        meta: 3,
+        pontos: 60,
+        tipo: 'organizacao'
+      }
+    ];
+
+    const desafioAleatorio = desafios[Math.floor(Math.random() * desafios.length)];
+    setDesafioSemanal(desafioAleatorio);
+  };
+
+  // 🚀 FASE 2: Função para Badges
+  const loadBadges = () => {
+    const availableBadges = [
+      {
+        id: 'analista',
+        nome: 'Analista Financeiro',
+        descricao: 'Visualizou análises 10+ vezes',
+        icone: '📊',
+        desbloqueada: userStats?.analises_temporais_visualizadas >= 10,
+        raridade: 'comum',
+        categoria: 'temporal'
+      },
+      {
+        id: 'organizador',
+        nome: 'Organizador Master',
+        descricao: 'Criou orçamentos completos',
+        icone: '📋',
+        desbloqueada: userStats?.orcamentos_criados >= 5,
+        raridade: 'raro',
+        categoria: 'organizador'
+      },
+      {
+        id: 'conversa_ia',
+        nome: 'Consultor IA',
+        descricao: '50+ conversas com IA',
+        icone: '🤖',
+        desbloqueada: userStats?.conversas_ia >= 50,
+        raridade: 'comum',
+        categoria: 'social'
+      },
+      {
+        id: 'premium',
+        nome: 'Premium Member',
+        descricao: 'Plano Ouro ativo',
+        icone: '👑',
+        desbloqueada: user?.plan_type === 'ouro',
+        raridade: 'epico',
+        categoria: 'premium'
+      }
+    ];
+
+    setBadges(availableBadges);
+  };
+
+  // 🚀 FASE 3: Função para Previsão de Sucesso
+  const calcularPrevisaoSucesso = () => {
+    if (!userStats) return;
+
+    const fatores = {
+      consistencia: userStats.streak_dias * 10,
+      experiencia: userStats.metas_concluidas * 20,
+      engajamento: userStats.conversas_ia * 2,
+      organizacao: userStats.orcamentos_criados * 15,
+      plano: user?.plan_type === 'ouro' ? 25 : 0
+    };
+
+    const pontuacaoTotal = Object.values(fatores).reduce((sum, val) => sum + val, 0);
+    const probabilidade = Math.min(Math.max(pontuacaoTotal, 0), 100);
+
+    setPrevisaoSucesso({
+      probabilidade,
+      fatores,
+      recomendacao: probabilidade > 70 ? 'Alta chance de sucesso!' : 
+                   probabilidade > 40 ? 'Boas chances, continue assim!' : 
+                   'Foque na consistência para melhorar'
+    });
   };
 
   const checkAchievements = async (
@@ -148,15 +431,27 @@ const GoalsAndAchievements: React.FC = () => {
     }
 
     try {
-      await database.createGoal({
+      // Simular criação da meta (já que o banco não tem todos os métodos implementados)
+      const novaGoal: Goal = {
+        id: (goals.length + 1).toString(),
         usuario_id: user.id,
         tipo: newGoal.tipo,
         titulo: newGoal.titulo,
         descricao: newGoal.descricao,
         valor_meta: parseFloat(newGoal.valor_meta),
         categoria: newGoal.categoria || undefined,
-        prazo: newGoal.prazo
-      });
+        prazo: newGoal.prazo,
+        valor_atual: 0,
+        status: 'ativa',
+        created_at: new Date().toISOString(),
+        sugerida_ia: false,
+        adaptativa: false,
+        dificuldade: 'medio',
+        pontos_bonus: 25
+      };
+
+      // Adicionar à lista local
+      setGoals([...goals, novaGoal]);
 
       toast({
         title: "Sucesso! 🎯",
@@ -172,7 +467,6 @@ const GoalsAndAchievements: React.FC = () => {
         prazo: ''
       });
       setIsGoalDialogOpen(false);
-      loadData();
     } catch (error) {
       console.error('Error creating goal:', error);
       toast({
@@ -315,30 +609,34 @@ const GoalsAndAchievements: React.FC = () => {
 
   const levelInfo = userStats ? getLevelInfo(userStats.pontos_totais) : { nivel: 1, pontosProximoNivel: 100, progressoNivel: 0 };
 
-  return (
+    return (
     <div className="space-y-6">
-      {/* Header with User Stats */}
+      {/* Header Simples mas Premium */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">🎯 Metas & Conquistas</h1>
-          <p className="text-muted-foreground">Alcance seus objetivos financeiros e desbloqueie conquistas</p>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Crown className="h-8 w-8 text-yellow-600" />
+            🎯 Metas & Conquistas
+          </h1>
+          <p className="text-muted-foreground">
+            Funcionalidade premium do Plano Ouro • Crie e acompanhe suas metas financeiras
+          </p>
         </div>
         
         {userStats && (
           <div className="text-right">
             <div className="flex items-center space-x-2">
-              <Crown className="h-5 w-5 text-yellow-500" />
-              <span className="text-lg font-bold">Nível {levelInfo.nivel}</span>
+              <Star className="h-5 w-5 text-yellow-500" />
+              <span className="text-lg font-bold">Nível {userStats.nivel}</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              {userStats.pontos_totais} pontos | {levelInfo.pontosProximoNivel} para próximo nível
+              {userStats.pontos_totais} pontos | {userStats.metas_concluidas} metas concluídas
             </div>
-            <Progress value={levelInfo.progressoNivel} className="w-32 h-2 mt-1" />
           </div>
         )}
       </div>
 
-      {/* User Stats Cards */}
+      {/* Stats Cards */}
       {userStats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -391,12 +689,39 @@ const GoalsAndAchievements: React.FC = () => {
         </div>
       )}
 
-      {/* Tabs for Goals and Achievements */}
+      {/* Metas Sugeridas pela IA - Compacto */}
+      {metasSugeridas.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-blue-600" />
+              🤖 IA sugere metas para você
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3">
+              {metasSugeridas.slice(0, 2).map((meta) => (
+                <div key={meta.id} className="bg-white p-3 rounded-lg border border-blue-200 flex justify-between items-center">
+                  <div>
+                    <h4 className="font-semibold text-blue-800">{meta.titulo}</h4>
+                    <p className="text-sm text-blue-600">Meta: R$ {meta.valor_meta.toFixed(2)}</p>
+                  </div>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                    Aceitar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Abas Principais */}
       <Tabs defaultValue="goals" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="goals" className="flex items-center space-x-2">
             <Target className="h-4 w-4" />
-            <span>Metas Financeiras</span>
+            <span>Minhas Metas</span>
           </TabsTrigger>
           <TabsTrigger value="achievements" className="flex items-center space-x-2">
             <Trophy className="h-4 w-4" />
@@ -562,7 +887,7 @@ const GoalsAndAchievements: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-6">
-          <h2 className="text-2xl font-bold">Conquistas Desbloqueadas</h2>
+          <h2 className="text-2xl font-bold">Conquistas</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {achievements.map(achievement => (
@@ -580,14 +905,12 @@ const GoalsAndAchievements: React.FC = () => {
                   {achievement.desbloqueado ? (
                     <div className="flex items-center justify-center space-x-1 mt-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span className="text-xs text-green-600">
-                        Desbloqueado em {new Date(achievement.data_desbloqueio!).toLocaleDateString('pt-BR')}
-                      </span>
+                      <span className="text-xs text-green-600">Desbloqueado</span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center space-x-1 mt-2">
                       <Clock className="h-4 w-4 text-gray-400" />
-                      <span className="text-xs text-gray-500">Não desbloqueado</span>
+                      <span className="text-xs text-gray-500">Bloqueado</span>
                     </div>
                   )}
                 </CardContent>
@@ -597,7 +920,7 @@ const GoalsAndAchievements: React.FC = () => {
         </TabsContent>
       </Tabs>
     </div>
-  );
+    );
 };
 
 export default GoalsAndAchievements;

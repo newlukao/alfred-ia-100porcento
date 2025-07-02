@@ -1,26 +1,33 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 const LoginForm: React.FC = () => {
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const { toast } = useToast();
-  const [formData, setFormData] = useState({
+  const [activeTab, setActiveTab] = useState('login');
+  const [loginData, setLoginData] = useState({
     email: '',
     password: ''
   });
+  const [registerData, setRegisterData] = useState({
+    nome: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password) {
+    if (!loginData.email || !loginData.password) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
@@ -31,7 +38,7 @@ const LoginForm: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const success = await login(formData.email, formData.password);
+      const { success, error } = await login(loginData.email, loginData.password);
       
       if (success) {
         toast({
@@ -41,7 +48,7 @@ const LoginForm: React.FC = () => {
       } else {
         toast({
           title: "Erro",
-          description: "E-mail ou senha inválidos",
+          description: error || "E-mail ou senha inválidos",
           variant: "destructive"
         });
       }
@@ -57,9 +64,72 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!registerData.nome || !registerData.email || !registerData.password || !registerData.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (registerData.password !== registerData.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (registerData.password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { success, error } = await register(registerData.email, registerData.password, registerData.nome);
+      
+      if (success) {
+        toast({
+          title: "Conta criada! 🎉",
+          description: "Bem-vindo ao FinanceAI!"
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: error || "Falha ao criar conta",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Register error:', error);
+      toast({
+        title: "Erro",
+        description: "Falha no registro. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setLoginData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRegisterInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setRegisterData(prev => ({ ...prev, [name]: value }));
   };
 
   return (
@@ -75,34 +145,43 @@ const LoginForm: React.FC = () => {
           </p>
         </div>
 
-        {/* Login Card */}
+        {/* Auth Card */}
         <Card className="glass">
           <CardHeader>
-            <CardTitle className="text-center">Entrar</CardTitle>
+            <CardTitle className="text-center">
+              {activeTab === 'login' ? 'Entrar' : 'Criar Conta'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Entrar</TabsTrigger>
+                <TabsTrigger value="register">Registrar</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="login">
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
+                    <Label htmlFor="login-email">E-mail</Label>
                 <Input
-                  id="email"
+                      id="login-email"
                   name="email"
                   type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
+                      value={loginData.email}
+                      onChange={handleLoginInputChange}
                   placeholder="seu@email.com"
                   required
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                    <Label htmlFor="login-password">Senha</Label>
                 <Input
-                  id="password"
+                      id="login-password"
                   name="password"
                   type="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
+                      value={loginData.password}
+                      onChange={handleLoginInputChange}
                   placeholder="••••••••"
                   required
                 />
@@ -112,19 +191,82 @@ const LoginForm: React.FC = () => {
                 {isLoading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
+              </TabsContent>
+              
+              <TabsContent value="register">
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-nome">Nome</Label>
+                    <Input
+                      id="register-nome"
+                      name="nome"
+                      type="text"
+                      value={registerData.nome}
+                      onChange={handleRegisterInputChange}
+                      placeholder="Seu nome completo"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">E-mail</Label>
+                    <Input
+                      id="register-email"
+                      name="email"
+                      type="email"
+                      value={registerData.email}
+                      onChange={handleRegisterInputChange}
+                      placeholder="seu@email.com"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Senha</Label>
+                    <Input
+                      id="register-password"
+                      name="password"
+                      type="password"
+                      value={registerData.password}
+                      onChange={handleRegisterInputChange}
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-confirm">Confirmar Senha</Label>
+                    <Input
+                      id="register-confirm"
+                      name="confirmPassword"
+                      type="password"
+                      value={registerData.confirmPassword}
+                      onChange={handleRegisterInputChange}
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
 
-            {/* Demo Accounts */}
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Criando conta...' : 'Criar Conta'}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+
+            {/* Demo Alert - apenas na aba login */}
+            {activeTab === 'login' && (
             <Alert className="mt-4">
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-medium">Contas de demonstração:</p>
-                  <div className="text-sm space-y-1">
-                    <p><strong>Usuário:</strong> demo@exemplo.com / demo</p>
-                    <p><strong>Admin:</strong> admin@exemplo.com / admin</p>
+                    <p className="font-medium">🧪 Ambiente de desenvolvimento:</p>
+                    <div className="text-sm">
+                      <p>Crie sua conta ou use: <strong>teste@exemplo.com</strong> / <strong>123456</strong></p>
                   </div>
                 </div>
               </AlertDescription>
             </Alert>
+            )}
           </CardContent>
         </Card>
 
@@ -147,10 +289,10 @@ const LoginForm: React.FC = () => {
           </div>
           
           <div className="space-y-2">
-            <div className="text-2xl">💾</div>
-            <h3 className="font-medium">Automático</h3>
+            <div className="text-2xl">🔒</div>
+            <h3 className="font-medium">Seguro</h3>
             <p className="text-xs text-muted-foreground">
-              Salva gastos automaticamente no banco
+              Dados protegidos com Supabase Auth
             </p>
           </div>
         </div>

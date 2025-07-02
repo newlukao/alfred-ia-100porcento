@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Debug IA Financeira</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { 
+            padding: 10px 15px; 
+            margin: 5px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        .primary { background: #007bff; color: white; }
+        .danger { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🚨 DEBUG IA FINANCEIRA</h1>
+    
+    <div id="status">
+        <div class="status info">🔄 Iniciando diagnóstico...</div>
+    </div>
+
+    <div id="actions">
+        <button class="primary" onclick="testVite()">🔧 Testar Vite</button>
+        <button class="primary" onclick="testBrowser()">🌐 Testar Browser</button>
+        <button class="danger" onclick="clearAll()">🗑️ Limpar Tudo</button>
+        <button class="primary" onclick="openNormal()">📱 Abrir App</button>
+    </div>
+
+    <div id="logs" style="background: #000; color: #0f0; padding: 15px; margin-top: 20px; border-radius: 5px; max-height: 400px; overflow-y: auto;">
+        <div>🚀 Sistema de Debug Iniciado</div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            logs.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function addStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.innerHTML += `<div class="status ${type}">${message}</div>`;
+        }
+
+        function testVite() {
+            log('🔧 Testando Vite...');
+            fetch('/')
+                .then(response => {
+                    if (response.ok) {
+                        log('✅ Vite server está funcionando', 'success');
+                        addStatus('✅ Servidor Vite OK', 'success');
+                    } else {
+                        log('❌ Vite server com problemas: ' + response.status, 'error');
+                        addStatus('❌ Servidor Vite com problema', 'error');
+                    }
+                })
+                .catch(error => {
+                    log('❌ Erro no Vite: ' + error, 'error');
+                    addStatus('❌ Erro de conexão com Vite', 'error');
+                });
+        }
+
+        function testBrowser() {
+            log('🌐 Testando Browser...');
+            
+            // Test localStorage
+            try {
+                localStorage.setItem('test', 'ok');
+                localStorage.removeItem('test');
+                log('✅ LocalStorage OK', 'success');
+            } catch (e) {
+                log('❌ LocalStorage erro: ' + e, 'error');
+            }
+
+            // Test console
+            if (typeof console !== 'undefined') {
+                log('✅ Console OK', 'success');
+            } else {
+                log('❌ Console não disponível', 'error');
+            }
+
+            // Test fetch
+            if (typeof fetch !== 'undefined') {
+                log('✅ Fetch API OK', 'success');
+            } else {
+                log('❌ Fetch API não disponível', 'error');
+            }
+
+            addStatus('✅ Testes de Browser concluídos', 'success');
+        }
+
+        function clearAll() {
+            log('🗑️ Limpando cache e storage...');
+            
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                log('✅ Storage limpo', 'success');
+            } catch (e) {
+                log('❌ Erro ao limpar storage: ' + e, 'error');
+            }
+
+            // Clear service workers
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(registration => {
+                        registration.unregister();
+                        log('✅ Service Worker removido', 'success');
+                    });
+                });
+            }
+
+            addStatus('✅ Limpeza concluída - Recarregue a página', 'success');
+        }
+
+        function openNormal() {
+            log('📱 Redirecionando para aplicação...');
+            window.location.href = '/';
+        }
+
+        // Auto-run basic tests
+        setTimeout(() => {
+            testVite();
+            testBrowser();
+        }, 1000);
+    </script>
+</body>
+</html> 
