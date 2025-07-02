@@ -15,7 +15,6 @@ import AdvancedAnalyticsPage from "@/components/AdvancedAnalyticsPage";
 import NotificationCenterPage from "@/components/NotificationCenterPage";
 import CalendarPage from "@/components/CalendarPage";
 import NotFound from "./pages/NotFound";
-import OneSignal from 'react-onesignal';
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -135,34 +134,6 @@ const AppContent = () => {
 
 const App = () => {
   console.log('🚀 APP - Componente principal iniciando...');
-
-  useEffect(() => {
-    OneSignal.init({
-      appId: 'c2a8fd12-0027-45ce-a68e-7ffd90fb4560',
-      notifyButton: {
-        enable: true,
-        prenotify: true,
-        showCredit: false,
-        text: {
-          'tip.state.unsubscribed': 'Ativar notificações',
-          'tip.state.subscribed': 'Você está inscrito',
-          'tip.state.blocked': 'Notificações bloqueadas',
-          'message.prenotify': 'Clique para ativar notificações',
-          'message.action.subscribed': 'Inscrito! 🎉',
-          'message.action.resubscribed': 'Inscrito novamente!',
-          'message.action.unsubscribed': 'Notificações desativadas',
-          'message.action.subscribing': 'Inscrevendo...',
-          'dialog.main.title': 'Gerenciar notificações',
-          'dialog.main.button.subscribe': 'Ativar',
-          'dialog.main.button.unsubscribe': 'Desativar',
-          'dialog.blocked.title': 'Notificações bloqueadas',
-          'dialog.blocked.message': 'Ative as notificações nas configurações do navegador.'
-        }
-      },
-      allowLocalhostAsSecureOrigin: true,
-      serviceWorkerPath: '/OneSignalSDKWorker.js',
-    });
-  }, []);
 
   return (
     <ErrorBoundary>
