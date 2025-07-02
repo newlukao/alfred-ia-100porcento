@@ -17,6 +17,15 @@ function formatBrazilDate(date: Date): string {
   });
 }
 
+// 🔥 NOVA FUNÇÃO: Gera data brasileira no formato YYYY-MM-DD
+function getBrazilDateString(): string {
+  const brazilDate = getBrazilDate();
+  const year = brazilDate.getFullYear();
+  const month = String(brazilDate.getMonth() + 1).padStart(2, '0');
+  const day = String(brazilDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -29,6 +38,18 @@ interface TransactionExtraction {
   data: string;
   isValid: boolean;
   type: 'expense' | 'income'; // 🔥 NOVO: Tipo da transação
+}
+
+// 📅 NOVO: Interface para compromissos
+interface AppointmentExtraction {
+  titulo: string;
+  descricao: string;
+  data: string;
+  hora: string;
+  local?: string;
+  categoria: string;
+  isValid: boolean;
+  type: 'appointment';
 }
 
 // Manter compatibilidade com código existente
@@ -115,7 +136,8 @@ export class OpenAIService {
     conversationHistory: any[] = [],
     userPersonality?: string,
     userId?: string,
-    chatState?: string // 'waiting_expense' | 'waiting_income' | 'initial'
+    chatState?: string, // 'waiting_expense' | 'waiting_income' | 'initial'
+    userPlanType?: 'bronze' | 'ouro' // NOVO: tipo de plano do usuário
   ): Promise<{
     response: string;
     extraction: TransactionExtraction;
@@ -180,7 +202,7 @@ export class OpenAIService {
             valor: contextValue,
             categoria: finalCategory,
             descricao: isContextIncome ? `Recebimento em ${finalCategory}` : `Gasto em ${finalCategory}`,
-            data: new Date().toISOString().split('T')[0],
+            data: getBrazilDateString(),
             isValid: false, // Aguarda confirmação
             type: isContextIncome ? 'income' : 'expense'
           }
@@ -195,6 +217,9 @@ export class OpenAIService {
     // 🔥 DETECÇÃO DE CONFIRMAÇÃO INTELIGENTE
     const confirmationWords = ['sim', 'ta sim', 'tá sim', 'certo', 'isso mesmo', 'exato', 'correto', 'confirmo', 'pode ser', 'tá certo', 'é isso', 'isso aí', 'ta certo', 'perfeito', 'ok', 'okay'];
     const isConfirmation = confirmationWords.some(word => currentMessage === word || currentMessage.includes(word));
+    
+    console.log('🔥 OpenAI - Mensagem atual:', currentMessage);
+    console.log('🔥 OpenAI - É confirmação?', isConfirmation);
     
     if (isConfirmation && conversationHistory.length > 0) {
       // Buscar a última mensagem do bot que pediu confirmação
@@ -224,18 +249,21 @@ export class OpenAIService {
                           lastBotMessage.content.includes('recebi') ||
                           isWaitingForIncomeCategory;
           
+          console.log('🎉 OpenAI - CONFIRMAÇÃO DETECTADA! Criando extraction com isValid: true');
+          console.log('🎉 OpenAI - Valor:', valor, 'Categoria:', categoria, 'Tipo:', isIncome ? 'income' : 'expense');
+          
           return {
             response: isIncome ? 
               `Massa! R$ ${valor.toFixed(2)} de recebimento em ${categoria} registrado! 🎉💎\n\nShow de bola! Quer adicionar mais alguma entrada?` :
               `Massa! R$ ${valor.toFixed(2)} em ${categoria} registrado! 🎉\n\nShow! Rolou mais algum gasto que você quer anotar?`,
-            extraction: {
-              valor: valor,
-              categoria: categoria,
-              descricao: isIncome ? `Recebimento em ${categoria}` : `Gasto em ${categoria}`,
-              data: new Date().toISOString().split('T')[0],
-              isValid: true,
-              type: isIncome ? 'income' : 'expense'
-            }
+                          extraction: {
+                valor: valor,
+                categoria: categoria,
+                descricao: isIncome ? `Recebimento em ${categoria}` : `Gasto em ${categoria}`,
+                data: getBrazilDateString(),
+                isValid: true,
+                type: isIncome ? 'income' : 'expense'
+              }
           };
         }
       }
@@ -254,13 +282,13 @@ export class OpenAIService {
         'Tranquilo! 🙌 Estou aqui pra isso! 💪'
       ];
       
-      return {
-        response: responses[Math.floor(Math.random() * responses.length)],
-        extraction: {
-          valor: 0, categoria: '', descricao: '', data: new Date().toISOString().split('T')[0],
-          isValid: false, type: 'expense'
-        }
-      };
+              return {
+          response: responses[Math.floor(Math.random() * responses.length)],
+          extraction: {
+            valor: 0, categoria: '', descricao: '', data: getBrazilDateString(),
+            isValid: false, type: 'expense'
+          }
+        };
     }
 
     // 👋 DETECÇÃO DE SAUDAÇÕES (PRIORITY #3)
@@ -268,64 +296,64 @@ export class OpenAIService {
     const isGreeting = greetingWords.some(word => currentMessage.startsWith(word) || currentMessage === word);
     
     if (isGreeting) {
-      const responses = [
-        `E aí! Beleza? 😄
-
-📝 **COMO USAR (super fácil):**
-
-💸 **Para GASTOS:**
-• "gastei 50 no mercado"
-• "comprei pizza por 35"
-• "paguei 100 de luz"
-
-💰 **Para RECEBIMENTOS:**
-• "recebi 3000 de salário"
-• "ganhei 500 de freelance"
-
-🎯 **Dica:** Sempre fale VALOR + ONDE/DO QUE!
-
-Manda aí! 🚀`,
+      // 🥇 MENSAGENS SIMPLES PARA USUÁRIOS (direcionando para botões)
+      if (userPlanType === 'ouro') {
+        const goldResponses = [
+          `E aí! Beleza? 😄💎\n\nPosso te ajudar com finanças e agenda! Use os botões abaixo para escolher o que quer fazer! 🚀`,
+          `Opa! Tudo jóia? 😊💎\n\nBora organizar suas finanças e compromissos? Clica em um dos botões aí embaixo! 💰📅`,
+          `Salve! 🤙💎\n\nAqui é seu assistente premium! Use os botões abaixo para registrar gastos, recebimentos ou compromissos! 💪`
+        ];
         
-        `Opa! Tudo jóia? 😊
-
-📝 **EXEMPLOS FÁCEIS:**
-
-💸 **Gastos:**
-• "gastei 80 no supermercado"
-• "paguei 200 de internet"
-• "comprei roupa por 150"
-
-💰 **Recebimentos:**
-• "recebi 2500 de salário"
-• "ganhei 300 de extra"
-
-Qual você quer registrar? 💰`,
-
-        `Salve! 🤙
-
-📝 **JEITO MAIS FÁCIL:**
-
-💸 **Para gastos, fale:**
-• "gastei [valor] em/no/na [coisa]"
-• "paguei [valor] de [conta]"
-
-💰 **Para recebimentos:**
-• "recebi [valor] de [origem]"
-
-🎯 **Exemplos:**
-• "gastei 45 no lanche"
-• "recebi 1500 de freelance"
-
-Bora registrar? 💪`
+        return {
+          response: goldResponses[Math.floor(Math.random() * goldResponses.length)],
+          extraction: {
+            valor: 0, categoria: '', descricao: '', data: getBrazilDateString(),
+            isValid: false, type: 'expense'
+          }
+        };
+      }
+      
+      // 🥉 MENSAGENS SIMPLES PARA USUÁRIOS BRONZE
+      const bronzeResponses = [
+        `E aí! Beleza? 😄\n\nBora controlar seus gastos? Clica no botão aí embaixo! 🚀`,
+        `Opa! Tudo jóia? 😊\n\nPronto para registrar um gasto? Use o botão abaixo! 💰`,
+        `Salve! 🤙\n\nVamos organizar suas finanças? Clica no botão de "Registrar Gasto" embaixo! 💪`
       ];
       
-      return {
-        response: responses[Math.floor(Math.random() * responses.length)],
+              return {
+          response: bronzeResponses[Math.floor(Math.random() * bronzeResponses.length)],
+          extraction: {
+            valor: 0, categoria: '', descricao: '', data: getBrazilDateString(),
+            isValid: false, type: 'expense'
+          }
+        };
+    }
+
+    // 📅 DETECÇÃO PRIORITÁRIA DE COMPROMISSOS (antes de valores)
+    const actionType = this.detectActionType(userMessage, chatState);
+    
+    if (actionType === 'appointment') {
+      console.log('📅 COMPROMISSO DETECTADO! Chamando extractAppointmentData');
+      // Se é compromisso, processar direto como appointment (não como transação)
+      return this.extractAppointmentData(
+        userMessage,
+        systemInstructions,
+        conversationHistory,
+        userPersonality,
+        userId,
+        chatState
+      ).then(result => ({
+        response: result.response,
         extraction: {
-          valor: 0, categoria: '', descricao: '', data: new Date().toISOString().split('T')[0],
-          isValid: false, type: 'expense'
-        }
-      };
+          valor: 0,
+          categoria: result.extraction.categoria,
+          descricao: result.extraction.titulo,
+          data: result.extraction.data,
+          isValid: result.extraction.isValid,
+          type: 'expense' // Compatibilidade com interface TransactionExtraction
+        } as TransactionExtraction,
+        personalityUpdate: result.personalityUpdate
+      }));
     }
 
     // 🔥 DETECÇÃO INTELIGENTE BASEADA NO ESTADO DO CHAT E CONTEXTO
@@ -380,7 +408,7 @@ Bora registrar? 💪`
             valor: valor,
             categoria: detectedCategory,
             descricao: transactionType === 'income' ? `Recebimento em ${detectedCategory}` : `Gasto em ${detectedCategory}`,
-            data: new Date().toISOString().split('T')[0],
+            data: getBrazilDateString(),
             isValid: false, // Aguarda confirmação
             type: transactionType
           }
@@ -553,28 +581,52 @@ IMPORTANTES:
       else categoria = 'outros';
     }
     
-    return {
-      response: valor > 0 ? 
-        (transactionType === 'income' ? 
-          `Opa! R$ ${valor.toFixed(2)} de recebimento anotado! ${categoria !== 'outros' ? `De ${categoria}! Tá certo?` : 'De que categoria?'}` :
-          `Opa! R$ ${valor.toFixed(2)} anotado! ${categoria !== 'outros' ? `Em ${categoria}! Tá certo?` : 'Mas em que categoria?'}`
-        ) :
-        (transactionType === 'income' ? 
-          'Não consegui sacar direito... Pode falar tipo "recebi R$ 500 de salário"? 😅' :
-          'Não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅'
-        ),
-      extraction: {
-        valor: valor,
-        categoria: categoria !== 'outros' ? categoria : '',
-        descricao: transactionType === 'income' ? 'Recebimento' : 'Gasto',
-        data: new Date().toISOString().split('T')[0],
-        isValid: false,
-        type: transactionType
-      }
-    };
+          return {
+        response: valor > 0 ? 
+          (transactionType === 'income' ? 
+            `Opa! R$ ${valor.toFixed(2)} de recebimento anotado! ${categoria !== 'outros' ? `De ${categoria}! Tá certo?` : 'De que categoria?'}` :
+            `Opa! R$ ${valor.toFixed(2)} anotado! ${categoria !== 'outros' ? `Em ${categoria}! Tá certo?` : 'Mas em que categoria?'}`
+          ) :
+          (transactionType === 'income' ? 
+            'Não consegui sacar direito... Pode falar tipo "recebi R$ 500 de salário"? 😅' :
+            'Não consegui sacar direito... Pode falar tipo "gastei R$ 50 no mercado"? 😅'
+          ),
+        extraction: {
+          valor: valor,
+          categoria: categoria !== 'outros' ? categoria : '',
+          descricao: transactionType === 'income' ? 'Recebimento' : 'Gasto',
+          data: getBrazilDateString(),
+          isValid: false,
+          type: transactionType
+        }
+      };
   }
 
-  // 🔥 MÉTODO AUXILIAR: Detecta tipo de transação
+  // 🔥 MÉTODO AUXILIAR: Detecta tipo geral (transação ou compromisso)
+  private detectActionType(message: string, chatState?: string): 'expense' | 'income' | 'appointment' {
+    const lowerMessage = message.toLowerCase();
+    
+    // Se o estado do chat já define o tipo, usar ele
+    if (chatState === 'waiting_expense') return 'expense';
+    if (chatState === 'waiting_income') return 'income';
+    if (chatState === 'waiting_appointment') return 'appointment';
+    
+    // 📅 Palavras-chave para compromissos (NOVA DETECÇÃO)
+    const appointmentWords = ['compromisso', 'agendamento', 'agendar', 'consulta', 'reunião', 'reuniao', 'encontro', 'dentista', 'médico', 'medico', 'doutor', 'doutora', 'hospital', 'clínica', 'clinica', 'appointment', 'meeting', 'lembrete', 'evento', 'aniversário', 'aniversario'];
+    const timeWords = ['hoje', 'amanha', 'amanhã', 'dia', 'hora', 'horas', 'às', 'as'];
+    
+    const hasAppointmentWords = appointmentWords.some(word => lowerMessage.includes(word));
+    const hasTimeContext = timeWords.some(word => lowerMessage.includes(word));
+    
+    // Se detecta palavras de compromisso + contexto de tempo, é appointment
+    if (hasAppointmentWords || (hasTimeContext && (lowerMessage.includes('no ') || lowerMessage.includes('na ') || lowerMessage.includes('com ')))) {
+      return 'appointment';
+    }
+    
+    return this.detectTransactionType(message, chatState);
+  }
+
+  // 🔥 MÉTODO AUXILIAR: Detecta tipo de transação financeira
   private detectTransactionType(message: string, chatState?: string): 'expense' | 'income' {
     const lowerMessage = message.toLowerCase();
     
@@ -600,13 +652,341 @@ IMPORTANTES:
     return 'expense';
   }
 
+  // 📅 NOVO MÉTODO: Processa compromissos
+  async extractAppointmentData(
+    userMessage: string, 
+    systemInstructions: string, 
+    conversationHistory: any[] = [],
+    userPersonality?: string,
+    userId?: string,
+    chatState?: string
+  ): Promise<{
+    response: string;
+    extraction: AppointmentExtraction;
+    personalityUpdate?: string;
+  }> {
+    
+    const currentMessage = userMessage.toLowerCase().trim();
+    console.log('📅 VERIFICANDO COMPROMISSO:', userMessage);
+    console.log('🎯 ESTADO DO CHAT:', chatState);
+    
+    // 🧠 ANÁLISE CONTEXTUAL
+    const lastBotMessage = conversationHistory
+      .slice()
+      .reverse()
+      .find(msg => msg.type === 'assistant')?.content || '';
+    
+    // 🔥 DETECÇÃO DE CONFIRMAÇÃO PARA COMPROMISSOS
+    const confirmationWords = ['sim', 'ta sim', 'tá sim', 'certo', 'isso mesmo', 'exato', 'correto', 'confirmo', 'pode ser', 'tá certo', 'é isso', 'isso aí', 'ta certo', 'perfeito', 'ok', 'okay'];
+    const isConfirmation = confirmationWords.some(word => currentMessage === word || currentMessage.includes(word));
+    
+    if (isConfirmation && lastBotMessage.includes('Tá certo?')) {
+      console.log('✅ CONFIRMAÇÃO DE COMPROMISSO DETECTADA!');
+      
+      // Extrair dados da mensagem de confirmação do bot
+      const tituloMatch = lastBotMessage.match(/Compromisso:\s*([^,\n]+)/i);
+      const dataMatch = lastBotMessage.match(/Data:\s*([^,\n]+)/i);
+      const horaMatch = lastBotMessage.match(/Hora:\s*([^,\n]+)/i);
+      const localMatch = lastBotMessage.match(/Local:\s*([^,\n]+)/i);
+      const categoriaMatch = lastBotMessage.match(/Categoria:\s*([^,\n]+)/i);
+      
+      if (tituloMatch && dataMatch && horaMatch) {
+        // 🔧 LIMPAR ASTERISCOS E FORMATAÇÃO MARKDOWN DO TÍTULO
+        const tituloLimpo = tituloMatch[1].replace(/\*\*/g, '').trim();
+        const horaLimpa = horaMatch[1].replace(/\*\*/g, '').trim();
+        const dataLimpa = dataMatch[1].replace(/\*\*/g, '').trim();
+        const localLimpo = localMatch?.[1]?.replace(/\*\*/g, '').trim() || '';
+        
+        return {
+          response: `🎉 Massa! Compromisso agendado com sucesso! 📅\n\n✅ ${tituloLimpo} - ${dataLimpa} às ${horaLimpa}`,
+          extraction: {
+            titulo: tituloLimpo,
+            descricao: tituloLimpo,
+            data: this.parseAppointmentDate(dataLimpa),
+            hora: horaLimpa,
+            local: localLimpo,
+            categoria: this.mapAppointmentCategory(categoriaMatch?.[1] || ''),
+            isValid: true,
+            type: 'appointment'
+          }
+        };
+      }
+    }
+
+    // Prompt para processamento de compromissos
+    const appointmentPrompt = `Você é um assistente brasileiro SUPER INTELIGENTE para compromissos! 📅
+
+CONTEXTO DA CONVERSA:
+${conversationHistory.slice(-5).map((msg, i) => `${i + 1}. ${msg.type}: "${msg.content}"`).join('\n')}
+
+ESTADO ATUAL: ${chatState || 'initial'}
+
+VOCÊ É SUPER INTELIGENTE E:
+- Fala como brasileiro jovem: "massa", "show", "beleza", "top"
+- CONECTA informações entre mensagens  
+- ENTENDE confirmações: "sim", "certo", "isso"
+- Detecta compromissos facilmente: reunião, dentista, consulta, etc.
+
+DETECÇÃO INTELIGENTE DE COMPROMISSOS:
+- "reunião amanhã às 14h" = título="Reunião", data="amanhã", hora="14:00", categoria="trabalho"
+- "dentista dia 20 às 15h" = título="Dentista", data="dia 20", hora="15:00", categoria="saúde"
+- "consulta médica às 10h" = título="Consulta médica", data="hoje", hora="10:00", categoria="saúde"
+- "encontro cliente às 9h" = título="Encontro cliente", data="hoje", hora="09:00", categoria="negócios"
+- "reuniao depois de amanha as 15 horas" = título="Reunião", data="depois de amanhã", hora="15:00", categoria="trabalho"
+- "consulta dia 25 as 10 horas" = título="Consulta", data="dia 25", hora="10:00", categoria="saúde"
+
+CATEGORIAS AUTOMÁTICAS:
+- reunião, meeting, trabalho → "trabalho"
+- dentista, médico, consulta, hospital → "saúde"  
+- cliente, vendas, negócio → "negócios"
+- família, casa, pessoal → "família"
+- escola, curso, aula → "educação"
+- outros casos → "pessoal"
+
+LÓGICA SIMPLES:
+1. Se tem TÍTULO + DATA/TEMPO + HORA → pergunta "Tá certo?" mostrando detalhes
+2. Se falta info específica → pergunta o que falta
+3. Se usuário confirma → isValid = true
+
+FORMATO (JSON):
+{
+  "response": "resposta_natural_brasileira",
+  "extraction": {
+    "titulo": "titulo_claro",
+    "descricao": "titulo_claro", 
+    "data": "amanhã_ou_hoje_ou_dia_X",
+    "hora": "HH:MM",
+    "local": "",
+    "categoria": "categoria_detectada",
+    "isValid": false_se_perguntando_confirmacao,
+    "type": "appointment"
+  }
+}
+
+EXEMPLOS DE RESPOSTA:
+Usuário: "reunião amanhã às 14h"
+→ "Show! Vou agendar:
+
+📅 Compromisso: Reunião
+📅 Data: Amanhã  
+📅 Hora: 14:00
+📅 Categoria: Trabalho
+
+Tá certo?"
+
+IMPORTANTES:
+- JSON válido sempre
+- isValid = false até confirmar (para perguntar "Tá certo?")
+- Seja natural e brasileiro
+- Detecte até info parcial e pergunte o resto`;
+
+    try {
+      const messages: ChatMessage[] = [
+        { role: 'system', content: appointmentPrompt },
+        { role: 'user', content: userMessage }
+      ];
+
+      const result = await this.chatCompletion(messages);
+      console.log('🤖 Resposta da IA (Compromisso):', result);
+      
+      try {
+        const cleanResult = result.replace(/```json\n?|\n?```/g, '').trim();
+        const parsed = JSON.parse(cleanResult);
+        
+        if (parsed.extraction && parsed.response) {
+          // 🔧 LIMPAR ASTERISCOS DE TODOS OS CAMPOS
+          if (parsed.extraction.titulo) {
+            parsed.extraction.titulo = parsed.extraction.titulo.replace(/\*\*/g, '').trim();
+          }
+          if (parsed.extraction.descricao) {
+            parsed.extraction.descricao = parsed.extraction.descricao.replace(/\*\*/g, '').trim();
+          }
+          if (parsed.extraction.local) {
+            parsed.extraction.local = parsed.extraction.local.replace(/\*\*/g, '').trim();
+          }
+          
+          parsed.extraction.type = 'appointment';
+          return parsed;
+        }
+      } catch (parseError) {
+        console.log('❌ Erro parse JSON, usando fallback para compromisso');
+      }
+      
+      // Fallback para compromissos
+      return this.createAppointmentFallback(userMessage, result);
+      
+    } catch (error) {
+      console.error('Error in extractAppointmentData:', error);
+      throw error;
+    }
+  }
+
+  // 🔧 HELPER: Mapear categoria de compromisso
+  private mapAppointmentCategory(categoria: string): string {
+    categoria = categoria.toLowerCase();
+    
+    if (categoria.includes('médic') || categoria.includes('dentist') || categoria.includes('consulta') || categoria.includes('hospital') || categoria.includes('clínic')) {
+      return 'saúde';
+    } else if (categoria.includes('trabalho') || categoria.includes('reunião') || categoria.includes('meeting') || categoria.includes('escritório')) {
+      return 'trabalho';
+    } else if (categoria.includes('família') || categoria.includes('family') || categoria.includes('casa') || categoria.includes('irmã') || categoria.includes('pai') || categoria.includes('mãe')) {
+      return 'família';
+    } else if (categoria.includes('escola') || categoria.includes('curso') || categoria.includes('aula') || categoria.includes('professor')) {
+      return 'educação';
+    } else if (categoria.includes('lazer') || categoria.includes('cinema') || categoria.includes('festa') || categoria.includes('show')) {
+      return 'lazer';
+    } else if (categoria.includes('banco') || categoria.includes('financ') || categoria.includes('contador')) {
+      return 'financeiro';
+    } else if (categoria.includes('negóc') || categoria.includes('client') || categoria.includes('vendas')) {
+      return 'negócios';
+    }
+    
+    return 'pessoal';
+  }
+
+  // 🔧 HELPER: Converter data de compromisso
+  private parseAppointmentDate(dateText: string): string {
+    const hoje = new Date();
+    const text = dateText.toLowerCase();
+    
+    if (text.includes('hoje')) {
+      return hoje.toISOString().split('T')[0];
+    } else if (text.includes('depois de amanhã') || text.includes('depois de amanha')) {
+      const depoisAmanha = new Date(hoje);
+      depoisAmanha.setDate(hoje.getDate() + 2);
+      return depoisAmanha.toISOString().split('T')[0];
+    } else if (text.includes('amanhã') || text.includes('amanha')) {
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+      return amanha.toISOString().split('T')[0];
+    } else if (text.includes('dia ')) {
+      const dayMatch = text.match(/dia (\d{1,2})/);
+      if (dayMatch) {
+        const day = parseInt(dayMatch[1]);
+        const thisMonth = new Date(hoje.getFullYear(), hoje.getMonth(), day);
+        // Se o dia já passou neste mês, assume próximo mês
+        if (thisMonth < hoje) {
+          thisMonth.setMonth(thisMonth.getMonth() + 1);
+        }
+        return thisMonth.toISOString().split('T')[0];
+      }
+    }
+    
+    // Se não conseguiu parsear, retorna hoje
+    return hoje.toISOString().split('T')[0];
+  }
+
+  // 🧠 HELPER: Fallback para compromissos
+  private createAppointmentFallback(userMessage: string, aiResponse: string): any {
+    const message = userMessage.toLowerCase();
+    
+    // Tentar extrair informações básicas
+    let titulo = '';
+    let categoria = 'pessoal';
+    let data = 'hoje';
+    let hora = '';
+    
+    // Detectar título/tipo
+    if (message.includes('dentist')) {
+      titulo = 'Dentista';
+      categoria = 'saúde';
+    } else if (message.includes('médic') || message.includes('medico')) {
+      titulo = 'Consulta médica';
+      categoria = 'saúde';
+    } else if (message.includes('reunião') || message.includes('reuniao')) {
+      titulo = 'Reunião';
+      categoria = 'trabalho';
+    } else if (message.includes('consulta')) {
+      titulo = 'Consulta';
+      categoria = 'saúde';
+    } else if (message.includes('encontro')) {
+      titulo = 'Encontro';
+      categoria = 'pessoal';
+    } else if (message.includes('compromisso')) {
+      titulo = 'Compromisso';
+    } else {
+      // Tentar extrair o primeiro termo como título
+      const words = userMessage.split(' ');
+      titulo = words[0].charAt(0).toUpperCase() + words[0].slice(1);
+    }
+    
+    // Adicionar pessoa se mencionada "com [nome]"
+    const comMatch = message.match(/com (\w+)/);
+    if (comMatch) {
+      titulo += ` com ${comMatch[1].charAt(0).toUpperCase() + comMatch[1].slice(1)}`;
+    }
+    
+    // Detectar data
+    if (message.includes('depois de amanhã') || message.includes('depois de amanha')) {
+      data = 'depois de amanhã';
+    } else if (message.includes('amanhã') || message.includes('amanha')) {
+      data = 'amanhã';
+    } else if (message.includes('hoje')) {
+      data = 'hoje';
+    } else if (message.includes('dia ')) {
+      const dayMatch = message.match(/dia (\d{1,2})/);
+      if (dayMatch) {
+        data = `dia ${dayMatch[1]}`;
+      }
+    }
+    
+    // Detectar hora
+    const horaMatch = message.match(/(\d{1,2})h|(\d{1,2}):(\d{2})|às (\d{1,2})|as (\d{1,2})|(\d{1,2}) horas/);
+    if (horaMatch) {
+      if (horaMatch[1]) hora = `${horaMatch[1]}:00`;
+      else if (horaMatch[2] && horaMatch[3]) hora = `${horaMatch[2]}:${horaMatch[3]}`;
+      else if (horaMatch[4]) hora = `${horaMatch[4]}:00`;
+      else if (horaMatch[5]) hora = `${horaMatch[5]}:00`;
+      else if (horaMatch[6]) hora = `${horaMatch[6]}:00`;
+    }
+    
+    // Se conseguiu extrair informações básicas, fazer confirmação
+    if (titulo && hora && data) {
+      return {
+        response: `Show! Vou agendar:
+
+📅 Compromisso: ${titulo}
+📅 Data: ${data.charAt(0).toUpperCase() + data.slice(1)}
+📅 Hora: ${hora}
+📅 Categoria: ${categoria.charAt(0).toUpperCase() + categoria.slice(1)}
+
+Tá certo?`,
+        extraction: {
+          titulo: titulo,
+          descricao: titulo,
+          data: data,
+          hora: hora,
+          local: '',
+          categoria: categoria,
+          isValid: false, // Aguardando confirmação
+          type: 'appointment'
+        }
+      };
+    }
+    
+    return {
+      response: 'Quase lá! Pode me falar mais detalhes? Ex: "Reunião amanhã às 14h" ou "Dentista dia 20 às 15h" 😊',
+      extraction: {
+        titulo: titulo || 'Compromisso',
+        descricao: titulo || 'Compromisso',
+        data: data,
+        hora: hora,
+        local: '',
+        categoria: categoria,
+        isValid: false,
+        type: 'appointment'
+      }
+    };
+  }
+
   // 🔄 MANTER COMPATIBILIDADE: Método antigo que chama o novo
   async extractExpenseData(
     userMessage: string, 
     systemInstructions: string, 
     conversationHistory: any[] = [],
     userPersonality?: string,
-    userId?: string
+    userId?: string,
+    userPlanType?: 'bronze' | 'ouro'
   ): Promise<{
     response: string;
     extraction: ExpenseExtraction;
@@ -618,7 +998,8 @@ IMPORTANTES:
       conversationHistory, 
       userPersonality, 
       userId, 
-      'waiting_expense' // Força tipo gasto para compatibilidade
+      'waiting_expense', // Força tipo gasto para compatibilidade
+      userPlanType
     );
     
     return {

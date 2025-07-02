@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { authService, AppUser } from '@/lib/supabase-auth';
 
 interface AuthContextType {
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       console.log('🔐 AuthContext - Fazendo login:', email);
       
@@ -83,9 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ AuthContext - Erro no login:', error);
       return { success: false, error: 'Erro interno do sistema' };
     }
-  };
+  }, []);
 
-  const register = async (email: string, password: string, nome: string): Promise<{ success: boolean; error?: string }> => {
+    const register = useCallback(async (email: string, password: string, nome: string): Promise<{ success: boolean; error?: string }> => {
     try {
       console.log('📝 AuthContext - Registrando usuário:', email, nome);
       
@@ -107,21 +107,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ AuthContext - Erro no registro:', error);
       return { success: false, error: 'Erro interno do sistema' };
     }
-  };
+  }, []);
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     try {
       console.log('🚪 AuthContext - Fazendo logout');
       await authService.signOut();
-    setUser(null);
+	setUser(null);
       console.log('✅ AuthContext - Logout realizado');
     } catch (error) {
       console.error('❌ AuthContext - Erro no logout:', error);
     }
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    login,
+    register,
+    logout,
+    isLoading
+  }), [user, login, register, logout, isLoading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

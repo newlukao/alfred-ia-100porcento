@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, TrendingDown, TrendingUp, Calendar, Filter, Trash2, Download, Edit, Target, BarChart3, Trophy, Bell, BookTemplate, Crown, Shield, DollarSign, PiggyBank } from 'lucide-react';
+import { Plus, TrendingDown, TrendingUp, Calendar, Filter, Trash2, Download, Edit, Edit2, Target, BarChart3, Trophy, Bell, BookTemplate, Crown, Shield, DollarSign, PiggyBank, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, Expense, Budget, Income } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,8 @@ import NotificationCenter from './NotificationCenter';
 import AdvancedSearch from './AdvancedSearch';
 import SimpleExpenseTemplates from './SimpleExpenseTemplates';
 import PlanBasedDashboard from './PlanBasedDashboard';
+import MobileBottomNav from './MobileBottomNav';
+import { useDevice } from '@/hooks/use-device';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -36,12 +38,21 @@ const Dashboard: React.FC = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
   
   // Filters
   const [dateFilter, setDateFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [minValue, setMinValue] = useState('');
   const [maxValue, setMaxValue] = useState('');
+  
+  // Mobile date range filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  // Pagination for transactions
+  const [currentPage, setCurrentPage] = useState(1);
+  const transactionsPerPage = 10;
   
   // New expense form
   const [newExpense, setNewExpense] = useState({
@@ -68,11 +79,25 @@ const Dashboard: React.FC = () => {
     data: ''
   });
 
+  // Edit income form
+  const [editIncome, setEditIncome] = useState({
+    amount: '',
+    category: '',
+    description: '',
+    date: '',
+    tags: ''
+  });
+  const [editingIncome, setEditingIncome] = useState<Income | null>(null);
+  const [isEditIncomeDialogOpen, setIsEditIncomeDialogOpen] = useState(false);
+
   // Budget form
   const [budgetForm, setBudgetForm] = useState({
     categoria: '',
     valor_orcamento: ''
   });
+
+  const [todayAppointmentsCount, setTodayAppointmentsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const expenseCategories = [
     'mercado', 'transporte', 'contas', 'lazer', 'alimentação', 
@@ -104,20 +129,46 @@ const Dashboard: React.FC = () => {
     dividendos: '#84cc16'
   };
 
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const device = useDevice();
+  useEffect(() => {
+    if (device.isMobile) {
+      setShowInstallBanner(true);
+    }
+  }, [device.isMobile]);
+
   useEffect(() => {
     loadData();
   }, [user]);
 
   useEffect(() => {
     applyFilters();
-  }, [expenses, incomes, dateFilter, categoryFilter, minValue, maxValue]);
+    setCurrentPage(1); // Reset pagination when filters change
+  }, [expenses, incomes, dateFilter, categoryFilter, minValue, maxValue, startDate, endDate]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (!user) return;
+    // Buscar compromissos do dia
+    if (user.plan_type === 'ouro' && database.getAppointmentsByUser) {
+      database.getAppointmentsByUser(user.id).then(userAppointments => {
+        const today = new Date().toISOString().split('T')[0];
+        const todayAppointments = userAppointments.filter(apt => apt.date === today);
+        setTodayAppointmentsCount(todayAppointments.length);
+      });
+    }
+    // Buscar notificações não lidas
+    if (database.getUnreadNotificationCount) {
+      database.getUnreadNotificationCount(user.id).then(count => setUnreadNotificationsCount(count));
+    }
+  }, [user]);
+
+  const loadData = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
     try {
-      console.log('📊 Dashboard - Carregando dados para usuário:', user.id);
+      // console.log('📊 Dashboard - Carregando dados para usuário:', user.id);
       
       // Load expenses
       const userExpenses = await database.getExpensesByUser(user.id);
@@ -146,13 +197,23 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   const applyFilters = () => {
     let filteredExp = [...expenses];
     let filteredInc = [...incomes];
 
-    if (dateFilter) {
+    // Priority: Use mobile date range if set, otherwise use desktop single date
+    if (startDate || endDate) {
+      if (startDate) {
+        filteredExp = filteredExp.filter(expense => expense.data >= startDate);
+        filteredInc = filteredInc.filter(income => income.date >= startDate);
+      }
+      if (endDate) {
+        filteredExp = filteredExp.filter(expense => expense.data <= endDate);
+        filteredInc = filteredInc.filter(income => income.date <= endDate);
+      }
+    } else if (dateFilter) {
       filteredExp = filteredExp.filter(expense => expense.data === dateFilter);
       filteredInc = filteredInc.filter(income => income.date === dateFilter);
     }
@@ -336,6 +397,73 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleEditIncome = (income: Income) => {
+    setEditingIncome(income);
+    setEditIncome({
+      amount: income.amount.toString(),
+      category: income.category,
+      description: income.description,
+      date: income.date,
+      tags: income.tags.join(', ')
+    });
+    setIsEditIncomeDialogOpen(true);
+  };
+
+  const handleUpdateIncome = async () => {
+    if (!editingIncome || !editIncome.amount || !editIncome.category || !editIncome.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await database.updateIncome(editingIncome.id, {
+        amount: parseFloat(editIncome.amount),
+        category: editIncome.category,
+        description: editIncome.description,
+        date: editIncome.date,
+        tags: editIncome.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      });
+
+      toast({
+        title: "Sucesso! ✏️",
+        description: "Recebimento atualizado com sucesso"
+      });
+
+      setIsEditIncomeDialogOpen(false);
+      setEditingIncome(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating income:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar recebimento",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteIncome = async (id: string) => {
+    try {
+      await database.deleteIncome(id);
+      toast({
+        title: "Sucesso",
+        description: "Recebimento removido com sucesso"
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error deleting income:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao remover recebimento",
+        variant: "destructive"
+      });
+    }
+  };
+
   const exportData = () => {
     // Export both expenses and incomes
     const expensesData = filteredExpenses.map(expense => [
@@ -502,198 +630,318 @@ const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando dashboard...</p>
+      <div className="space-y-6 animate-in fade-in-50 duration-300">
+        <div className="space-y-2">
+          <div className="h-8 bg-muted rounded-md animate-pulse"></div>
+          <div className="h-4 bg-muted/60 rounded-md animate-pulse max-w-md"></div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="p-6 border rounded-lg space-y-3">
+              <div className="h-4 bg-muted rounded animate-pulse"></div>
+              <div className="h-8 bg-muted rounded animate-pulse"></div>
+              <div className="h-3 bg-muted/60 rounded animate-pulse max-w-20"></div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-6 border rounded-lg space-y-4">
+            <div className="h-6 bg-muted rounded animate-pulse max-w-32"></div>
+            <div className="h-64 bg-muted/30 rounded animate-pulse"></div>
+          </div>
+          <div className="p-6 border rounded-lg space-y-4">
+            <div className="h-6 bg-muted rounded animate-pulse max-w-32"></div>
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-muted/40 rounded animate-pulse"></div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">📊 Dashboard</h1>
-          <p className="text-muted-foreground">
-            {user?.plan_type === 'ouro' 
-              ? 'Controle completo do seu fluxo de caixa' 
-              : 'Visão geral dos seus gastos'}
-          </p>
+    <div className="space-y-6 pb-32 md:pb-6">
+      {/* Banner sutil de instalação no mobile */}
+      {showInstallBanner && device.isMobile && (
+        <div className="sticky top-0 z-30 flex items-center justify-center bg-blue-50 text-blue-900 px-3 py-1 shadow-sm text-xs font-medium gap-2 rounded-b-md">
+          <button
+            className="flex items-center gap-2 focus:outline-none"
+            onClick={() => setShowInstallPrompt(true)}
+          >
+            <Download size={16} />
+            Clique aqui para instalar o app
+          </button>
+          <button
+            className="ml-2 text-blue-400 hover:text-blue-700 text-base"
+            onClick={() => setShowInstallBanner(false)}
+            aria-label="Fechar"
+          >
+            ×
+          </button>
         </div>
-        
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadData}>
-            🔄 Recarregar
-          </Button>
-          
-          <Button variant="outline" onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}>
-            <Filter size={16} className="mr-2" />
-            Busca Avançada
-          </Button>
-          
-          <Button variant="outline" onClick={() => setShowTemplates(!showTemplates)}>
-            <BookTemplate size={16} className="mr-2" />
-            Templates
-          </Button>
-          
-          <Button variant="outline" onClick={exportData}>
-            <Download size={16} className="mr-2" />
-            Exportar
-          </Button>
-          
-          <Button variant="outline" onClick={() => setIsBudgetDialogOpen(true)}>
-            <Target size={16} className="mr-2" />
-            Orçamentos
-          </Button>
-          
-          {user?.plan_type === 'ouro' && (
-            <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
-                  <TrendingUp size={16} className="mr-2" />
-                  Nova Entrada
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Novo Recebimento</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="income-amount">Valor (R$)</Label>
-                    <Input
-                      id="income-amount"
-                      type="number"
-                      step="0.01"
-                      value={newIncome.amount}
-                      onChange={(e) => setNewIncome(prev => ({ ...prev, amount: e.target.value }))}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="income-category">Categoria</Label>
-                    <Select value={newIncome.category} onValueChange={(value) => setNewIncome(prev => ({ ...prev, category: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {incomeCategories.map(category => (
-                          <SelectItem key={category} value={category}>
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="income-description">Descrição</Label>
-                    <Textarea
-                      id="income-description"
-                      value={newIncome.description}
-                      onChange={(e) => setNewIncome(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descreva o recebimento..."
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="income-date">Data</Label>
-                    <Input
-                      id="income-date"
-                      type="date"
-                      value={newIncome.date}
-                      onChange={(e) => setNewIncome(prev => ({ ...prev, date: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="income-tags">Tags (separadas por vírgula)</Label>
-                    <Input
-                      id="income-tags"
-                      value={newIncome.tags}
-                      onChange={(e) => setNewIncome(prev => ({ ...prev, tags: e.target.value }))}
-                      placeholder="trabalho, extra, mensal..."
-                    />
-                  </div>
-                  
-                  <Button onClick={handleAddIncome} className="w-full bg-green-600 hover:bg-green-700">
-                    Adicionar Recebimento
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-          
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus size={16} className="mr-2" />
-                Novo Gasto
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Adicionar Novo Gasto</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="valor">Valor (R$)</Label>
-                  <Input
-                    id="valor"
-                    type="number"
-                    step="0.01"
-                    value={newExpense.valor}
-                    onChange={(e) => setNewExpense(prev => ({ ...prev, valor: e.target.value }))}
-                    placeholder="0,00"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="categoria">Categoria</Label>
-                  <Select value={newExpense.categoria} onValueChange={(value) => setNewExpense(prev => ({ ...prev, categoria: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {expenseCategories.map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="descricao">Descrição</Label>
-                  <Textarea
-                    id="descricao"
-                    value={newExpense.descricao}
-                    onChange={(e) => setNewExpense(prev => ({ ...prev, descricao: e.target.value }))}
-                    placeholder="Descreva o gasto..."
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="data">Data</Label>
-                  <Input
-                    id="data"
-                    type="date"
-                    value={newExpense.data}
-                    onChange={(e) => setNewExpense(prev => ({ ...prev, data: e.target.value }))}
-                  />
-                </div>
-                
-                <Button onClick={handleAddExpense} className="w-full">
-                  Adicionar Gasto
-                </Button>
+      )}
+      {/* Modal de instrução de instalação */}
+      {showInstallPrompt && device.isMobile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-xs w-full relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              onClick={() => setShowInstallPrompt(false)}
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+            <h2 className="text-lg font-bold mb-2 text-center">Instale o App na Tela Inicial</h2>
+            {device.isIOS ? (
+              <div className="text-sm text-gray-700 space-y-2">
+                <p>Para instalar no iPhone/iPad:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Toque no ícone <span className="inline-block align-middle"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12l7-7 7 7"/></svg> </span> no Safari.</li>
+                  <li>Selecione <b>Adicionar à Tela de Início</b>.</li>
+                  <li>Confirme e pronto! O app ficará como um aplicativo normal.</li>
+                </ol>
               </div>
-            </DialogContent>
-          </Dialog>
+            ) : device.isAndroid ? (
+              <div className="text-sm text-gray-700 space-y-2">
+                <p>Para instalar no Android:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Toque no menu <b>⋮</b> no navegador.</li>
+                  <li>Selecione <b>Adicionar à tela inicial</b> ou <b>Instalar app</b>.</li>
+                  <li>Confirme e pronto! O app ficará como um aplicativo normal.</li>
+                </ol>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+      {/* Header */}
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">📊 Dashboard</h1>
+        <p className="text-muted-foreground">
+          {user?.plan_type === 'ouro' 
+            ? 'Controle completo do seu fluxo de caixa' 
+            : 'Visão geral dos seus gastos'}
+        </p>
+        
+        {/* Botão Ver Opções - Mobile */}
+        <div className="md:hidden">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowOptions(!showOptions)}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            Ver opções
+            {showOptions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </Button>
+        </div>
+
+        {/* Ações principais - Mobile */}
+        <div className="md:hidden flex gap-2 mb-4">
+          <Button 
+            onClick={() => setIsDialogOpen(true)} 
+            variant="outline" 
+            className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
+          >
+            <span className="text-lg font-bold mr-2">-</span>
+            Saída
+          </Button>
+          {user?.plan_type === 'ouro' && (
+            <Button 
+              onClick={() => setIsIncomeDialogOpen(true)} 
+              variant="outline" 
+              className="flex-1 text-green-600 border-green-300 hover:bg-green-50"
+            >
+              <span className="text-lg font-bold mr-2">+</span>
+              Entrada
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            className="flex-1 text-blue-600 border-blue-300 hover:bg-blue-50"
+          >
+            <MessageCircle size={20} />
+          </Button>
+        </div>
+
+        {/* Container de opções - sempre visível no desktop, expansível no mobile */}
+        <div className={`${showOptions ? 'block' : 'hidden'} md:block`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full mb-4">
+            <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
+              🔄 Recarregar
+            </Button>
+            <Button variant="outline" onClick={() => setShowAdvancedSearch(!showAdvancedSearch)} className="w-full sm:w-auto">
+              <Filter size={16} className="mr-2" />
+              Busca Avançada
+            </Button>
+            <Button variant="outline" onClick={() => setShowTemplates(!showTemplates)} className="w-full sm:w-auto">
+              <BookTemplate size={16} className="mr-2" />
+              Templates
+            </Button>
+            <Button variant="outline" onClick={exportData} className="w-full sm:w-auto">
+              <Download size={16} className="mr-2" />
+              Exportar
+            </Button>
+            <Button variant="outline" onClick={() => setIsBudgetDialogOpen(true)} className="w-full sm:w-auto">
+              <Target size={16} className="mr-2" />
+              Orçamentos
+            </Button>
+            <Button variant="outline" onClick={() => window.location.href = '/calendar'} className="w-full sm:w-auto">
+              <Calendar size={16} className="mr-2" />
+              Meus compromissos
+            </Button>
+            {/* Botões de ação principal apenas no desktop */}
+            <div className="hidden md:flex gap-2">
+              {user?.plan_type === 'ouro' && (
+                <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
+                      <TrendingUp size={16} className="mr-2" />
+                      Nova Entrada
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Adicionar Novo Recebimento</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="income-amount">Valor (R$)</Label>
+                        <Input
+                          id="income-amount"
+                          type="number"
+                          step="0.01"
+                          value={newIncome.amount}
+                          onChange={(e) => setNewIncome(prev => ({ ...prev, amount: e.target.value }))}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="income-category">Categoria</Label>
+                        <Select value={newIncome.category} onValueChange={(value) => setNewIncome(prev => ({ ...prev, category: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {incomeCategories.map(category => (
+                              <SelectItem key={category} value={category}>
+                                {category.charAt(0).toUpperCase() + category.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="income-description">Descrição</Label>
+                        <Textarea
+                          id="income-description"
+                          value={newIncome.description}
+                          onChange={(e) => setNewIncome(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Descreva o recebimento..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="income-date">Data</Label>
+                        <Input
+                          id="income-date"
+                          type="date"
+                          value={newIncome.date}
+                          onChange={(e) => setNewIncome(prev => ({ ...prev, date: e.target.value }))}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="income-tags">Tags (separadas por vírgula)</Label>
+                        <Input
+                          id="income-tags"
+                          value={newIncome.tags}
+                          onChange={(e) => setNewIncome(prev => ({ ...prev, tags: e.target.value }))}
+                          placeholder="trabalho, extra, mensal..."
+                        />
+                      </div>
+                      
+                      <Button onClick={handleAddIncome} className="w-full bg-green-600 hover:bg-green-700">
+                        Adicionar Recebimento
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus size={16} className="mr-2" />
+                    Novo Gasto
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Novo Gasto</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="valor">Valor (R$)</Label>
+                      <Input
+                        id="valor"
+                        type="number"
+                        step="0.01"
+                        value={newExpense.valor}
+                        onChange={(e) => setNewExpense(prev => ({ ...prev, valor: e.target.value }))}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="categoria">Categoria</Label>
+                      <Select value={newExpense.categoria} onValueChange={(value) => setNewExpense(prev => ({ ...prev, categoria: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {expenseCategories.map(category => (
+                            <SelectItem key={category} value={category}>
+                              {category.charAt(0).toUpperCase() + category.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="descricao">Descrição</Label>
+                      <Textarea
+                        id="descricao"
+                        value={newExpense.descricao}
+                        onChange={(e) => setNewExpense(prev => ({ ...prev, descricao: e.target.value }))}
+                        placeholder="Descreva o gasto..."
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="data">Data</Label>
+                      <Input
+                        id="data"
+                        type="date"
+                        value={newExpense.data}
+                        onChange={(e) => setNewExpense(prev => ({ ...prev, data: e.target.value }))}
+                      />
+                    </div>
+                    
+                    <Button onClick={handleAddExpense} className="w-full">
+                      Adicionar Gasto
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -742,9 +990,56 @@ const Dashboard: React.FC = () => {
         </Card>
       )}
 
+      {/* Mobile: Filtro Minimalista */}
+      <div className="md:hidden">
+        <div className="bg-gradient-to-r from-slate-50 to-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center">
+              <Filter className="h-2.5 w-2.5 text-blue-600" />
+            </div>
+            <span className="text-xs font-medium text-gray-700">Período</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs text-gray-500">De</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500">Até</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          
+          {(startDate || endDate) && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => {
+                setStartDate('');
+                setEndDate('');
+              }}
+              className="w-full mt-2 h-6 text-xs text-gray-400"
+            >
+              ✕ Limpar
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Tabs Navigation */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
             <span>Visão Geral</span>
@@ -753,79 +1048,184 @@ const Dashboard: React.FC = () => {
             <TrendingUp className="h-4 w-4" />
             <span>Análises Avançadas</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center space-x-2">
+          <TabsTrigger value="notifications" className="hidden md:flex items-center space-x-2">
             <Bell className="h-4 w-4" />
             <span>Notificações</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Unified Cash Flow Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Entradas</CardTitle>
+          {/* Mobile: Cards Minimalistas */}
+          <div className="md:hidden grid grid-cols-2 gap-3">
+            {/* Card Total de Entradas - Mobile */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-xl p-3 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
             <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+                </div>
+                {user?.plan_type !== 'ouro' && (
+                  <div className="w-5 h-5 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <span className="text-xs">🔒</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-green-700">Entradas</p>
+                <p className="text-lg font-bold text-green-800">
               R$ {totalIncomes.toFixed(2)}
+                </p>
+                <p className="text-xs text-green-600 opacity-80">
+                  {filteredIncomes.length} registros
+                </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {filteredIncomes.length} recebimentos
-            </p>
+              <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-green-200 rounded-full opacity-20"></div>
+            </div>
+
+            {/* Card Total de Saídas - Mobile */}
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100 rounded-xl p-3 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-red-700">Saídas</p>
+                <p className="text-lg font-bold text-red-800">
+                  R$ {totalExpenses.toFixed(2)}
+                </p>
+                <p className="text-xs text-red-600 opacity-80">
+                  {filteredExpenses.length} gastos
+                </p>
+              </div>
+              <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-red-200 rounded-full opacity-20"></div>
+            </div>
+
+            {/* Card Saldo Líquido - Mobile */}
+            <div className={`bg-gradient-to-br ${netBalance >= 0 ? 'from-blue-50 to-indigo-50 border-blue-100' : 'from-orange-50 to-amber-50 border-orange-100'} border rounded-xl p-3 relative overflow-hidden`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-8 h-8 rounded-lg ${netBalance >= 0 ? 'bg-blue-100' : 'bg-orange-100'} flex items-center justify-center`}>
+                  <DollarSign className={`h-4 w-4 ${netBalance >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className={`text-xs font-medium ${netBalance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Saldo Geral</p>
+                <p className={`text-lg font-bold ${netBalance >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                  R$ {netBalance.toFixed(2)}
+                </p>
+                <p className={`text-xs ${netBalance >= 0 ? 'text-blue-600' : 'text-orange-600'} opacity-80`}>
+                  {netBalance >= 0 ? 'Positivo' : 'Negativo'}
+                </p>
+              </div>
+              <div className={`absolute -right-4 -bottom-4 w-16 h-16 ${netBalance >= 0 ? 'bg-blue-200' : 'bg-orange-200'} rounded-full opacity-20`}></div>
+            </div>
+
+            {/* Card Gasto Médio - Mobile */}
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-3 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <PiggyBank className="h-4 w-4 text-purple-600" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-purple-700">Gasto Médio</p>
+                <p className="text-lg font-bold text-purple-800">
+                  R$ {averageExpense.toFixed(2)}
+                </p>
+                <p className="text-xs text-purple-600 opacity-80">
+                  por item
+                </p>
+              </div>
+              <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-purple-200 rounded-full opacity-20"></div>
+            </div>
+          </div>
+
+          {/* Desktop: Cards Minimalistas */}
+          <div className="hidden md:grid grid-cols-4 gap-4">
+            {/* Card Total de Entradas - Desktop */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
             {user?.plan_type !== 'ouro' && (
-              <p className="text-xs text-yellow-600 mt-1">
+                  <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <span className="text-sm">🔒</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-green-700">Entradas</p>
+                <p className="text-2xl font-bold text-green-800">
+                  R$ {totalIncomes.toFixed(2)}
+                </p>
+                <p className="text-sm text-green-600 opacity-80">
+                  {filteredIncomes.length} registros
+                </p>
+                {user?.plan_type !== 'ouro' && (
+                  <p className="text-xs text-yellow-600 mt-2">
                 🥇 Upgrade para Ouro para registrar
               </p>
             )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Saídas</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              R$ {totalExpenses.toFixed(2)}
+              </div>
+              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-green-200 rounded-full opacity-20"></div>
             </div>
-            <p className="text-xs text-muted-foreground">
+
+            {/* Card Total de Saídas - Desktop */}
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100 rounded-xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                  <TrendingDown className="h-5 w-5 text-red-600" />
+            </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-red-700">Saídas</p>
+                <p className="text-2xl font-bold text-red-800">
+                  R$ {totalExpenses.toFixed(2)}
+                </p>
+                <p className="text-sm text-red-600 opacity-80">
               {filteredExpenses.length} gastos
             </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Líquido</CardTitle>
-            <DollarSign className={`h-4 w-4 ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {netBalance.toFixed(2)}
+              </div>
+              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-red-200 rounded-full opacity-20"></div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {netBalance >= 0 ? 'Superávit' : 'Déficit'}
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
-            <PiggyBank className={`h-4 w-4 ${monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {monthlyBalance.toFixed(2)}
+            {/* Card Saldo Líquido - Desktop */}
+            <div className={`bg-gradient-to-br ${netBalance >= 0 ? 'from-blue-50 to-indigo-50 border-blue-100' : 'from-orange-50 to-amber-50 border-orange-100'} border rounded-xl p-4 relative overflow-hidden`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-lg ${netBalance >= 0 ? 'bg-blue-100' : 'bg-orange-100'} flex items-center justify-center`}>
+                  <DollarSign className={`h-5 w-5 ${netBalance >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('pt-BR', { month: 'long' })}
-            </p>
-          </CardContent>
-        </Card>
+              </div>
+              <div className="space-y-2">
+                <p className={`text-sm font-medium ${netBalance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Saldo Geral</p>
+                <p className={`text-2xl font-bold ${netBalance >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                  R$ {netBalance.toFixed(2)}
+                </p>
+                <p className={`text-sm ${netBalance >= 0 ? 'text-blue-600' : 'text-orange-600'} opacity-80`}>
+                  {netBalance >= 0 ? 'Positivo' : 'Negativo'}
+                </p>
+              </div>
+              <div className={`absolute -right-6 -bottom-6 w-20 h-20 ${netBalance >= 0 ? 'bg-blue-200' : 'bg-orange-200'} rounded-full opacity-20`}></div>
+            </div>
+
+            {/* Card Gasto Médio - Desktop */}
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <PiggyBank className="h-5 w-5 text-purple-600" />
+            </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-purple-700">Gasto Médio</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  R$ {averageExpense.toFixed(2)}
+                </p>
+                <p className="text-sm text-purple-600 opacity-80">
+                  por item
+                </p>
+              </div>
+              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-purple-200 rounded-full opacity-20"></div>
+            </div>
       </div>
 
       {/* Budget Progress */}
@@ -873,8 +1273,8 @@ const Dashboard: React.FC = () => {
         </Card>
       )}
 
-      {/* Filters */}
-      <Card>
+          {/* Desktop: Filtros Completos */}
+          <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
@@ -947,281 +1347,293 @@ const Dashboard: React.FC = () => {
 
       {/* Charts */}
       {cashFlowData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Fluxo de Caixa</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  📊 Fluxo de Caixa
+                </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="monthName" />
-                  <YAxis />
-                  <Tooltip labelFormatter={(value) => {
-                    const data = cashFlowData.find(d => d.month === value.dataKey);
-                    return [
-                      `Data: ${data?.monthName}`,
-                      `Saldo: R$ ${data?.balance.toFixed(2)}`
-                    ];
-                  }} />
-                  <Bar dataKey="expenses" fill="#ef4444" />
-                  <Bar dataKey="incomes" fill="#22c55e" />
-                  <Area dataKey="balance" type="monotone" stroke="#000000" fill="#ff7373" />
+                <div className="h-64 md:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={cashFlowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis 
+                        dataKey="monthName" 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(value) => `R$ ${value}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                        formatter={(value, name) => [
+                          `R$ ${Number(value).toFixed(2)}`,
+                          name === 'expenses' ? '💸 Saídas' : '💰 Entradas'
+                        ]}
+                        labelFormatter={(label) => `📅 ${label}`}
+                      />
+                      <Bar 
+                        dataKey="expenses" 
+                        fill="#ef4444" 
+                        name="expenses"
+                        radius={[4, 4, 0, 0]}
+                        opacity={0.8}
+                      />
+                      <Bar 
+                        dataKey="incomes" 
+                        fill="#22c55e" 
+                        name="incomes"
+                        radius={[4, 4, 0, 0]}
+                        opacity={0.8}
+                      />
                 </ComposedChart>
               </ResponsiveContainer>
+                </div>
             </CardContent>
           </Card>
-
-          {monthlyData.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Gastos por Mês</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Total']} />
-                    <Bar dataKey="total" fill="#10b981" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
           )}
+
+          {/* Histórico de Transações */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-medium">Transações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Combine and sort all transactions
+                const allTransactions = [
+                  ...filteredIncomes.map(income => ({
+                    ...income,
+                    type: 'income' as const,
+                    amount: income.amount,
+                    description: income.description,
+                    category: income.category,
+                    date: income.date
+                  })),
+                  ...filteredExpenses.map(expense => ({
+                    ...expense,
+                    type: 'expense' as const,
+                    amount: expense.valor,
+                    description: expense.descricao,
+                    category: expense.categoria,
+                    date: expense.data
+                  }))
+                ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                const totalPages = Math.ceil(allTransactions.length / transactionsPerPage);
+                const startIndex = (currentPage - 1) * transactionsPerPage;
+                const currentTransactions = allTransactions.slice(startIndex, startIndex + transactionsPerPage);
+
+                                 return (
+                   <>
+                     <div className="max-h-80 overflow-y-auto">
+                       <div className="space-y-2 pr-2">
+                         {currentTransactions.map((transaction, index) => (
+                           <div 
+                             key={`${transaction.type}-${index}`} 
+                             className="group flex items-center justify-between py-2 px-1 hover:bg-gray-50 rounded-md transition-colors"
+                           >
+                             <div className="flex items-center gap-2 flex-1 min-w-0">
+                               <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                               <div className="min-w-0 flex-1">
+                                 <p className="font-medium text-sm text-gray-900 truncate">{transaction.description}</p>
+                                 <p className="text-xs text-gray-500 capitalize">{transaction.category}</p>
+                               </div>
+                             </div>
+                             
+                             <div className="flex items-center gap-2">
+                               <div className="text-right flex-shrink-0">
+                                 <p className={`font-semibold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                   {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toFixed(2)}
+                                 </p>
+                                 <p className="text-xs text-gray-400">
+                                   {new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                 </p>
+                               </div>
+                               
+                               {/* Ações - sempre visíveis no mobile, hover no desktop */}
+                               <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                 <Button
+                                   variant="ghost"
+                                   size="sm"
+                                   className="h-6 w-6 p-0 hover:bg-blue-100"
+                                   onClick={() => {
+                                     if (transaction.type === 'expense') {
+                                       handleEditExpense(transaction as any);
+                                     } else {
+                                       handleEditIncome(transaction as any);
+                                     }
+                                   }}
+                                 >
+                                   <Edit2 className="h-3 w-3 text-blue-600" />
+                                 </Button>
+                                 
+                                 <Button
+                                   variant="ghost"
+                                   size="sm"
+                                   className="h-6 w-6 p-0 hover:bg-red-100"
+                                   onClick={() => {
+                                     if (confirm('Tem certeza que deseja excluir esta transação?')) {
+                                       if (transaction.type === 'expense') {
+                                         handleDeleteExpense(transaction.id);
+                                       } else {
+                                         handleDeleteIncome(transaction.id);
+                                       }
+                                     }
+                                   }}
+                                 >
+                                   <Trash2 className="h-3 w-3 text-red-600" />
+                                 </Button>
+                               </div>
+                             </div>
+                           </div>
+                         ))}
+                         
+                         {allTransactions.length === 0 && (
+                           <div className="text-center py-8 text-gray-400">
+                             <p className="text-sm">Nenhuma transação encontrada</p>
         </div>
       )}
+                       </div>
+                     </div>
 
-      {/* Unified Transactions List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {user?.plan_type === 'ouro' 
-              ? `Fluxo de Caixa (${filteredExpenses.length + filteredIncomes.length} transações)`
-              : `Lista de Gastos (${filteredExpenses.length})`
-            }
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(filteredExpenses.length === 0 && filteredIncomes.length === 0) ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhuma transação encontrada com os filtros aplicados.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* Combine and sort all transactions */}
-              {[
-                ...filteredExpenses.map(expense => ({
-                  ...expense,
-                  type: 'expense' as const,
-                  amount: expense.valor,
-                  date: expense.data,
-                  category: expense.categoria,
-                  description: expense.descricao
-                })),
-                ...filteredIncomes.map(income => ({
-                  ...income,
-                  type: 'income' as const,
-                  amount: income.amount,
-                  date: income.date,
-                  category: income.category,
-                  description: income.description
-                }))
-              ]
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map((transaction) => (
-                  <div
-                    key={`${transaction.type}-${transaction.id}`}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Badge 
-                          variant={transaction.type === 'expense' ? 'destructive' : 'default'}
-                          className={transaction.type === 'expense' ? '' : 'bg-green-100 text-green-800 border-green-200'}
+                    {/* Paginação */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                          className="text-xs"
                         >
-                          {transaction.type === 'expense' ? '📤 Saída' : '📥 Entrada'}
-                        </Badge>
-                        <Badge 
-                          variant="outline"
-                          style={{ 
-                            borderColor: categoryColors[transaction.category as keyof typeof categoryColors],
-                            color: categoryColors[transaction.category as keyof typeof categoryColors]
-                          }}
-                        >
-                          {transaction.category}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          ← Anterior
+                        </Button>
+                        
+                        <span className="text-xs text-gray-500">
+                          {currentPage} de {totalPages}
                         </span>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                          className="text-xs"
+                        >
+                          Próxima →
+                        </Button>
                       </div>
-                      <p className="font-medium">{transaction.description}</p>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-lg font-bold ${
-                        transaction.type === 'expense' ? 'text-red-500' : 'text-green-500'
-                      }`}>
-                        {transaction.type === 'expense' ? '-' : '+'}R$ {transaction.amount.toFixed(2)}
-                      </span>
-                      {transaction.type === 'expense' && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditExpense(transaction as Expense)}
-                            className="text-blue-500 hover:text-blue-600"
-                          >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteExpense(transaction.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    )}
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+    </TabsContent>
 
-      {/* Edit Expense Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Gasto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-valor">Valor (R$)</Label>
-              <Input
-                id="edit-valor"
-                type="number"
-                step="0.01"
-                value={editExpense.valor}
-                onChange={(e) => setEditExpense(prev => ({ ...prev, valor: e.target.value }))}
-                placeholder="0,00"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-categoria">Categoria</Label>
-              <Select value={editExpense.categoria} onValueChange={(value) => setEditExpense(prev => ({ ...prev, categoria: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-descricao">Descrição</Label>
-              <Textarea
-                id="edit-descricao"
-                value={editExpense.descricao}
-                onChange={(e) => setEditExpense(prev => ({ ...prev, descricao: e.target.value }))}
-                placeholder="Descreva o gasto..."
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-data">Data</Label>
-              <Input
-                id="edit-data"
-                type="date"
-                value={editExpense.data}
-                onChange={(e) => setEditExpense(prev => ({ ...prev, data: e.target.value }))}
-              />
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button onClick={handleUpdateExpense} className="flex-1">
-                Salvar Alterações
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+    <TabsContent value="analytics" className="space-y-6">
+      <AdvancedAnalytics 
+        expenses={expenses} 
+        incomes={user?.plan_type === 'ouro' ? incomes : []} 
+      />
+    </TabsContent>
 
-      {/* Budget Dialog */}
-      <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Definir Orçamento Mensal</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="budget-categoria">Categoria</Label>
-              <Select value={budgetForm.categoria} onValueChange={(value) => setBudgetForm(prev => ({ ...prev, categoria: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="budget-valor">Orçamento (R$)</Label>
-              <Input
-                id="budget-valor"
-                type="number"
-                step="0.01"
-                value={budgetForm.valor_orcamento}
-                onChange={(e) => setBudgetForm(prev => ({ ...prev, valor_orcamento: e.target.value }))}
-                placeholder="0,00"
-              />
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button onClick={handleSetBudget} className="flex-1">
-                Definir Orçamento
-              </Button>
-              <Button variant="outline" onClick={() => setIsBudgetDialogOpen(false)} className="flex-1">
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-        </TabsContent>
+    <TabsContent value="notifications" className="space-y-6">
+      <NotificationCenter />
+    </TabsContent>
+  </Tabs>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <AdvancedAnalytics 
-            expenses={expenses} 
-            incomes={user?.plan_type === 'ouro' ? incomes : []} 
+  {/* Modal de Edição de Receitas */}
+  <Dialog open={isEditIncomeDialogOpen} onOpenChange={setIsEditIncomeDialogOpen}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Editar Recebimento</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="edit-income-amount">Valor (R$)</Label>
+          <Input
+            id="edit-income-amount"
+            type="number"
+            step="0.01"
+            value={editIncome.amount}
+            onChange={(e) => setEditIncome(prev => ({ ...prev, amount: e.target.value }))}
+            placeholder="0,00"
           />
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <NotificationCenter />
-        </TabsContent>
-      </Tabs>
-    </div>
+        </div>
+        
+        <div>
+          <Label htmlFor="edit-income-category">Categoria</Label>
+          <Select value={editIncome.category} onValueChange={(value) => setEditIncome(prev => ({ ...prev, category: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {incomeCategories.map(category => (
+                <SelectItem key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <Label htmlFor="edit-income-description">Descrição</Label>
+          <Textarea
+            id="edit-income-description"
+            value={editIncome.description}
+            onChange={(e) => setEditIncome(prev => ({ ...prev, description: e.target.value }))}
+            placeholder="Descreva o recebimento..."
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="edit-income-date">Data</Label>
+          <Input
+            id="edit-income-date"
+            type="date"
+            value={editIncome.date}
+            onChange={(e) => setEditIncome(prev => ({ ...prev, date: e.target.value }))}
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="edit-income-tags">Tags (separadas por vírgula)</Label>
+          <Input
+            id="edit-income-tags"
+            value={editIncome.tags}
+            onChange={(e) => setEditIncome(prev => ({ ...prev, tags: e.target.value }))}
+            placeholder="trabalho, extra, mensal..."
+          />
+        </div>
+        
+        <Button onClick={handleUpdateIncome} className="w-full bg-green-600 hover:bg-green-700">
+          Atualizar Recebimento
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+  <MobileBottomNav
+    active={/* id do menu ativo, se houver */ 'overview'}
+    onChange={() => {}}
+    agendaBadge={todayAppointmentsCount}
+    avisosBadge={unreadNotificationsCount}
+  />
+</div>
   );
 };
 
-export default Dashboard;
+export default React.memo(Dashboard);

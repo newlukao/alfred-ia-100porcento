@@ -1,0 +1,7 @@
+PlanBasedDashboard.tsx  = MEXER NA DASH DESKTOP
+
+Dashboard.tsx = MEXER NO MOBILE DASH
+
+Queria ver se é possivel...
+
+---   Tudo que um usuario gold pode fazer, quero que o usuario q nao é gold possa ver e quando tentar usar uma função do plano gold apareça uma mensagem dizendo q pra usar a função tem q ser plano gold. e tenha um botao se tornar gold  q vai redirecionar pra tela de planos

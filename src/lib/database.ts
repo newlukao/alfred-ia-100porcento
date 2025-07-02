@@ -130,11 +130,7 @@ export interface UserStats {
 export interface NotificationSettings {
   id: string;
   usuario_id: string;
-  budget_alerts: boolean;
-  goal_progress: boolean;
   daily_reminders: boolean;
-  achievement_unlocks: boolean;
-  expense_limits: boolean;
   weekly_summaries: boolean;
   push_enabled: boolean;
   email_enabled: boolean;
@@ -142,6 +138,7 @@ export interface NotificationSettings {
   quiet_hours_end: string;
   created_at: string;
   updated_at: string;
+  appointment_alerts: boolean;
 }
 
 export interface NotificationHistory {
@@ -194,6 +191,20 @@ export interface Badge {
   categoria: Achievement['categoria'];
   raridade: Achievement['raridade'];
   condicoes: string; // JSON com as condições para desbloquear
+}
+
+// 📅 NOVA INTERFACE: Para compromissos/agendamentos
+export interface Appointment {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  location?: string;
+  category: 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
+  created_at: string;
+  updated_at: string;
 }
 
 class MockDatabase {
@@ -250,6 +261,7 @@ class MockDatabase {
   private notificationSettings: NotificationSettings[] = [];
   private notificationHistory: NotificationHistory[] = [];
   private incomes: Income[] = [];
+  private appointments: Appointment[] = [];
 
   private constructor() {
     console.log('⚠️ MockDatabase - Backup instance (not used)');
@@ -298,6 +310,94 @@ class MockDatabase {
     if (index > -1) {
       this.incomes.splice(index, 1);
     }
+  }
+
+  // 📅 Appointment methods (Plano Ouro apenas)
+  async getAppointmentsByUser(userId: string): Promise<Appointment[]> {
+    const user = this.users.find(u => u.id === userId);
+    if (!user || user.plan_type !== 'ouro') {
+      return [];
+    }
+    return this.appointments.filter(appointment => appointment.user_id === userId)
+      .sort((a, b) => {
+        // Ordenar por data e hora
+        const dateA = new Date(`${a.date}T${a.time}`);
+        const dateB = new Date(`${b.date}T${b.time}`);
+        return dateA.getTime() - dateB.getTime();
+      });
+  }
+
+  async addAppointment(appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<Appointment | null> {
+    const user = this.users.find(u => u.id === appointment.user_id);
+    if (!user || user.plan_type !== 'ouro') {
+      return null;
+    }
+
+    const newAppointment: Appointment = {
+      ...appointment,
+      id: (this.appointments.length + 1).toString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    this.appointments.push(newAppointment);
+
+    // Update user stats
+    await this.updateUserStats(appointment.user_id, { pontos_totais: 3 }); // 3 points per appointment
+
+    console.log('✅ MockDatabase - Compromisso adicionado:', newAppointment);
+    return newAppointment;
+  }
+
+  async updateAppointment(id: string, updates: Partial<Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Appointment | null> {
+    const index = this.appointments.findIndex(appointment => appointment.id === id);
+    if (index > -1) {
+      this.appointments[index] = {
+        ...this.appointments[index],
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+      return this.appointments[index];
+    }
+    return null;
+  }
+
+  async deleteAppointment(id: string): Promise<void> {
+    const index = this.appointments.findIndex(appointment => appointment.id === id);
+    if (index > -1) {
+      this.appointments.splice(index, 1);
+    }
+  }
+
+  async getAppointmentsByDate(userId: string, date: string): Promise<Appointment[]> {
+    const user = this.users.find(u => u.id === userId);
+    if (!user || user.plan_type !== 'ouro') {
+      return [];
+    }
+    return this.appointments.filter(appointment => 
+      appointment.user_id === userId && appointment.date === date
+    ).sort((a, b) => a.time.localeCompare(b.time));
+  }
+
+  async getUpcomingAppointments(userId: string, days: number = 7): Promise<Appointment[]> {
+    const user = this.users.find(u => u.id === userId);
+    if (!user || user.plan_type !== 'ouro') {
+      return [];
+    }
+
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + days);
+
+    return this.appointments.filter(appointment => {
+      if (appointment.user_id !== userId) return false;
+      
+      const appointmentDate = new Date(`${appointment.date}T${appointment.time}`);
+      return appointmentDate >= now && appointmentDate <= futureDate;
+    }).sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time}`);
+      const dateB = new Date(`${b.date}T${b.time}`);
+      return dateA.getTime() - dateB.getTime();
+    });
   }
 
   async getUserById(userId: string): Promise<User | null> {
@@ -720,9 +820,29 @@ class MockDatabase {
     return userStats;
   }
 
+  // 🔥 Função auxiliar para data brasileira em formato string
+  private getBrazilDateString(): string {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const brazilTime = new Date(utc + (-3 * 3600000)); // UTC-3
+    const year = brazilTime.getFullYear();
+    const month = String(brazilTime.getMonth() + 1).padStart(2, '0');
+    const day = String(brazilTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   async checkAndUpdateStreak(userId: string): Promise<number> {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = this.getBrazilDateString();
+    const yesterday = (() => {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const brazilTime = new Date(utc + (-3 * 3600000)); // UTC-3
+      brazilTime.setDate(brazilTime.getDate() - 1);
+      const year = brazilTime.getFullYear();
+      const month = String(brazilTime.getMonth() + 1).padStart(2, '0');
+      const day = String(brazilTime.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
     
     const todayExpenses = this.expenses.filter(expense => 
       expense.usuario_id === userId && expense.data === today
@@ -760,18 +880,15 @@ class MockDatabase {
       settings = {
         id: (this.notificationSettings.length + 1).toString(),
         usuario_id: userId,
-        budget_alerts: true,
-        goal_progress: true,
         daily_reminders: true,
-        achievement_unlocks: true,
-        expense_limits: true,
         weekly_summaries: true,
         push_enabled: true,
         email_enabled: false,
         quiet_hours_start: '22:00',
         quiet_hours_end: '08:00',
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        appointment_alerts: true
       };
       
       this.notificationSettings.push(settings);
@@ -1187,7 +1304,7 @@ class MockDatabase {
     recent_notifications: any[];
   }> {
     const adminNotifications = this.notificationHistory.filter(n => n.tipo === 'admin_message');
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.getBrazilDateString();
     const sentToday = adminNotifications.filter(n => n.data_criacao.startsWith(today));
     const readCount = adminNotifications.filter(n => n.lida).length;
     const readRate = adminNotifications.length > 0 ? (readCount / adminNotifications.length) * 100 : 0;

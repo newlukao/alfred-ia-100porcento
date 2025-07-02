@@ -34,8 +34,12 @@ import AdvancedSearch from './AdvancedSearch';
 import SimpleExpenseTemplates from './SimpleExpenseTemplates';
 import PlanBasedDashboard from './PlanBasedDashboard';
 import Chat from './Chat';
+import UserProfile from './UserProfile';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import AdminPanel from './AdminPanel';
+import MobileBottomNav from './MobileBottomNav';
+import { useDevice } from '@/hooks/use-device';
+import CalendarPage from './CalendarPage';
 
 interface SidebarItem {
   id: string;
@@ -55,43 +59,11 @@ const SidebarDashboard: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Menu items configuration
-  const menuItems: SidebarItem[] = [
-    {
-      id: 'chat',
-      label: 'Chat IA',
-      icon: <MessageCircle className="w-5 h-5" />,
-      component: <Chat />
-    },
-    {
-      id: 'overview',
-      label: 'Visão Geral',
-      icon: <Home className="w-5 h-5" />,
-      component: <PlanBasedDashboard user={user!} />
-    },
-    {
-      id: 'analytics',
-      label: 'Análises Avançadas',
-      icon: <BarChart3 className="w-5 h-5" />,
-      component: <AdvancedAnalytics expenses={expenses} incomes={incomes} />,
-      planRequired: 'ouro'
-    },
-    {
-      id: 'notifications',
-      label: 'Notificações',
-      icon: <Bell className="w-5 h-5" />,
-      component: <NotificationCenter />,
-      badge: '3'
-    },
-    {
-      id: 'admin',
-      label: 'Admin',
-      icon: <Shield className="w-5 h-5" />,
-      component: <AdminPanel />,
-      adminRequired: true
-    }
-  ];
+  const device = useDevice();
+  
+  // 🔥 NOVO: Estado para contar compromissos do dia e notificações
+  const [todayAppointmentsCount, setTodayAppointmentsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -111,6 +83,20 @@ const SidebarDashboard: React.FC = () => {
         const userIncomes = await database.getIncomesByUser(user.id);
         setIncomes(userIncomes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       }
+      
+      // 🔥 NOVO: Carregar compromissos do dia (apenas para plano ouro)
+      if (user?.plan_type === 'ouro' && database.getAppointmentsByUser) {
+        const userAppointments = await database.getAppointmentsByUser(user.id);
+        const today = new Date().toISOString().split('T')[0];
+        const todayAppointments = userAppointments.filter(apt => apt.date === today);
+        setTodayAppointmentsCount(todayAppointments.length);
+      }
+      
+      // 🔥 NOVO: Carregar notificações não lidas
+      if (database.getUnreadNotificationCount) {
+        const unreadCount = await database.getUnreadNotificationCount(user.id);
+        setUnreadNotificationsCount(unreadCount);
+      }
     } catch (error) {
       console.error('❌ Error loading data:', error);
       toast({
@@ -122,6 +108,57 @@ const SidebarDashboard: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Menu items configuration
+  const menuItems: SidebarItem[] = [
+    {
+      id: 'chat',
+      label: 'Alfred IA',
+      icon: <MessageCircle className="w-5 h-5" />,
+      component: <Chat />
+    },
+    {
+      id: 'overview',
+      label: 'Visão Geral',
+      icon: <Home className="w-5 h-5" />,
+      component: <PlanBasedDashboard user={user!} />
+    },
+    {
+      id: 'analytics',
+      label: 'Análises Avançadas',
+      icon: <BarChart3 className="w-5 h-5" />,
+      component: <AdvancedAnalytics expenses={expenses} incomes={incomes} />,
+      planRequired: 'ouro'
+    },
+    {
+      id: 'calendar',
+      label: 'Meus Compromissos',
+      icon: <Calendar className="w-5 h-5" />,
+      component: <CalendarPage />,
+      planRequired: 'ouro',
+      badge: todayAppointmentsCount > 0 ? todayAppointmentsCount.toString() : undefined
+    },
+    {
+      id: 'notifications',
+      label: 'Notificações',
+      icon: <Bell className="w-5 h-5" />,
+      component: <NotificationCenter />,
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount.toString() : undefined
+    },
+    {
+      id: 'profile',
+      label: 'Perfil',
+      icon: <User className="w-5 h-5" />,
+      component: <UserProfile />
+    },
+    {
+      id: 'admin',
+      label: 'Admin',
+      icon: <Shield className="w-5 h-5" />,
+      component: <AdminPanel />,
+      adminRequired: true
+    }
+  ];
 
   // Filter menu items based on user plan and admin status
   const filteredMenuItems = menuItems.filter(item => {
@@ -163,12 +200,116 @@ const SidebarDashboard: React.FC = () => {
     </Card>
   );
 
+  // Renderização condicional: mobile vs desktop
+  if (device.isMobile) {
+    return (
+      <div className="relative w-full bg-gray-50 dark:bg-gray-900" style={{ height: '100vh' }}>
+        {/* User Info */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+            <User className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium truncate">{user?.nome}</p>
+              {user?.is_admin && (
+                <Badge variant="default" className="text-xs bg-red-600 hover:bg-red-700">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Admin
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          </div>
+        </div>
+        {/* Quick Stats */}
+        <div className="p-4 space-y-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-muted-foreground">Resumo Rápido</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+              <span className="text-sm">Gastos</span>
+              <span className="text-sm font-medium text-red-600">R$ {totalExpenses.toFixed(2)}</span>
+            </div>
+            {user?.plan_type === 'ouro' && (
+              <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                <span className="text-sm">Recebimentos</span>
+                <span className="text-sm font-medium text-green-600">R$ {totalIncomes.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center p-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900 dark:to-purple-900 rounded">
+              <span className="text-sm font-medium">Saldo</span>
+              <span className={`text-sm font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {netBalance.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+        {/* Top Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold">{activeMenuItem?.label}</h1>
+              <p className="text-sm text-muted-foreground">
+                {new Date().toLocaleDateString('pt-BR', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              {user?.plan_type === 'bronze' && (
+                <Button variant="outline" size="sm" className="text-yellow-600 border-yellow-300">
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade para Ouro
+                </Button>
+              )}
+              <ThemeToggle />
+              <Button variant="ghost" size="sm">
+                <Bell className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+        {/* Content Area - Position absolute para forçar scroll */}
+        <div 
+          className="absolute inset-x-0 overflow-y-auto overflow-x-hidden p-2" 
+          style={{ 
+            top: '280px', 
+            bottom: '64px',
+            WebkitOverflowScrolling: 'touch',
+            scrollBehavior: 'smooth'
+          }}
+        >
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="pb-8">
+              {activeMenuItem?.component}
+            </div>
+          )}
+        </div>
+        {/* Menu fixo na parte inferior */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <MobileBottomNav 
+            active={activeItem} 
+            onChange={setActiveItem}
+            appointmentsCount={todayAppointmentsCount}
+            notificationsCount={unreadNotificationsCount}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
+      {/* Sidebar - apenas desktop/tablet */}
       <div className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full",
+        "hidden md:flex"
       )}>
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -281,7 +422,7 @@ const SidebarDashboard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
         {/* Top Header */}
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
           <div className="flex items-center justify-between">
@@ -332,6 +473,15 @@ const SidebarDashboard: React.FC = () => {
             activeMenuItem?.component
           )}
         </main>
+        {/* Mobile Bottom Navigation */}
+        <div className="md:hidden">
+          <MobileBottomNav 
+            active={activeItem} 
+            onChange={setActiveItem}
+            appointmentsCount={todayAppointmentsCount}
+            notificationsCount={unreadNotificationsCount}
+          />
+        </div>
       </div>
 
       {/* Mobile Overlay */}

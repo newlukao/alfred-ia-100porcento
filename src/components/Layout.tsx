@@ -18,6 +18,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (location.pathname === '/') return 'chat';
     if (location.pathname === '/dashboard') return 'overview';
     if (location.pathname === '/admin') return 'admin';
+    if (location.pathname === '/advanced-analytics') return 'analytics';
+    if (location.pathname === '/notification-center') return 'notifications';
+    if (location.pathname === '/calendar') return 'calendar';
     return 'overview';
   };
 
@@ -31,6 +34,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         break;
       case 'admin':
         window.location.href = '/admin';
+        break;
+      case 'analytics':
+        window.location.href = '/advanced-analytics';
+        break;
+      case 'notifications':
+        window.location.href = '/notification-center';
+        break;
+      case 'calendar':
+        window.location.href = '/calendar';
         break;
       default:
         break;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +11,11 @@ import LoginForm from "@/components/LoginForm";
 import Chat from "@/components/Chat";
 import Dashboard from "@/components/Dashboard";
 import AdminPanel from "@/components/AdminPanel";
+import AdvancedAnalyticsPage from "@/components/AdvancedAnalyticsPage";
+import NotificationCenterPage from "@/components/NotificationCenterPage";
+import CalendarPage from "@/components/CalendarPage";
 import NotFound from "./pages/NotFound";
+import OneSignal from 'react-onesignal';
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -70,20 +74,30 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 const AppContent = () => {
-  console.log('🔄 APP CONTENT - Iniciando...');
+  // console.log('🔄 APP CONTENT - Iniciando...');
   
   try {
     const { user, isLoading } = useAuth();
-    console.log('👤 AUTH STATE:', { user: user?.email || 'null', isLoading });
+    // console.log('👤 AUTH STATE:', { user: user?.email || 'null', isLoading });
 
     if (isLoading) {
-      console.log('⏳ Mostrando loading...');
+      // console.log('⏳ Mostrando loading...');
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando...</p>
-            <p className="text-xs text-gray-400 mt-2">Aguardando autenticação...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20">
+          <div className="text-center space-y-4">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <div className="absolute inset-0 rounded-full h-12 w-12 border-t-2 border-primary/30 animate-pulse mx-auto"></div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium">Inicializando aplicação...</p>
+              <div className="flex items-center justify-center space-x-1">
+                <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Conectando com o sistema...</p>
+            </div>
           </div>
         </div>
       );
@@ -101,6 +115,9 @@ const AppContent = () => {
           <Route path="/" element={<Chat />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/advanced-analytics" element={<AdvancedAnalyticsPage />} />
+          <Route path="/notification-center" element={<NotificationCenterPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
@@ -118,7 +135,35 @@ const AppContent = () => {
 
 const App = () => {
   console.log('🚀 APP - Componente principal iniciando...');
-  
+
+  useEffect(() => {
+    OneSignal.init({
+      appId: 'c2a8fd12-0027-45ce-a68e-7ffd90fb4560',
+      notifyButton: {
+        enable: true,
+        prenotify: true,
+        showCredit: false,
+        text: {
+          'tip.state.unsubscribed': 'Ativar notificações',
+          'tip.state.subscribed': 'Você está inscrito',
+          'tip.state.blocked': 'Notificações bloqueadas',
+          'message.prenotify': 'Clique para ativar notificações',
+          'message.action.subscribed': 'Inscrito! 🎉',
+          'message.action.resubscribed': 'Inscrito novamente!',
+          'message.action.unsubscribed': 'Notificações desativadas',
+          'message.action.subscribing': 'Inscrevendo...',
+          'dialog.main.title': 'Gerenciar notificações',
+          'dialog.main.button.subscribe': 'Ativar',
+          'dialog.main.button.unsubscribe': 'Desativar',
+          'dialog.blocked.title': 'Notificações bloqueadas',
+          'dialog.blocked.message': 'Ative as notificações nas configurações do navegador.'
+        }
+      },
+      allowLocalhostAsSecureOrigin: true,
+      serviceWorkerPath: '/OneSignalSDKWorker.js',
+    });
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

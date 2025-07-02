@@ -8,6 +8,8 @@ export interface DeviceInfo {
   height: number;
   orientation: 'portrait' | 'landscape';
   touchEnabled: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
 }
 
 export const useDevice = (): DeviceInfo => {
@@ -18,7 +20,9 @@ export const useDevice = (): DeviceInfo => {
     width: 1024,
     height: 768,
     orientation: 'landscape',
-    touchEnabled: false
+    touchEnabled: false,
+    isIOS: false,
+    isAndroid: false
   });
 
   useEffect(() => {
@@ -31,6 +35,9 @@ export const useDevice = (): DeviceInfo => {
       const isMobile = width < 768;
       const isTablet = width >= 768 && width < 1024;
       const isDesktop = width >= 1024;
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isIOS = /iPad|iPhone|iPod/.test(userAgent) && typeof (window as any).MSStream === "undefined";
+      const isAndroid = /android/i.test(userAgent);
 
       setDeviceInfo({
         isMobile,
@@ -39,7 +46,9 @@ export const useDevice = (): DeviceInfo => {
         width,
         height,
         orientation,
-        touchEnabled
+        touchEnabled,
+        isIOS,
+        isAndroid
       });
     };
 

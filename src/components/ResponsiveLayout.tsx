@@ -8,12 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Menu, X, Home, BarChart3, TrendingUp, Trophy, 
   Bell, MessageCircle, Settings, User, LogOut,
-  Plus, Search, Filter, Crown, Shield
+  Plus, Search, Filter, Crown, Shield, Calendar
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/hooks/use-device';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useToast } from '@/hooks/use-toast';
+import { database } from '../lib/database';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -41,6 +42,10 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     email: user?.email || '',
     telefone: '(11) 99999-9999' // Telefone fixo apenas para visualização
   });
+
+  // Estados para badges
+  const [todayAppointmentsCount, setTodayAppointmentsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const getInitials = (name: string) => {
     return name
@@ -72,7 +77,26 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     }
   }, [user]);
 
-  const navigationItems = [
+  React.useEffect(() => {
+    const loadBadges = async () => {
+      if (!user) return;
+      // Compromissos do dia (apenas para plano ouro)
+      if (user.plan_type === 'ouro' && database.getAppointmentsByUser) {
+        const userAppointments = await database.getAppointmentsByUser(user.id);
+        const today = new Date().toISOString().split('T')[0];
+        const todayAppointments = userAppointments.filter(apt => apt.date === today);
+        setTodayAppointmentsCount(todayAppointments.length);
+      }
+      // Notificações não lidas
+      if (database.getUnreadNotificationCount) {
+        const unreadCount = await database.getUnreadNotificationCount(user.id);
+        setUnreadNotificationsCount(unreadCount);
+      }
+    };
+    loadBadges();
+  }, [user]);
+
+  const baseNavigationItems = [
     { 
       id: 'chat', 
       label: 'Chat', 
@@ -88,21 +112,46 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
       color: 'text-blue-500' 
     },
     { 
-      id: 'analytics', 
-      label: 'Análises', 
-      icon: BarChart3, 
-      mobileIcon: BarChart3,
-      color: 'text-green-500' 
-    },
-    { 
       id: 'notifications', 
       label: 'Alertas', 
       icon: Bell, 
       mobileIcon: Bell,
       color: 'text-purple-500',
-      badge: unreadNotifications > 0 ? unreadNotifications : undefined
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined
     }
   ];
+
+  // Adicionar calendário apenas para plano Gold
+  const navigationItems = user?.plan_type === 'ouro' 
+    ? [
+        ...baseNavigationItems.slice(0, 3), // Chat, Dashboard, Análises
+        { 
+          id: 'calendar', 
+          label: 'Meus compromissos', 
+          icon: Calendar, 
+          mobileIcon: Calendar,
+          color: 'text-amber-500',
+          badge: todayAppointmentsCount > 0 ? todayAppointmentsCount : undefined
+        },
+        ...baseNavigationItems.slice(3), // Alertas
+        { 
+          id: 'profile', 
+          label: 'Perfil', 
+          icon: User, 
+          mobileIcon: User,
+          color: 'text-orange-500' 
+        }
+      ]
+    : [
+        ...baseNavigationItems,
+        { 
+          id: 'profile', 
+          label: 'Perfil', 
+          icon: User, 
+          mobileIcon: User,
+          color: 'text-orange-500' 
+        }
+      ];
 
   const quickActions = [
     { id: 'add-expense', label: 'Novo Gasto', icon: Plus, action: () => {} },
@@ -266,8 +315,8 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                                 <Icon className={`h-4 w-4 ${isActive ? item.color : 'text-muted-foreground'}`} />
                               </div>
                               <div className="flex-1 text-left">
-                                <span className={`text-sm font-medium ${isActive ? 'text-primary' : ''}`}>
-                                  {item.label}
+                                <span className={`text-[10px] font-medium leading-tight ${isActive ? 'font-bold' : ''}`} style={{marginTop: 2}}>
+                                  {item.id === 'chat' ? 'Alfred IA' : item.label}
                                 </span>
                               </div>
                               {item.badge && (
@@ -317,92 +366,202 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border">
-          <div className="grid grid-cols-5 h-16">
-            {navigationItems.map((item) => {
-              const Icon = item.mobileIcon;
-              const isActive = currentPage === item.id;
-              
-              return (
-                <button
-                  key={item.id}
-                  className={`flex flex-col items-center justify-center space-y-1 relative transition-colors ${
-                    isActive 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  onClick={() => handleNavigation(item.id)}
-                >
-                  <Icon className={`h-5 w-5 ${isActive ? item.color : ''}`} />
-                  <span className="text-xs font-medium">{item.label}</span>
-                  {item.badge && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center"
-                    >
-                      {item.badge > 9 ? '9+' : item.badge}
-                    </Badge>
-                  )}
-                  {isActive && (
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-primary rounded-b-full" />
-                  )}
-                </button>
-              );
-            })}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border shadow-lg">
+          <div className="flex items-center justify-center px-4 py-2">
+            <div className="flex items-center justify-between w-full max-w-sm space-x-2">
+              {navigationItems.map((item) => {
+                const Icon = item.mobileIcon;
+                const isActive = currentPage === item.id;
+                
+                return (
+                  <button
+                    key={item.id}
+                    className={`
+                      flex flex-col items-center justify-center p-2 min-w-[60px] h-14 rounded-xl
+                      transition-all duration-200 ease-in-out relative
+                      ${isActive 
+                        ? 'text-primary bg-primary/10 scale-105 shadow-sm' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      }
+                    `}
+                    onClick={() => {
+                      if (item.id === 'profile') {
+                        setIsProfileDialogOpen(true);
+                      } else {
+                        handleNavigation(item.id);
+                      }
+                    }}
+                  >
+                    <div className={`${isActive ? 'animate-pulse' : ''}`}>
+                      <Icon className={`h-5 w-5 ${isActive ? item.color : ''}`} />
+                    </div>
+                    <span className={`text-[10px] font-medium leading-tight ${isActive ? 'font-bold' : ''}`} style={{marginTop: 2}}>
+                      {item.id === 'chat' ? 'Alfred IA' : item.label}
+                    </span>
+                    
+                    {/* Badge de notificação */}
+                    {item.id === 'calendar' && item.badge && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center bg-blue-500 text-white animate-bounce"
+                      >
+                        {item.badge > 9 ? '9+' : item.badge}
+                      </Badge>
+                    )}
+                    {item.id === 'notifications' && item.badge && (
+                      <Badge 
+                        variant="destructive" 
+                        className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center animate-bounce"
+                      >
+                        {item.badge > 9 ? '9+' : item.badge}
+                      </Badge>
+                    )}
+                    
+                    {/* Indicador ativo */}
+                    {isActive && (
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-primary rounded-b-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </nav>
 
         {/* Dialogs para Mobile */}
         {/* Profile Dialog */}
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
-          <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-lg">✏️ Editar Perfil</DialogTitle>
+              <DialogTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Meu Perfil
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 px-1">
-              <div>
-                <Label htmlFor="nome" className="text-sm">Nome</Label>
-                <Input
-                  id="nome"
-                  value={profileForm.nome}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, nome: e.target.value }))}
-                  placeholder="Seu nome completo"
-                  className="mt-1"
-                />
+            <div className="space-y-6 px-1 py-2">
+              {/* Avatar e Info Básica */}
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                  {getInitials(user?.nome || 'U')}
+                </div>
+                <div className="text-center">
+                  <h3 className="font-bold text-lg">{user?.nome}</h3>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <div className="flex justify-center gap-2 mt-2">
+                    <Badge 
+                      variant={user?.plan_type === 'ouro' ? 'default' : 'secondary'}
+                      className={user?.plan_type === 'ouro' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                    >
+                      {user?.plan_type === 'ouro' ? <Crown className="w-3 h-3 mr-1" /> : null}
+                      Plano {user?.plan_type === 'ouro' ? 'Ouro' : 'Bronze'}
+                    </Badge>
+                    {user?.is_admin && (
+                      <Badge variant="destructive">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="email" className="text-sm">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={profileForm.email}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="seu@email.com"
-                  className="mt-1"
-                />
+
+              {/* Formulário de Edição */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="nome" className="text-sm font-medium">Nome Completo</Label>
+                  <Input
+                    id="nome"
+                    value={profileForm.nome}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Seu nome completo"
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="seu@email.com"
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="telefone" className="text-sm font-medium">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    value={profileForm.telefone}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, telefone: e.target.value }))}
+                    placeholder="(11) 99999-9999"
+                    className="mt-1"
+                  />
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="telefone" className="text-sm">Telefone</Label>
-                <Input
-                  id="telefone"
-                  value={profileForm.telefone}
-                  disabled
-                  className="bg-muted mt-1"
-                  placeholder="Telefone não pode ser alterado"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  📱 Telefone não pode ser alterado
-                </p>
+
+              {/* Informações da Conta */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Informações da Conta
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tipo de conta:</span>
+                    <span>{user?.is_admin ? 'Administrador' : 'Usuário'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plano atual:</span>
+                    <span className="capitalize">{user?.plan_type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Membro desde:</span>
+                    <span>{new Date(user?.data_criacao || '').toLocaleDateString('pt-BR')}</span>
+                  </div>
+                </div>
               </div>
-              
-              <div className="flex flex-col space-y-2 pt-2">
+
+              {/* Ações */}
+              <div className="flex flex-col space-y-3 pt-2">
+                {(!user?.plan_type || user?.plan_type === 'bronze') && (
+                  <Button
+                    variant="default"
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold mb-2"
+                    onClick={() => {
+                      setIsProfileDialogOpen(false);
+                      setIsPlanDialogOpen(true);
+                    }}
+                  >
+                    {!user?.plan_type ? 'Contratar Plano' : 'Upgrade para Ouro'}
+                  </Button>
+                )}
+                
                 <Button onClick={handleProfileSave} className="w-full">
+                  <User className="w-4 h-4 mr-2" />
                   Salvar Alterações
                 </Button>
-                <Button variant="outline" onClick={() => setIsProfileDialogOpen(false)} className="w-full">
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsProfileDialogOpen(false)} 
+                  className="w-full"
+                >
                   Cancelar
+                </Button>
+                
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    logout();
+                    setIsProfileDialogOpen(false);
+                  }} 
+                  className="w-full"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair da Conta
                 </Button>
               </div>
             </div>
@@ -551,14 +710,14 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
   const planFeatures = {
     bronze: [
       "📊 Controle de gastos",
-      "🤖 Chat IA para gastos",
+      "🤖 Alfred IA para gastos",
       "📈 Relatórios básicos",
       "💾 Backup automático"
     ],
     ouro: [
       "📊 Controle de gastos",
       "💰 Controle de recebimentos", 
-      "🤖 Chat IA completo",
+      "🤖 Alfred IA completo",
       "📈 Relatórios avançados",
       "🎯 Metas e orçamentos",
       "📱 Acesso prioritário",
@@ -633,7 +792,7 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
                 </div>
                 <div className="flex items-center text-xs text-yellow-700">
                   <span className="mr-2">🤖</span>
-                  <span>Chat IA completo</span>
+                  <span>Alfred IA completo</span>
                 </div>
                 <div className="flex items-center text-xs text-yellow-700">
                   <span className="mr-2">📊</span>

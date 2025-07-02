@@ -23,8 +23,8 @@ interface Message {
   }>;
 }
 
-type ChatState = 'initial' | 'waiting_expense' | 'waiting_income' | 'completed';
-type TransactionType = 'expense' | 'income' | null;
+type ChatState = 'initial' | 'waiting_expense' | 'waiting_income' | 'waiting_appointment' | 'completed';
+type TransactionType = 'expense' | 'income' | 'appointment' | null;
 
 const Chat: React.FC = () => {
   const { user } = useAuth();
@@ -37,6 +37,7 @@ const Chat: React.FC = () => {
   const [isSecureMode, setIsSecureMode] = useState(true);
   const [chatState, setChatState] = useState<ChatState>('initial');
   const [transactionType, setTransactionType] = useState<TransactionType>(null);
+  const [awaitingReportFollowup, setAwaitingReportFollowup] = useState<null | 'gastos' | 'compromissos'>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -70,28 +71,14 @@ const Chat: React.FC = () => {
             type: 'assistant',
             content: `👋 E aí! Sou seu assistente financeiro premium! 💎
 
-Como você tem o plano ouro, posso ajudar com GASTOS e RECEBIMENTOS!
-
-📝 **COMO USAR (super fácil):**
-
-💸 **Para GASTOS:**
-• "gastei 50 no mercado"
-• "comprei uma pizza por 35"
-• "paguei 100 de luz"
-
-💰 **Para RECEBIMENTOS:**
-• "recebi 3000 de salário" 
-• "ganhei 500 de freelance"
-• "recebi 200 de dívida"
-
-🎯 **Dica:** Sempre fale o VALOR e ONDE/DO QUE foi!
-
-O que você quer registrar hoje?`,
+Posso te ajudar com suas finanças e agenda! O que você quer fazer hoje?`,
             timestamp: new Date(),
             showOptions: true,
             options: [
-              { label: '💸 Registrar um Gasto', value: 'expense', icon: '💸' },
-              { label: '💰 Registrar um Recebimento', value: 'income', icon: '💰' }
+              { label: 'Registrar um Gasto', value: 'expense', icon: '💸' },
+              { label: 'Registrar um Recebimento', value: 'income', icon: '💰' },
+              { label: 'Agendar um Compromisso', value: 'appointment', icon: '📅' },
+              { label: 'Buscar Relatório', value: 'report', icon: '📊' }
             ]
           };
         } else {
@@ -100,20 +87,12 @@ O que você quer registrar hoje?`,
             type: 'assistant',
             content: `👋 E aí! Sou seu assistente financeiro! 
 
-📝 **COMO USAR (super fácil):**
-
-💸 **Para GASTOS, fale assim:**
-• "gastei 50 no mercado"
-• "comprei uma pizza por 35" 
-• "paguei 100 de luz"
-• "saiu 25 do uber"
-
-🎯 **Dica:** Sempre fale o VALOR e ONDE foi!
-
-Exemplos: "gastei 80 no supermercado", "paguei 200 de internet"
-
-Manda aí seu gasto! 💰`,
-            timestamp: new Date()
+Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
+            timestamp: new Date(),
+            showOptions: true,
+            options: [
+              { label: 'Registrar um Gasto', value: 'expense', icon: '💸' }
+            ]
           };
         }
         setMessages([welcomeMessage]);
@@ -121,13 +100,50 @@ Manda aí seu gasto! 💰`,
         // Save welcome message to history
         await database.addConversationMessage(user.id, 'assistant', welcomeMessage.content);
       } else {
-        // Load existing conversation
+        // Load existing conversation but ALWAYS show options after the last message
         const loadedMessages: Message[] = history.map(h => ({
           id: h.id,
           type: h.type,
           content: h.content,
           timestamp: new Date(h.timestamp)
         }));
+        
+        // Se a última mensagem não tem botões, adicionar uma nova com botões
+        const lastMessage = loadedMessages[loadedMessages.length - 1];
+        const needsOptions = !lastMessage?.showOptions && lastMessage?.type === 'assistant';
+        
+        if (needsOptions) {
+          let optionsMessage: Message;
+          if (user.plan_type === 'ouro') {
+            optionsMessage = {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: `👋 E aí! O que você gostaria de fazer agora?`,
+              timestamp: new Date(),
+              showOptions: true,
+              options: [
+                { label: 'Registrar um Gasto', value: 'expense', icon: '💸' },
+                { label: 'Registrar um Recebimento', value: 'income', icon: '💰' },
+                { label: 'Agendar um Compromisso', value: 'appointment', icon: '📅' },
+                { label: 'Buscar Relatório', value: 'report', icon: '📊' },
+                { label: 'Finalizar por agora', value: 'finish', icon: '✅' }
+              ]
+            };
+          } else {
+            optionsMessage = {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: `👋 E aí! Pronto para registrar um gasto?`,
+              timestamp: new Date(),
+              showOptions: true,
+              options: [
+                { label: 'Registrar um Gasto', value: 'expense', icon: '💸' }
+              ]
+            };
+          }
+          loadedMessages.push(optionsMessage);
+        }
+        
         setMessages(loadedMessages);
       }
     } catch (error) {
@@ -174,29 +190,236 @@ Manda aí seu gasto! 💰`,
     };
   };
 
+  // Definir o array de botões do menu principal em uma constante para reutilizar
+  const MAIN_MENU_OPTIONS = [
+    { label: 'Registrar um Gasto', value: 'expense', icon: '💸' },
+    { label: 'Registrar um Recebimento', value: 'income', icon: '💰' },
+    { label: 'Agendar um Compromisso', value: 'appointment', icon: '📅' },
+    { label: 'Buscar Relatório', value: 'report', icon: '📊' },
+    { label: 'Finalizar por agora', value: 'finish', icon: '✅' }
+  ];
+
   const createCompletionMessage = (): Message => {
+    console.log('🎉 Creating completion message for plan type:', user?.plan_type);
+    
     if (user?.plan_type === 'ouro') {
-      return createOptionsMessage(
-        '🎉 Perfeito! Transação registrada com sucesso!\n\nPosso te ajudar com mais alguma coisa?',
-        [
-          { label: 'Registrar outro Gasto', value: 'expense', icon: '💸' },
-          { label: 'Registrar outro Recebimento', value: 'income', icon: '💰' },
-          { label: 'Finalizar por agora', value: 'finish', icon: '✅' }
-        ]
+      const message = createOptionsMessage(
+        '🎉 Perfeito! Registrado com sucesso!\n\nPosso te ajudar com mais alguma coisa?',
+        MAIN_MENU_OPTIONS
       );
+      console.log('🎉 Gold completion message created with options:', message.options?.map(o => o.label));
+      return message;
     } else {
-      return createOptionsMessage(
+      const message = createOptionsMessage(
         '🎉 Massa! Gasto registrado! Quer adicionar mais algum?',
-        [
-          { label: 'Registrar outro Gasto', value: 'expense', icon: '💸' },
-          { label: 'Finalizar por agora', value: 'finish', icon: '✅' }
-        ]
+        MAIN_MENU_OPTIONS
       );
+      console.log('🎉 Bronze completion message created with options:', message.options?.map(o => o.label));
+      return message;
     }
   };
 
   const handleOptionSelect = async (option: string) => {
     console.log('🎯 Opção selecionada:', option);
+
+    // 1. Relatórios: tratar antes de qualquer fallback/menu principal
+    if (option.startsWith('report_') || option.startsWith('appointments_')) {
+      let reportText = '';
+      let followupType: null | 'gastos' | 'compromissos' = null;
+      if (option === 'report_today' || option === 'report_week' || option === 'report_month' || option === 'report_category') {
+        // Gastos
+        const now = new Date();
+        if (option === 'report_today') {
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+          const expenses = await database.getExpensesByUser(user!.id);
+          const todayExpenses = expenses.filter(e => e.data === todayStr);
+          const total = todayExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (todayExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto hoje.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** hoje.\n\n`;
+            todayExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_week') {
+          const now = new Date();
+          const firstDay = new Date(now);
+          firstDay.setDate(now.getDate() - now.getDay());
+          const lastDay = new Date(firstDay);
+          lastDay.setDate(firstDay.getDate() + 6);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const weekExpenses = expenses.filter(e => {
+            const d = new Date(e.data);
+            return d >= firstDay && d <= lastDay;
+          });
+          const total = weekExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (weekExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto nesta semana.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** nesta semana.\n\n`;
+            weekExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_month') {
+          const now = new Date();
+          const monthStr = now.toISOString().slice(0, 7);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
+          const total = monthExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (monthExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto neste mês.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** neste mês.\n\n`;
+            monthExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_category') {
+          const now = new Date();
+          const monthStr = now.toISOString().slice(0, 7);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
+          const byCategory: Record<string, { total: number, items: { valor: number, descricao: string, data: string }[] }> = {};
+          monthExpenses.forEach(e => {
+            if (!byCategory[e.categoria]) byCategory[e.categoria] = { total: 0, items: [] };
+            byCategory[e.categoria].total += e.valor;
+            byCategory[e.categoria].items.push({ valor: e.valor, descricao: e.descricao, data: e.data });
+          });
+          if (Object.keys(byCategory).length === 0) {
+            reportText = 'Você não registrou nenhum gasto neste mês.';
+          } else {
+            reportText = '**Gastos por categoria neste mês:**\n\n';
+            Object.entries(byCategory).forEach(([cat, val]) => {
+              reportText += `• ${cat}: \n\n`;
+              val.items.forEach(item => {
+                const data = new Date(item.data).toLocaleDateString('pt-BR');
+                reportText += `- **R$ ${item.valor.toFixed(2)}** - ${data}\n`;
+              });
+              reportText += '\n';
+            });
+          }
+          followupType = 'gastos';
+        }
+        followupType = 'gastos';
+      } else if (option === 'appointments_today' || option === 'appointments_week' || option === 'appointments_month') {
+        // Compromissos
+        if (option === 'appointments_today') {
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+          const appointments = await database.getAppointmentsByDate(user!.id, todayStr);
+          if (appointments.length === 0) {
+            reportText = 'Você não tem compromissos para hoje.';
+          } else {
+            reportText = 'Seus compromissos para hoje:\n';
+            appointments.forEach(a => {
+              reportText += `• ${a.title} às ${a.time} (${a.category})\n`;
+            });
+          }
+        } else if (option === 'appointments_week') {
+          // Buscar compromissos da semana atual
+          const now = new Date();
+          const firstDay = new Date(now);
+          firstDay.setDate(now.getDate() - now.getDay()); // Domingo
+          const lastDay = new Date(firstDay);
+          lastDay.setDate(firstDay.getDate() + 6); // Sábado
+          // Buscar todos os compromissos do usuário
+          const allAppointments = await database.getAppointmentsByUser(user!.id);
+          // Filtrar compromissos da semana
+          const weekAppointments = allAppointments.filter(a => {
+            const d = new Date(a.date);
+            return d >= firstDay && d <= lastDay;
+          });
+          if (weekAppointments.length === 0) {
+            reportText = 'Você não tem compromissos para esta semana.';
+          } else {
+            reportText = 'Seus compromissos desta semana:\n';
+            weekAppointments.forEach(a => {
+              const dia = new Date(a.date).toLocaleDateString('pt-BR');
+              reportText += `• ${a.title} em ${dia} às ${a.time} (${a.category})\n`;
+            });
+          }
+        } else if (option === 'appointments_month') {
+          // Compromissos do mês
+          const now = new Date();
+          const monthStr = now.toISOString().slice(0, 7); // YYYY-MM
+          const allAppointments = await database.getAppointmentsByUser(user!.id);
+          const monthAppointments = allAppointments.filter(a => a.date.startsWith(monthStr));
+          if (monthAppointments.length === 0) {
+            reportText = 'Você não tem compromissos para este mês.';
+          } else {
+            reportText = 'Seus compromissos deste mês:\n';
+            monthAppointments.forEach(a => {
+              const dia = new Date(a.date).toLocaleDateString('pt-BR');
+              reportText += `• ${a.title} em ${dia} às ${a.time} (${a.category})\n`;
+            });
+          }
+        }
+        followupType = 'compromissos';
+      }
+      const reportMsg: Message = {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: reportText,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, reportMsg]);
+      await database.addConversationMessage(user!.id, 'assistant', reportMsg.content);
+      // Pergunta contextual
+      let followupMsg: Message;
+      if (followupType === 'gastos') {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Deseja ver outro relatório, registrar um novo gasto ou consultar outra informação?',
+          timestamp: new Date()
+        };
+      } else if (followupType === 'compromissos') {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Quer agendar um novo compromisso, ver outra semana ou consultar outra informação?',
+          timestamp: new Date()
+        };
+      } else {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Se precisar de mais alguma coisa é só me dizer!',
+          timestamp: new Date()
+        };
+      }
+      setMessages(prev => [...prev, followupMsg]);
+      await database.addConversationMessage(user!.id, 'assistant', followupMsg.content);
+      setAwaitingReportFollowup(followupType);
+      return;
+    }
+
+    // 2. Exibir menu de relatórios ao selecionar 'Buscar Relatório' no menu principal
+    if (option === 'report') {
+      const reportOptions = [
+        { label: 'Gastos Hoje', value: 'report_today', icon: '📅' },
+        { label: 'Gastos na Semana', value: 'report_week', icon: '🗓️' },
+        { label: 'Gastos no Mês', value: 'report_month', icon: '📆' },
+        { label: 'Gastos por Categoria', value: 'report_category', icon: '📊' },
+        { label: 'Compromissos Hoje', value: 'appointments_today', icon: '📅' },
+        { label: 'Compromissos da Semana', value: 'appointments_week', icon: '🗓️' },
+        { label: 'Compromissos do Mês', value: 'appointments_month', icon: '📆' }
+      ];
+      const reportMenu = createOptionsMessage(
+        'Qual relatório você deseja ver?',
+        reportOptions
+      );
+      setMessages(prev => [...prev, reportMenu]);
+      await database.addConversationMessage(user!.id, 'assistant', reportMenu.content);
+      setAwaitingReportFollowup('gastos');
+      return;
+    }
     
     // 🔥 TRATAR CONFIRMAÇÕES SEPARADAMENTE
     if (option === 'sim' || option === 'não') {
@@ -209,9 +432,10 @@ Manda aí seu gasto! 💰`,
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: option === 'expense' ? '💸 Adicionar um Gasto' : 
-               option === 'income' ? '💰 Adicionar um Recebimento' : 
-               option === 'finish' ? '✅ Finalizar por agora' : option,
+      content: option === 'expense' ? 'Adicionar um Gasto' : 
+               option === 'income' ? 'Adicionar um Recebimento' : 
+               option === 'appointment' ? 'Agendar um Compromisso' :
+               option === 'finish' ? 'Finalizar por agora' : option,
       timestamp: new Date()
     };
     
@@ -258,6 +482,25 @@ Me conta seu gasto:`,
 Me conta seu recebimento:`,
         timestamp: new Date()
       };
+    } else if (option === 'appointment') {
+      setTransactionType('appointment');
+      setChatState('waiting_appointment');
+      responseMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: `📅 Show! Vamos agendar um compromisso!
+
+📝 **EXEMPLOS FÁCEIS:**
+• "compromisso dia 20 no dentista às 15h"
+• "reunião amanhã às 14h"
+• "consulta médica dia 25 às 10h"
+• "encontro com cliente dia 15 às 9h"
+
+🎯 **Dica:** Fale O QUE É + QUANDO (dia/hora)!
+
+Me conta seu compromisso:`,
+        timestamp: new Date()
+      };
     } else if (option === 'finish') {
       setChatState('initial');
       setTransactionType(null);
@@ -267,17 +510,26 @@ Me conta seu recebimento:`,
         content: '✅ Beleza! Qualquer coisa é só me chamar! Estou aqui para te ajudar sempre! 😊',
         timestamp: new Date()
       };
+      setMessages(prev => [...prev, responseMessage]);
+      await database.addConversationMessage(user!.id, 'assistant', responseMessage.content);
+      // Exibir menu principal após finalizar
+      if (user?.plan_type === 'ouro') {
+        const mainMenu = createOptionsMessage(
+          'Se precisar de mais alguma coisa é só me dizer!',
+          MAIN_MENU_OPTIONS
+        );
+        setMessages(prev => [...prev, mainMenu]);
+        await database.addConversationMessage(user.id, 'assistant', mainMenu.content);
+      }
+      return;
     } else {
       // Reset to initial state para opções não reconhecidas
       setChatState('initial');
       setTransactionType(null);
       if (user?.plan_type === 'ouro') {
         responseMessage = createOptionsMessage(
-          '👋 E aí! O que você gostaria de fazer?',
-          [
-            { label: 'Adicionar um Gasto', value: 'expense', icon: '💸' },
-            { label: 'Adicionar um Recebimento', value: 'income', icon: '💰' }
-          ]
+          'Se precisar de mais alguma coisa é só me dizer!',
+          MAIN_MENU_OPTIONS
         );
       } else {
         responseMessage = {
@@ -291,6 +543,143 @@ Me conta seu recebimento:`,
     
     setMessages(prev => [...prev, responseMessage]);
     await database.addConversationMessage(user!.id, 'assistant', responseMessage.content);
+
+    // Relatórios
+    if (option.startsWith('report_') || option.startsWith('appointments_')) {
+      let reportText = '';
+      let followupType: null | 'gastos' | 'compromissos' = null;
+      if (option === 'report_today' || option === 'report_week' || option === 'report_month' || option === 'report_category') {
+        // Gastos
+        const now = new Date();
+        if (option === 'report_today') {
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+          const expenses = await database.getExpensesByUser(user!.id);
+          const todayExpenses = expenses.filter(e => e.data === todayStr);
+          const total = todayExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (todayExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto hoje.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** hoje.\n\n`;
+            todayExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_week') {
+          const now = new Date();
+          const firstDay = new Date(now);
+          firstDay.setDate(now.getDate() - now.getDay());
+          const lastDay = new Date(firstDay);
+          lastDay.setDate(firstDay.getDate() + 6);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const weekExpenses = expenses.filter(e => {
+            const d = new Date(e.data);
+            return d >= firstDay && d <= lastDay;
+          });
+          const total = weekExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (weekExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto nesta semana.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** nesta semana.\n\n`;
+            weekExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_month') {
+          const now = new Date();
+          const monthStr = now.toISOString().slice(0, 7);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
+          const total = monthExpenses.reduce((sum, e) => sum + e.valor, 0);
+          if (monthExpenses.length === 0) {
+            reportText = 'Você não registrou nenhum gasto neste mês.';
+          } else {
+            reportText = `Você gastou **R$ ${total.toFixed(2)}** neste mês.\n\n`;
+            monthExpenses.forEach(e => {
+              const data = new Date(e.data).toLocaleDateString('pt-BR');
+              reportText += `• **R$ ${e.valor.toFixed(2)}** em ${e.categoria} - ${data}\n`;
+            });
+          }
+        } else if (option === 'report_category') {
+          const now = new Date();
+          const monthStr = now.toISOString().slice(0, 7);
+          const expenses = await database.getExpensesByUser(user!.id);
+          const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
+          const byCategory: Record<string, { total: number, items: { valor: number, descricao: string, data: string }[] }> = {};
+          monthExpenses.forEach(e => {
+            if (!byCategory[e.categoria]) byCategory[e.categoria] = { total: 0, items: [] };
+            byCategory[e.categoria].total += e.valor;
+            byCategory[e.categoria].items.push({ valor: e.valor, descricao: e.descricao, data: e.data });
+          });
+          if (Object.keys(byCategory).length === 0) {
+            reportText = 'Você não registrou nenhum gasto neste mês.';
+          } else {
+            reportText = '**Gastos por categoria neste mês:**\n\n';
+            Object.entries(byCategory).forEach(([cat, val]) => {
+              reportText += `• ${cat}: \n\n`;
+              val.items.forEach(item => {
+                const data = new Date(item.data).toLocaleDateString('pt-BR');
+                reportText += `- **R$ ${item.valor.toFixed(2)}** - ${data}\n`;
+              });
+              reportText += '\n';
+            });
+          }
+        }
+        followupType = 'gastos';
+      } else if (option === 'appointments_today' || option === 'appointments_week' || option === 'appointments_month') {
+        // Compromissos
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const appointments = await database.getAppointmentsByDate(user!.id, todayStr);
+        if (appointments.length === 0) {
+          reportText = 'Você não tem compromissos para hoje.';
+        } else {
+          reportText = 'Seus compromissos para hoje:\n';
+          appointments.forEach(a => {
+            reportText += `• ${a.title} às ${a.time} (${a.category})\n`;
+          });
+        }
+        followupType = 'compromissos';
+      }
+      const reportMsg: Message = {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: reportText,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, reportMsg]);
+      await database.addConversationMessage(user!.id, 'assistant', reportMsg.content);
+      // Pergunta contextual
+      let followupMsg: Message;
+      if (followupType === 'gastos') {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Deseja ver outro relatório, registrar um novo gasto ou consultar outra informação?',
+          timestamp: new Date()
+        };
+      } else if (followupType === 'compromissos') {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Quer agendar um novo compromisso, ver outra semana ou consultar outra informação?',
+          timestamp: new Date()
+        };
+      } else {
+        followupMsg = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          content: 'Se precisar de mais alguma coisa é só me dizer!',
+          timestamp: new Date()
+        };
+      }
+      setMessages(prev => [...prev, followupMsg]);
+      await database.addConversationMessage(user!.id, 'assistant', followupMsg.content);
+      setAwaitingReportFollowup(followupType);
+      return;
+    }
   };
 
   const handleSendMessage = async (customValue?: string) => {
@@ -303,6 +692,30 @@ Me conta seu recebimento:`,
         description: "O sistema está carregando. Tente novamente em alguns segundos.",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Se estava aguardando followup de relatório, após a resposta do usuário mostra o menu principal
+    if (awaitingReportFollowup) {
+      // Adiciona a mensagem do usuário ao chat e ao histórico
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        type: 'user',
+        content: valueToSend,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, userMessage]);
+      await database.addConversationMessage(user.id, 'user', valueToSend);
+      setAwaitingReportFollowup(null);
+      setInputValue('');
+      if (user?.plan_type === 'ouro') {
+        const mainMenu = createOptionsMessage(
+          'Se precisar de mais alguma coisa é só me dizer!',
+          MAIN_MENU_OPTIONS
+        );
+        setMessages(prev => [...prev, mainMenu]);
+        await database.addConversationMessage(user.id, 'assistant', mainMenu.content);
+      }
       return;
     }
 
@@ -332,15 +745,34 @@ Me conta seu recebimento:`,
       
       const openaiService = new OpenAIService(config.openai_api_key);
       const conversationHistory = updatedMessages.slice(-20);
-      // 🔥 USAR NOVO MÉTODO: extractTransactionData
-      const result = await openaiService.extractTransactionData(
+      
+      // 📅 DETECTAR SE É COMPROMISSO E USAR MÉTODO ESPECÍFICO
+      let result: any;
+      
+      if (chatState === 'waiting_appointment') {
+        // Processar como compromisso
+        console.log('📅 Processando como compromisso');
+        result = await openaiService.extractAppointmentData(
         valueToSend, 
         config.instrucoes_personalizadas, 
         conversationHistory,
         userPersonality?.personality_profile,
         user.id,
-        chatState // Passa o estado do chat
-      );
+          chatState
+        );
+      } else {
+        // Processar como transação financeira
+        console.log('💰 Processando como transação financeira');
+        result = await openaiService.extractTransactionData(
+          valueToSend, 
+          config.instrucoes_personalizadas, 
+          conversationHistory,
+          userPersonality?.personality_profile,
+          user.id,
+          chatState,
+          user.plan_type // 🔥 PASSAR O TIPO DE PLANO
+        );
+      }
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -376,13 +808,195 @@ Me conta seu recebimento:`,
       console.log('💰 Chat - Tipo do resultado:', typeof result);
       console.log('💰 Chat - Extraction válida?', result.extraction?.isValid);
       console.log('💰 Chat - Valor extraído:', result.extraction?.valor);
-      console.log('💰 Chat - Descrição:', result.extraction?.descricao);
+      console.log('💰 Chat - Categoria extraída:', result.extraction?.categoria);
+      console.log('💰 Chat - Tipo extraído:', result.extraction?.type);
+      console.log('💰 Chat - Condição completa:', result.extraction?.isValid && result.extraction?.valor > 0);
       
-      if (result.extraction?.isValid && result.extraction?.valor > 0) {
+      // 📅 PROCESSAR COMPROMISSO VÁLIDO (verificar se tem extraction de compromisso real)
+      if (chatState === 'waiting_appointment' && result.extraction?.isValid) {
+        console.log('📅 Chat - Processando compromisso do estado waiting_appointment');
+        
+        // Re-chamar extractAppointmentData para ter todos os dados do compromisso
+        const appointmentResult = await openaiService.extractAppointmentData(
+          valueToSend,
+          config.instrucoes_personalizadas,
+          conversationHistory,
+          userPersonality?.personality_profile,
+          user.id,
+          chatState
+        );
+        
+        if (appointmentResult.extraction?.isValid) {
+          console.log('📅 Chat - Compromisso válido detectado:', {
+            titulo: appointmentResult.extraction?.titulo,
+            data: appointmentResult.extraction?.data,
+            hora: appointmentResult.extraction?.hora,
+            categoria: appointmentResult.extraction?.categoria
+          });
+
+          // Só salvar se for usuário Gold (tem acesso ao calendário)
+          if (user.plan_type === 'ouro') {
+            try {
+              const savedAppointment = await database.addAppointment({
+                user_id: user.id,
+                title: appointmentResult.extraction.titulo,
+                description: appointmentResult.extraction.descricao,
+                date: appointmentResult.extraction.data,
+                time: appointmentResult.extraction.hora,
+                location: appointmentResult.extraction.local || '',
+                category: appointmentResult.extraction.categoria as any
+              });
+              console.log('✅ Chat - Compromisso salvo com sucesso:', savedAppointment);
+
+              const appointmentSuccessMessages = [
+                "🎉 Show! Compromisso agendado! Não esquece, hein! 📅",
+                "✅ Massa! Agendado com sucesso! Vou te lembrar! 🔔",
+                "🚀 Top! Compromisso na agenda! Tudo organizadinho! 📋",
+                "💪 Beleza! Agendei pra você! Não perde, viu? ⏰",
+                "🎯 Dahora! Compromisso confirmado! Tô de olho! 👀",
+                "⭐ Show de bola! Agendado e confirmado! 📆",
+                "🔥 Irado! Mais um compromisso na agenda! 📝",
+                "✨ Perfeito! Agendado com sucesso! 🗓️"
+              ];
+              
+              const randomMessage = appointmentSuccessMessages[Math.floor(Math.random() * appointmentSuccessMessages.length)];
+
+              // Toast de sucesso
+              toast({
+                title: "Compromisso agendado!",
+                description: `${appointmentResult.extraction.titulo} - ${appointmentResult.extraction.data} às ${appointmentResult.extraction.hora}`,
+              });
+              
+              // Reset state and show completion options
+              setChatState('completed');
+              setTransactionType(null);
+              
+              // Mensagem divertida no chat + completion options
+              setTimeout(() => {
+                const funMessage: Message = {
+                  id: (Date.now() + 2).toString(),
+                  type: 'assistant',
+                  content: randomMessage,
+                  timestamp: new Date()
+                };
+                
+                setMessages(prev => [...prev, funMessage]);
+                database.addConversationMessage(user.id, 'assistant', randomMessage);
+                
+                // Completion message com delay
+                setTimeout(() => {
+                  const completionMessage = createCompletionMessage();
+                  setMessages(prev => [...prev, completionMessage]);
+                  // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
+                  // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                }, 1500);
+              }, 1000);
+              
+            } catch (appointmentError) {
+              console.error('❌ Chat - Erro ao salvar compromisso:', appointmentError);
+            }
+          } else {
+            // Suggest upgrade for bronze users trying to add appointments
+            toast({
+              title: "🥇 Upgrade para Plano Ouro!",
+              description: "Para agendar compromissos, você precisa do plano ouro!",
+              variant: "default"
+            });
+          }
+        }
+      }
+      // 📅 PROCESSAR COMPROMISSO DETECTADO AUTOMATICAMENTE
+      else if (result.extraction?.type === 'appointment' && result.extraction?.isValid) {
+        console.log('📅 Chat - Compromisso válido detectado:', {
+          titulo: result.extraction?.titulo,
+          data: result.extraction?.data,
+          hora: result.extraction?.hora,
+          categoria: result.extraction?.categoria
+        });
+
+        // Só salvar se for usuário Gold (tem acesso ao calendário)
+        if (user.plan_type === 'ouro') {
+          try {
+            const savedAppointment = await database.addAppointment({
+              user_id: user.id,
+              title: result.extraction.titulo,
+              description: result.extraction.descricao,
+              date: result.extraction.data,
+              time: result.extraction.hora,
+              location: result.extraction.local || '',
+              category: result.extraction.categoria
+            });
+            console.log('✅ Chat - Compromisso salvo com sucesso:', savedAppointment);
+
+            const appointmentSuccessMessages = [
+              "🎉 Show! Compromisso agendado! Não esquece, hein! 📅",
+              "✅ Massa! Agendado com sucesso! Vou te lembrar! 🔔",
+              "🚀 Top! Compromisso na agenda! Tudo organizadinho! 📋",
+              "💪 Beleza! Agendei pra você! Não perde, viu? ⏰",
+              "🎯 Dahora! Compromisso confirmado! Tô de olho! 👀",
+              "⭐ Show de bola! Agendado e confirmado! 📆",
+              "🔥 Irado! Mais um compromisso na agenda! 📝",
+              "✨ Perfeito! Agendado com sucesso! 🗓️"
+            ];
+            
+            const randomMessage = appointmentSuccessMessages[Math.floor(Math.random() * appointmentSuccessMessages.length)];
+
+                          // Toast de sucesso
+              toast({
+                title: "Compromisso agendado!",
+                description: `${result.extraction.titulo} - ${result.extraction.data} às ${result.extraction.hora}`,
+              });
+              
+              // Reset state and show completion options
+              setChatState('completed');
+              setTransactionType(null);
+              
+              // Mensagem divertida no chat + completion options
+              setTimeout(() => {
+                const funMessage: Message = {
+                  id: (Date.now() + 2).toString(),
+                  type: 'assistant',
+                  content: randomMessage,
+                  timestamp: new Date()
+                };
+                
+                setMessages(prev => [...prev, funMessage]);
+                database.addConversationMessage(user.id, 'assistant', randomMessage);
+                
+                // Completion message com delay
+                setTimeout(() => {
+                  const completionMessage = createCompletionMessage();
+                  setMessages(prev => [...prev, completionMessage]);
+                  // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
+                  // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                }, 1500);
+              }, 1000);
+            
+          } catch (appointmentError) {
+            console.error('❌ Chat - Erro ao salvar compromisso:', appointmentError);
+          }
+        } else {
+          // Suggest upgrade for bronze users trying to add appointments
+          toast({
+            title: "🥇 Upgrade para Plano Ouro!",
+            description: "Para agendar compromissos, você precisa do plano ouro!",
+            variant: "default"
+          });
+        }
+      }
+      // 💰 PROCESSAR TRANSAÇÕES FINANCEIRAS
+      else if (result.extraction?.isValid && result.extraction?.valor > 0) {
+        console.log('✅ Chat - ENTRANDO na condição de processar transação financeira!');
+        console.log('💰 Chat - Valor extraído:', result.extraction?.valor);
+        console.log('💰 Chat - Descrição:', result.extraction?.descricao);
         // 🔥 USAR NOVO CAMPO TYPE da extração
         const isIncome = result.extraction.type === 'income';
+        console.log('💰 Chat - isIncome:', isIncome);
+        console.log('💰 Chat - user.plan_type:', user.plan_type);
+        console.log('💰 Chat - database.addIncome exists:', !!database.addIncome);
         
         if (isIncome && user.plan_type === 'ouro' && database.addIncome) {
+          console.log('💎 Chat - ENTRANDO na condição de recebimento para usuário OURO');
           // Save as income for gold plan users
           console.log('💎 Chat - Salvando recebimento no banco (Plano Ouro):', {
             user_id: user.id,
@@ -393,6 +1007,7 @@ Me conta seu recebimento:`,
           });
           
           try {
+              console.log('💎 Chat - TENTANDO salvar recebimento...');
             const savedIncome = await database.addIncome({
               user_id: user.id,
               amount: result.extraction.valor,
@@ -446,14 +1061,22 @@ Me conta seu recebimento:`,
               setTimeout(() => {
                 const completionMessage = createCompletionMessage();
                 setMessages(prev => [...prev, completionMessage]);
-                database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
+                // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
               }, 1500);
             }, 1000);
             
           } catch (incomeError) {
             console.error('❌ Chat - Erro ao salvar recebimento:', incomeError);
+              console.error('❌ Chat - Stack trace:', incomeError.stack);
+              toast({
+                title: "Erro ao salvar recebimento!",
+                description: "Verifique o console para mais detalhes.",
+                variant: "destructive"
+              });
           }
         } else if (isIncome && user.plan_type === 'bronze') {
+          console.log('🥉 Chat - ENTRANDO na condição de recebimento para usuário BRONZE (sugerindo upgrade)');
           // Suggest upgrade for bronze users trying to add income
           toast({
             title: "🥇 Upgrade para Plano Ouro!",
@@ -461,6 +1084,7 @@ Me conta seu recebimento:`,
             variant: "default"
           });
         } else {
+          console.log('💸 Chat - ENTRANDO na condição de GASTO (default behavior)');
           // Save as expense (default behavior)
           console.log('💾 Chat - Salvando gasto no banco:', {
             usuario_id: user.id,
@@ -471,6 +1095,7 @@ Me conta seu recebimento:`,
           });
           
           try {
+              console.log('💸 Chat - TENTANDO salvar gasto...');
             const savedExpense = await database.addExpense({
               usuario_id: user.id,
               valor: result.extraction.valor,
@@ -523,14 +1148,27 @@ Me conta seu recebimento:`,
               setTimeout(() => {
                 const completionMessage = createCompletionMessage();
                 setMessages(prev => [...prev, completionMessage]);
-                database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
+                // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
               }, 1500);
             }, 1000);
             
           } catch (expenseError) {
             console.error('❌ Chat - Erro ao salvar gasto:', expenseError);
-          }
+              console.error('❌ Chat - Stack trace:', expenseError.stack);
+              toast({
+                title: "Erro ao salvar gasto!",
+                description: "Verifique o console para mais detalhes.",
+                variant: "destructive"
+              });
+            }
         }
+      } else {
+        console.log('❌ Chat - NÃO entrou na condição de processar transação financeira');
+        console.log('❌ Chat - isValid:', result.extraction?.isValid);
+        console.log('❌ Chat - valor:', result.extraction?.valor);
+        console.log('❌ Chat - valor > 0:', result.extraction?.valor > 0);
+        console.log('❌ Chat - type:', result.extraction?.type);
       }
 
     } catch (error) {
@@ -627,8 +1265,12 @@ Me conta seu recebimento:`,
       return "Ex: 'recebi 3000 de salário' ou 'ganhei 500 de freelance' 💰";
     }
     
+    if (chatState === 'waiting_appointment') {
+      return "Ex: 'compromisso dia 20 no dentista às 15h' 📅";
+    }
+    
     if (user?.plan_type === 'ouro') {
-      return "Ex: 'gastei 50 no mercado' ou 'recebi 3000 de salário' 😎💎";
+      return "Ex: 'gastei 50 no mercado' ou 'compromisso amanhã às 14h' 😎💎";
     }
     
     return "Ex: 'gastei 50 no mercado' ou 'paguei 100 de luz' 😎";
@@ -685,14 +1327,13 @@ Me conta seu recebimento:`,
         <div className="flex items-center space-x-2">
           <Bot className="w-6 h-6 text-primary" />
           <div>
-            <h2 className="text-lg font-semibold">
-              Assistente Financeiro {user?.plan_type === 'ouro' && '💎'}
-            </h2>
+            <h2 className="text-lg font-semibold">Alfred IA {user?.plan_type === 'ouro' && '💎'}</h2>
             {chatState !== 'initial' && (
               <p className="text-xs text-muted-foreground">
                 {chatState === 'waiting_expense' && '💸 Aguardando dados do gasto...'}
                 {chatState === 'waiting_income' && '💰 Aguardando dados do recebimento...'}
-                {chatState === 'completed' && '✅ Transação concluída!'}
+                {chatState === 'waiting_appointment' && '📅 Aguardando dados do compromisso...'}
+                {chatState === 'completed' && '✅ Registrado com sucesso!'}
               </p>
             )}
           </div>

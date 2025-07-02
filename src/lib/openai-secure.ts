@@ -1,6 +1,17 @@
 // src/lib/openai-secure.ts - VERSÃO SEGURA COM EDGE FUNCTION
 import { supabase } from './supabase';
 
+// 🔥 Função auxiliar para data brasileira em formato string
+function getBrazilDateString(): string {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const brazilTime = new Date(utc + (-3 * 3600000)); // UTC-3
+  const year = brazilTime.getFullYear();
+  const month = String(brazilTime.getMonth() + 1).padStart(2, '0');
+  const day = String(brazilTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -147,7 +158,7 @@ export class SecureOpenAIService {
               valor: valor,
               categoria: categoria,
               descricao: `Gasto confirmado em ${categoria}`,
-              data: new Date().toISOString().split('T')[0],
+              data: getBrazilDateString(),
               isValid: true // FINALIZA!
             }
           };
@@ -174,7 +185,7 @@ export class SecureOpenAIService {
             valor: 0,
             categoria: '',
             descricao: '',
-            data: new Date().toISOString().split('T')[0],
+            data: getBrazilDateString(),
             isValid: false
           }
         };
@@ -314,7 +325,7 @@ IMPORTANTE:
           valor: parsed.extraction?.valor || 0,
           categoria: parsed.extraction?.categoria || '',
           descricao: parsed.extraction?.descricao || 'Gasto',
-          data: parsed.extraction?.data || new Date().toISOString().split('T')[0],
+          data: parsed.extraction?.data || getBrazilDateString(),
           isValid: parsed.extraction?.isValid || false
         },
         personalityUpdate: parsed.personalityUpdate || ''
@@ -346,7 +357,7 @@ IMPORTANTE:
         valor: valor,
         categoria: valor > 0 ? '' : 'outros',
         descricao: valor > 0 ? 'Gasto a categorizar' : 'Gasto',
-        data: new Date().toISOString().split('T')[0],
+        data: getBrazilDateString(),
         isValid: false
       }
     };

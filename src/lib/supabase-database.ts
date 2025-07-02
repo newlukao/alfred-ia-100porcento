@@ -1,5 +1,16 @@
 import { supabase } from './supabase';
-import { User, Expense, Income, NotificationSettings, NotificationHistory } from './database';
+import { User, Expense, Income, NotificationSettings, NotificationHistory, Appointment } from './database';
+
+// 🔥 Função auxiliar para data brasileira em formato string
+function getBrazilDateString(): string {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const brazilTime = new Date(utc + (-3 * 3600000)); // UTC-3
+  const year = brazilTime.getFullYear();
+  const month = String(brazilTime.getMonth() + 1).padStart(2, '0');
+  const day = String(brazilTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export class SupabaseDatabase {
   private static instance: SupabaseDatabase;
@@ -267,6 +278,146 @@ export class SupabaseDatabase {
       console.log('✅ Income deleted from Supabase:', id);
     } catch (error) {
       console.error('Error deleting income:', error);
+    }
+  }
+
+  // ============================================================================
+  // APPOINTMENT METHODS (PLANO OURO APENAS)
+  // ============================================================================
+
+  async getAppointmentsByUser(userId: string): Promise<Appointment[]> {
+    try {
+      console.log('📅 getAppointmentsByUser - Buscando compromissos para usuário:', userId);
+      
+      // First check if user has gold plan
+      const user = await this.getUserById(userId);
+      if (!user || user.plan_type !== 'ouro') {
+        console.log('🚫 Usuário não tem plano ouro, retornando array vazio');
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+
+      if (error) throw error;
+      
+      console.log('✅ Compromissos encontrados:', data?.length || 0);
+      return data as Appointment[];
+    } catch (error) {
+      console.error('Error getting user appointments:', error);
+      return [];
+    }
+  }
+
+  async addAppointment(appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<Appointment | null> {
+    try {
+      console.log('📅 addAppointment - Adicionando compromisso:', appointment);
+      
+      // Check if user has gold plan
+      const user = await this.getUserById(appointment.user_id);
+      if (!user || user.plan_type !== 'ouro') {
+        console.log('🚫 Usuário não tem plano ouro, compromisso negado');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([appointment])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ Compromisso adicionado ao Supabase:', data);
+      return data as Appointment;
+    } catch (error) {
+      console.error('Error adding appointment:', error);
+      return null;
+    }
+  }
+
+  async updateAppointment(id: string, updates: Partial<Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Appointment | null> {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Appointment;
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      return null;
+    }
+  }
+
+  async deleteAppointment(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      console.log('✅ Appointment deleted from Supabase:', id);
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+    }
+  }
+
+  async getAppointmentsByDate(userId: string, date: string): Promise<Appointment[]> {
+    try {
+      const user = await this.getUserById(userId);
+      if (!user || user.plan_type !== 'ouro') {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .order('time', { ascending: true });
+
+      if (error) throw error;
+      return data as Appointment[];
+    } catch (error) {
+      console.error('Error getting appointments by date:', error);
+      return [];
+    }
+  }
+
+  async getUpcomingAppointments(userId: string, days: number = 7): Promise<Appointment[]> {
+    try {
+      const user = await this.getUserById(userId);
+      if (!user || user.plan_type !== 'ouro') {
+        return [];
+      }
+
+      const now = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(now.getDate() + days);
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', now.toISOString().split('T')[0])
+        .lte('date', futureDate.toISOString().split('T')[0])
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+
+      if (error) throw error;
+      return data as Appointment[];
+    } catch (error) {
+      console.error('Error getting upcoming appointments:', error);
+      return [];
     }
   }
 
@@ -543,7 +694,7 @@ export class SupabaseDatabase {
       if (allError) throw allError;
 
       // Get today's notifications
-      const today = new Date().toISOString().split('T')[0];
+      const today = getBrazilDateString();
       const { data: todayNotifications, error: todayError } = await supabase
         .from('notification_history')
         .select('*')

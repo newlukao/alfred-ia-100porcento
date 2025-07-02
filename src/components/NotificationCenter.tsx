@@ -9,12 +9,13 @@ import { Label } from '@/components/ui/label';
 import { 
   Bell, BellOff, Settings, History, Volume2, VolumeX, 
   Target, Trophy, Calendar, AlertTriangle, TrendingUp, 
-  Clock, Check, X, Trash2
+  Clock, Check, X, Trash2, Lock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, NotificationSettings, NotificationHistory } from '@/lib/database';
 import { notificationService } from '@/lib/notifications';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const NotificationCenter: React.FC = () => {
   const { user } = useAuth();
@@ -25,6 +26,8 @@ const NotificationCenter: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [selectedNotification, setSelectedNotification] = useState<NotificationHistory | null>(null);
+  const [showMessageModal, setShowMessageModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -175,6 +178,18 @@ const NotificationCenter: React.FC = () => {
     }
   };
 
+  // Função utilitária para transformar URLs em links clicáveis
+  function linkify(text: string) {
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+      if (urlRegex.test(part)) {
+        const url = part.startsWith('http') ? part : `https://${part}`;
+        return <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">{part}</a>;
+      }
+      return part;
+    });
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -189,7 +204,7 @@ const NotificationCenter: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h1 className="text-3xl font-bold flex items-center space-x-2">
             <Bell className="h-8 w-8" />
@@ -203,17 +218,17 @@ const NotificationCenter: React.FC = () => {
           <p className="text-muted-foreground">Gerencie alertas e configure suas preferências</p>
         </div>
 
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={loadData}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
             <Bell className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
-          <Button variant="outline" onClick={sendTestNotification}>
+          <Button variant="outline" onClick={sendTestNotification} className="w-full sm:w-auto">
             <Bell className="h-4 w-4 mr-2" />
             Testar Notificação
           </Button>
           {unreadCount > 0 && (
-            <Button onClick={handleMarkAllAsRead}>
+            <Button onClick={handleMarkAllAsRead} className="w-full sm:w-auto">
               <Check className="h-4 w-4 mr-2" />
               Marcar Todas como Lidas
             </Button>
@@ -301,16 +316,36 @@ const NotificationCenter: React.FC = () => {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => handleMarkAsRead(notification.id)}
+                                  onClick={() => {
+                                    setSelectedNotification(notification);
+                                    setShowMessageModal(true);
+                                    if (!notification.lida) handleMarkAsRead(notification.id);
+                                  }}
                                 >
                                   <Check className="h-3 w-3" />
                                 </Button>
                               )}
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {notification.mensagem}
-                          </p>
+                          <div className="mt-1 relative">
+                            <span
+                              className="block text-sm text-muted-foreground blur-sm cursor-pointer select-none transition rounded px-2 py-1"
+                              onClick={() => {
+                                setSelectedNotification(notification);
+                                setShowMessageModal(true);
+                                if (!notification.lida) handleMarkAsRead(notification.id);
+                              }}
+                              title="Clique para visualizar"
+                              style={{ userSelect: 'none' }}
+                            >
+                              {notification.mensagem}
+                            </span>
+                            <span className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                              <span className="bg-white/80 rounded-full p-1">
+                                <Lock className="w-5 h-5 text-gray-400 opacity-90" />
+                              </span>
+                            </span>
+                          </div>
                           {notification.lida && notification.data_leitura && (
                             <p className="text-xs text-green-600 mt-2">
                               Lida em {new Date(notification.data_leitura).toLocaleString('pt-BR')}
@@ -347,17 +382,6 @@ const NotificationCenter: React.FC = () => {
                       onCheckedChange={(value) => handleSettingChange('push_enabled', value)}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="font-medium">Notificações por Email</Label>
-                      <p className="text-sm text-muted-foreground">Receber resumos por email</p>
-                    </div>
-                    <Switch
-                      checked={settings.email_enabled}
-                      onCheckedChange={(value) => handleSettingChange('email_enabled', value)}
-                    />
-                  </div>
                 </CardContent>
               </Card>
 
@@ -369,46 +393,17 @@ const NotificationCenter: React.FC = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <Calendar className="h-4 w-4 text-blue-500" />
                       <div>
-                        <Label className="font-medium">Alertas de Orçamento</Label>
-                        <p className="text-sm text-muted-foreground">Avisos quando ultrapassar 80% do orçamento</p>
+                        <Label className="font-medium">Compromissos</Label>
+                        <p className="text-sm text-muted-foreground">Receba notificações 1h antes e 10 minutos antes dos seus compromissos do dia.</p>
                       </div>
                     </div>
                     <Switch
-                      checked={settings.budget_alerts}
-                      onCheckedChange={(value) => handleSettingChange('budget_alerts', value)}
+                      checked={settings.appointment_alerts}
+                      onCheckedChange={(value) => handleSettingChange('appointment_alerts', value)}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Target className="h-4 w-4 text-green-500" />
-                      <div>
-                        <Label className="font-medium">Progresso de Metas</Label>
-                        <p className="text-sm text-muted-foreground">Atualizações sobre o progresso das suas metas</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.goal_progress}
-                      onCheckedChange={(value) => handleSettingChange('goal_progress', value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Trophy className="h-4 w-4 text-yellow-500" />
-                      <div>
-                        <Label className="font-medium">Conquistas</Label>
-                        <p className="text-sm text-muted-foreground">Notificações quando desbloquear conquistas</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.achievement_unlocks}
-                      onCheckedChange={(value) => handleSettingChange('achievement_unlocks', value)}
-                    />
-                  </div>
-
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Calendar className="h-4 w-4 text-blue-500" />
@@ -422,21 +417,6 @@ const NotificationCenter: React.FC = () => {
                       onCheckedChange={(value) => handleSettingChange('daily_reminders', value)}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <TrendingUp className="h-4 w-4 text-orange-500" />
-                      <div>
-                        <Label className="font-medium">Limites de Gastos</Label>
-                        <p className="text-sm text-muted-foreground">Alertas sobre limites diários de gastos</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={settings.expense_limits}
-                      onCheckedChange={(value) => handleSettingChange('expense_limits', value)}
-                    />
-                  </div>
-
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Clock className="h-4 w-4 text-purple-500" />
@@ -452,43 +432,22 @@ const NotificationCenter: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Quiet Hours */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Horário Silencioso</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Durante estes horários, você não receberá notificações (exceto emergências).
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="quiet-start">Início</Label>
-                      <Input
-                        id="quiet-start"
-                        type="time"
-                        value={settings.quiet_hours_start}
-                        onChange={(e) => handleSettingChange('quiet_hours_start', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="quiet-end">Fim</Label>
-                      <Input
-                        id="quiet-end"
-                        type="time"
-                        value={settings.quiet_hours_end}
-                        onChange={(e) => handleSettingChange('quiet_hours_end', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Modal para exibir mensagem completa */}
+      {selectedNotification && (
+        <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedNotification.titulo}</DialogTitle>
+            </DialogHeader>
+            <div className="text-base text-gray-800 whitespace-pre-line mt-2">{linkify(selectedNotification.mensagem)}</div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

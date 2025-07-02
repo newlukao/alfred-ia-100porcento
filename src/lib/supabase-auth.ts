@@ -10,7 +10,19 @@ export interface AppUser {
   data_criacao: string;
 }
 
+// Cache simples para usuários
+interface UserCache {
+  [key: string]: {
+    user: AppUser;
+    timestamp: number;
+    ttl: number; // Time to live em ms
+  }
+}
+
 class SupabaseAuthService {
+  private userCache: UserCache = {};
+  private readonly CACHE_TTL = 60000; // 1 minuto cache
+  private readonly QUERY_TIMEOUT = 1000; // Reduzido para 1s
   // 🔐 LOGIN COM SUPABASE AUTH
   async signIn(email: string, password: string): Promise<{ user: AppUser | null; error: string | null }> {
     try {
@@ -84,12 +96,19 @@ class SupabaseAuthService {
     }
   }
 
-  // 👤 BUSCAR DADOS DO USUÁRIO (COM TIMEOUT E FALLBACK)
+  // 👤 BUSCAR DADOS DO USUÁRIO (COM CACHE E TIMEOUT OTIMIZADO)
   private async getAppUser(authUserId: string): Promise<AppUser | null> {
     try {
-      console.log('🔍 Buscando usuário na tabela users para ID:', authUserId);
+      // Verificar cache primeiro
+      const cached = this.userCache[authUserId];
+      if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+        console.log('⚡ Cache hit para usuário:', authUserId);
+        return cached.user;
+      }
+
+      // console.log('🔍 Buscando usuário na tabela users para ID:', authUserId);
       
-      // Timeout de 3 segundos para evitar travamento
+      // Timeout reduzido para 1 segundo
       const queryPromise = supabase
         .from('users')
         .select('*')
@@ -97,7 +116,7 @@ class SupabaseAuthService {
         .single();
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Query timeout')), 3000)
+        setTimeout(() => reject(new Error('Query timeout')), this.QUERY_TIMEOUT)
       );
 
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
@@ -108,7 +127,11 @@ class SupabaseAuthService {
         // Se usuário não existe, criar
         if (error.code === 'PGRST116') {
           console.log('🔧 Usuário não encontrado, criando...');
-          return await this.createUserInDatabase(authUserId);
+          const newUser = await this.createUserInDatabase(authUserId);
+          if (newUser) {
+            this.setCacheUser(authUserId, newUser);
+          }
+          return newUser;
         }
         
         // Para outros erros, usar fallback
@@ -116,23 +139,51 @@ class SupabaseAuthService {
         return this.createFallbackUser(authUserId);
       }
 
-      console.log('✅ Usuário encontrado:', data);
-      return data as AppUser;
+      const user = data as AppUser;
+      // console.log('✅ Usuário encontrado:', user);
+      
+      // Adicionar ao cache
+      this.setCacheUser(authUserId, user);
+      
+      return user;
     } catch (error) {
       console.error('❌ Erro/timeout na busca do usuário:', error);
-      // Em caso de timeout ou erro, usar fallback
+      // Em caso de timeout ou erro, usar fallback apenas se não há cache
+      const cached = this.userCache[authUserId];
+      if (cached) {
+        console.log('🔄 Usando cache expirado como fallback');
+        return cached.user;
+      }
+      
       console.log('🚨 Usando fallback devido ao erro/timeout');
       return this.createFallbackUser(authUserId);
+    }
+  }
+
+  // 📦 GERENCIAR CACHE DE USUÁRIO
+  private setCacheUser(authUserId: string, user: AppUser): void {
+    this.userCache[authUserId] = {
+      user,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL
+    };
+  }
+
+  private clearUserCache(authUserId?: string): void {
+    if (authUserId) {
+      delete this.userCache[authUserId];
+    } else {
+      this.userCache = {};
     }
   }
 
   // 🔧 CRIAR USUÁRIO NO BANCO (COM TIMEOUT)
   private async createUserInDatabase(authUserId: string): Promise<AppUser | null> {
     try {
-      // Timeout também na busca do usuário auth
+      // Timeout reduzido na busca do usuário auth
       const getUserPromise = supabase.auth.getUser();
       const timeoutPromise = new Promise((resolve) =>
-        setTimeout(() => resolve({ data: { user: null } }), 2000)
+        setTimeout(() => resolve({ data: { user: null } }), this.QUERY_TIMEOUT)
       );
 
       const { data: { user } } = await Promise.race([getUserPromise, timeoutPromise]) as any;
@@ -164,7 +215,7 @@ class SupabaseAuthService {
         .single();
 
       const createTimeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Create timeout')), 3000)
+        setTimeout(() => reject(new Error('Create timeout')), this.QUERY_TIMEOUT)
       );
 
       const { data, error } = await Promise.race([createPromise, createTimeoutPromise]) as any;
