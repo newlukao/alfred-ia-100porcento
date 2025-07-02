@@ -1,4 +1,3 @@
-
 import { database } from './database';
 
 // Função para obter data no fuso horário UTC-3 (Brasil)
@@ -34,12 +33,44 @@ interface ExpenseExtraction {
 export class OpenAIService {
   private apiKey: string;
   private baseURL = 'https://api.openai.com/v1/chat/completions';
+  
+  // ✅ PROTEÇÃO BÁSICA CONTRA ABUSO
+  private static lastRequest = 0;
+  private static requestCount = 0;
+  private static readonly MAX_REQUESTS_PER_HOUR = 50;
+  private static readonly MIN_INTERVAL_MS = 2000; // 2 segundos entre requests
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
   async chatCompletion(messages: ChatMessage[], model: string = 'gpt-4o-mini'): Promise<string> {
+    // ✅ RATE LIMITING - Proteção básica
+    const now = Date.now();
+    const timeSinceLastRequest = now - OpenAIService.lastRequest;
+    
+    if (timeSinceLastRequest < OpenAIService.MIN_INTERVAL_MS) {
+      const waitTime = OpenAIService.MIN_INTERVAL_MS - timeSinceLastRequest;
+      throw new Error(`⏳ Aguarde ${Math.ceil(waitTime / 1000)} segundos antes de fazer outra pergunta`);
+    }
+    
+    if (OpenAIService.requestCount >= OpenAIService.MAX_REQUESTS_PER_HOUR) {
+      throw new Error('🚫 Limite de 50 perguntas por hora atingido. Tente novamente mais tarde.');
+    }
+    
+    OpenAIService.lastRequest = now;
+    OpenAIService.requestCount++;
+    
+    // Reset counter every hour
+    if (OpenAIService.requestCount === 1) {
+      setTimeout(() => {
+        OpenAIService.requestCount = 0;
+        console.log('🔄 Rate limit resetado - 50 requests disponíveis novamente');
+      }, 3600000); // 1 hora
+    }
+    
+    console.log(`📊 Request ${OpenAIService.requestCount}/${OpenAIService.MAX_REQUESTS_PER_HOUR} - Rate limiting ativo`);
+    
     try {
       const response = await fetch(this.baseURL, {
         method: 'POST',
@@ -56,6 +87,9 @@ export class OpenAIService {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('🚫 OpenAI rate limit atingido. Aguarde alguns minutos.');
+        }
         throw new Error(`OpenAI API error: ${response.status}`);
       }
 
@@ -78,6 +112,383 @@ export class OpenAIService {
     extraction: ExpenseExtraction;
     personalityUpdate?: string;
   }> {
+    
+    // PRIORITY #1: DETECÇÕES BÁSICAS (ANTES DE QUALQUER OUTRO PROCESSAMENTO)
+    const currentMessage = userMessage.toLowerCase().trim();
+    console.log('🔍 VERIFICANDO MENSAGEM:', userMessage);
+    
+    // 🙏 DETECÇÃO DE AGRADECIMENTOS E DESPEDIDAS (PRIORITY #1)
+    const thankYouWords = ['obrigado', 'obrigada', 'valeu', 'vlw', 'thanks', 'thank you', 'brigado', 'brigada', 'muito obrigado', 'muito obrigada', 'valeu mesmo', 'tchau', 'até logo', 'ate logo', 'falou', 'flw', 'bye', 'adeus'];
+    const isThankYou = thankYouWords.some(word => 
+      currentMessage.includes(word) || 
+      currentMessage.startsWith(word) || 
+      currentMessage.endsWith(word)
+    );
+    
+    if (isThankYou) {
+      console.log('🙏 AGRADECIMENTO DETECTADO - FINALIZANDO');
+      const thankYouResponses = [
+        'Disponha! 😊 Sempre que precisar, é só chamar! Tô aqui pra te ajudar com seus gastos! 💰',
+        'Por nada! 🤙 Qualquer coisa, me chama! Bora manter essas finanças organizadas! 📊',
+        'Valeu! 😄 Tô sempre aqui pra ajudar! Se rolar mais algum gasto, é só falar! 🚀',
+        'De boa! 😎 Sempre que quiser registrar algum gasto, me dá um toque! 💸',
+        'Tranquilo! 🙌 Tô aqui pra isso mesmo! Bora manter o controle das finanças! ✨'
+      ];
+      
+      const randomResponse = thankYouResponses[Math.floor(Math.random() * thankYouResponses.length)];
+      
+      return {
+        response: randomResponse,
+        extraction: {
+          valor: 0,
+          categoria: '',
+          descricao: '',
+          data: new Date().toISOString().split('T')[0],
+          isValid: false
+        }
+      };
+    }
+
+    // 👋 DETECÇÃO DE SAUDAÇÕES (PRIORITY #2)
+    const greetingWords = ['ola', 'olá', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'hello', 'salve', 'fala'];
+    const isGreeting = greetingWords.some(word => 
+      currentMessage.startsWith(word) || 
+      currentMessage.includes(' ' + word + ' ') || 
+      currentMessage.endsWith(' ' + word) ||
+      (word.includes(' ') && currentMessage.includes(word))
+    ) || currentMessage === 'oi'; // Detecção específica para "oi" sozinho
+    
+    if (isGreeting) {
+      console.log('👋 SAUDAÇÃO DETECTADA - FINALIZANDO');
+      const greetingResponses = [
+        'E aí! Beleza? 😄 Pronto pra anotar uns gastos? Manda aí: "gastei R$ 50 no mercado" ou algo assim! 💰',
+        'Opa! Tudo jóia? 😊 Vamos registrar seus gastos? É só falar: "gastei R$ 30 no lanche" que eu anoto tudo! 🍔💸',
+        'Salve! Show de bola! 🤙 Bora organizar as finanças? Fala aí qualquer gasto: "gastei R$ 100 na roupa"! 👕',
+        'E aí, tranquilo? 😎 Tô aqui pra te ajudar com os gastos! Manda qualquer coisa tipo: "gastei R$ 80 no uber"! 🚗',
+        'Opa! Beleza demais! 🎉 Pronto pra registrar uns gastos maneiros? Só falar: "gastei R$ 25 no açaí"! 🍨'
+      ];
+      
+      const randomResponse = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+      
+      return {
+        response: randomResponse,
+        extraction: {
+          valor: 0,
+          categoria: '',
+          descricao: '',
+          data: new Date().toISOString().split('T')[0],
+          isValid: false
+        }
+      };
+    }
+    
+    // 🔥 CONEXÃO INTELIGENTE FORÇADA: Se bot perguntou categoria e usuário responde com categoria/produto
+    const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
+    const lastBotMessage = botMessages[botMessages.length - 1];
+    
+    if (lastBotMessage && lastBotMessage.content.includes('em que categoria')) {
+      console.log('🔗 DETECTADO: Bot perguntou categoria, analisando resposta do usuário...');
+      
+      // Extrair valor da mensagem do bot
+      const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+      
+      if (valorMatch) {
+        const valor = parseFloat(valorMatch[1].replace(',', '.'));
+        console.log(`💰 VALOR ENCONTRADO NA PERGUNTA: R$ ${valor}`);
+        
+        // Detectar categoria na resposta atual do usuário
+        let categoria = '';
+        let descricao = currentMessage;
+        
+        // Mapeamento inteligente de categorias
+        if (currentMessage.includes('agua') || currentMessage.includes('água') || currentMessage.includes('luz') || currentMessage.includes('internet') || currentMessage.includes('telefone') || currentMessage.includes('energia') || currentMessage.includes('conta')) {
+          categoria = 'contas';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else if (currentMessage.includes('almoç') || currentMessage.includes('jantar') || currentMessage.includes('lanche') || currentMessage.includes('comida') || currentMessage.includes('hambur') || currentMessage.includes('pizza') || currentMessage.includes('restaurante') || currentMessage.includes('café') || currentMessage.includes('bar')) {
+          categoria = 'alimentação';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else if (currentMessage.includes('uber') || currentMessage.includes('taxi') || currentMessage.includes('gasolina') || currentMessage.includes('combustível') || currentMessage.includes('ônibus') || currentMessage.includes('metro') || currentMessage.includes('passagem')) {
+          categoria = 'transporte';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else if (currentMessage.includes('mercado') || currentMessage.includes('supermercado') || currentMessage.includes('compras') || currentMessage.includes('feira') || currentMessage.includes('atacadão')) {
+          categoria = 'mercado';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+                 } else if (currentMessage.includes('cinema') || currentMessage.includes('festa') || currentMessage.includes('show') || currentMessage.includes('teatro') || currentMessage.includes('jogo') || currentMessage.includes('netflix') || currentMessage.includes('streaming') || currentMessage.includes('spotify') || currentMessage.includes('youtube')) {
+           categoria = 'lazer';
+           descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else if (currentMessage.includes('roupa') || currentMessage.includes('camisa') || currentMessage.includes('calça') || currentMessage.includes('sapato') || currentMessage.includes('tênis') || currentMessage.includes('shopping')) {
+          categoria = 'vestuário';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else if (currentMessage.includes('médico') || currentMessage.includes('farmácia') || currentMessage.includes('remédio') || currentMessage.includes('hospital') || currentMessage.includes('dentista')) {
+          categoria = 'saúde';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        } else {
+          // Categoria genérica baseada no contexto
+          categoria = 'outros';
+          descricao = currentMessage.replace(/paguei|gastei|comprei/gi, '').trim();
+        }
+        
+        if (categoria && descricao.length > 2) {
+          console.log(`🎯 CONEXÃO FORÇADA DETECTADA: R$ ${valor} em ${categoria} (${descricao})`);
+          
+          return {
+            response: `Show! Conectei as informações! R$ ${valor.toFixed(2)} em ${categoria} (${descricao})! 💰 Tá certo?`,
+            extraction: {
+              valor: valor,
+              categoria: categoria,
+              descricao: descricao,
+              data: new Date().toISOString().split('T')[0],
+              isValid: false // Aguardando confirmação
+            }
+          };
+        }
+      }
+    }
+    
+    // PRIORITY #2: CONFIRMAÇÃO FINAL DA DATA
+    if (currentMessage === 'sim' || currentMessage === 'ta sim' || currentMessage === 'tá sim') {
+      const lastBotMessage = [...conversationHistory]
+        .reverse()
+        .find(msg => msg.type === 'assistant');
+      
+      // CONFIRMAÇÃO DE DATA "HOJE"
+      if (lastBotMessage && (
+        lastBotMessage.content.includes('foi hoje') || 
+        lastBotMessage.content.includes('Esse gasto foi hoje')
+      )) {
+        console.log('✅ CONFIRMAÇÃO DE DATA HOJE DETECTADA');
+        
+        const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+        
+        if (valorMatch) {
+          const valor = parseFloat(valorMatch[1].replace(',', '.'));
+          const dataHoje = getBrazilDate().toISOString().split('T')[0];
+          
+          // Extrair categoria e descrição do histórico
+          let categoria = 'outros';
+          let descricao = 'Gasto registrado';
+          
+          // Buscar categoria nas mensagens do bot
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            const msg = conversationHistory[i];
+            if (msg.type === 'assistant' && msg.content.includes('em ')) {
+              const categoriaMatch = msg.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s|!|\?|\.)/i);
+              if (categoriaMatch) {
+                categoria = categoriaMatch[1].toLowerCase();
+                break;
+              }
+            }
+          }
+          
+          // 🔥 BUSCAR DESCRIÇÃO INTELIGENTE: Priorizar mensagens de categoria/produto
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            const msg = conversationHistory[i];
+            if (msg.type === 'user') {
+              // 1. PRIORIDADE: Mensagens sem "gastei", "sim", "não" (provavelmente categoria/produto)
+              if (!msg.content.includes('gastei') && !msg.content.includes('sim') && !msg.content.includes('não') && !msg.content.includes('comprei') && !msg.content.includes('paguei')) {
+                const cleanDescription = msg.content
+                  .replace(/\d+([.,]\d+)?/g, '') // Remove números
+                  .replace(/r\$|reais?/gi, '') // Remove R$ e reais
+                  .trim();
+                
+                if (cleanDescription && cleanDescription.length > 2) {
+                  descricao = cleanDescription;
+                  console.log('✨ DESCRIÇÃO CATEGORIA/PRODUTO EXTRAÍDA:', descricao, 'da mensagem:', msg.content);
+                  break;
+                }
+              }
+              
+              // 2. FALLBACK: Mensagens com "gastei" mas extrair o produto
+              if (msg.content.includes('gastei') || msg.content.includes('comprei') || msg.content.includes('paguei')) {
+                const itemMatch = msg.content.match(/(?:gastei|comprei|paguei).*?(?:com|no|na|de|em|para|pro)\s+([a-záêçã\s]+?)(?:\s|$)/i);
+                if (itemMatch) {
+                  descricao = itemMatch[1].trim();
+                  console.log('📝 DESCRIÇÃO EXTRAÍDA:', descricao, 'da mensagem:', msg.content);
+                  break;
+                }
+                // Fallback final: remover palavras de ação
+                const fallbackMatch = msg.content
+                  .replace(/\d+([.,]\d+)?/g, '') // Remove números
+                  .replace(/r\$|reais?/gi, '') // Remove R$ e reais
+                  .replace(/\b(gastei|comprei|paguei|foi|com|no|na|de|em|para|pro|um|uma|o|a)\b/gi, '') // Remove palavras de ação
+                  .trim();
+                if (fallbackMatch && fallbackMatch.length > 3) {
+                  descricao = fallbackMatch;
+                  console.log('📝 DESCRIÇÃO FALLBACK MELHORADA:', descricao);
+                  break;
+                }
+              }
+            }
+          }
+          
+          console.log('🎉 FINALIZANDO GASTO DE HOJE:', valor, categoria, descricao);
+          
+          return {
+            response: `Perfeito! R$ ${valor.toFixed(2)} em ${categoria} de hoje registrado! 🎉\n\nGasto salvo com sucesso!\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
+            extraction: {
+              valor: valor,
+              categoria: categoria,
+              descricao: descricao,
+              data: dataHoje,
+              isValid: true // FINALIZA!
+            }
+          };
+        }
+      }
+      
+      // CONFIRMAÇÃO DE DATA ESPECÍFICA
+      if (lastBotMessage && lastBotMessage.content.includes('Então foi dia') && lastBotMessage.content.includes('pra confirmar')) {
+        console.log('✅ CONFIRMAÇÃO FINAL DA DATA DETECTADA');
+        
+        const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+        const dataMatch = lastBotMessage.content.match(/\d{2}\/\d{2}\/\d{4}/);
+        
+        if (valorMatch && dataMatch) {
+          const valor = parseFloat(valorMatch[1].replace(',', '.'));
+          const dataFormatada = dataMatch[0];
+          const partesData = dataFormatada.split('/'); // [DD, MM, YYYY]
+          const dataISO = `${partesData[2]}-${partesData[1].padStart(2, '0')}-${partesData[0].padStart(2, '0')}`;
+          
+          // Extrair categoria e descrição do histórico
+          let categoria = 'outros';
+          let descricao = 'Gasto registrado';
+          
+          // Buscar categoria nas mensagens do bot
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            const msg = conversationHistory[i];
+            if (msg.type === 'assistant' && msg.content.includes('em ')) {
+              const categoriaMatch = msg.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s|!|\?|\.)/i);
+              if (categoriaMatch) {
+                categoria = categoriaMatch[1].toLowerCase();
+                break;
+              }
+            }
+          }
+          
+          // 🔥 BUSCAR DESCRIÇÃO INTELIGENTE: Priorizar mensagens de categoria/produto
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            const msg = conversationHistory[i];
+            if (msg.type === 'user') {
+              // 1. PRIORIDADE: Mensagens sem "gastei", "sim", "não" (provavelmente categoria/produto)
+              if (!msg.content.includes('gastei') && !msg.content.includes('sim') && !msg.content.includes('não') && !msg.content.includes('comprei') && !msg.content.includes('paguei')) {
+                const cleanDescription = msg.content
+                  .replace(/\d+([.,]\d+)?/g, '') // Remove números
+                  .replace(/r\$|reais?/gi, '') // Remove R$ e reais
+                  .trim();
+                
+                if (cleanDescription && cleanDescription.length > 2) {
+                  descricao = cleanDescription;
+                  console.log('✨ DESCRIÇÃO CATEGORIA/PRODUTO EXTRAÍDA:', descricao, 'da mensagem:', msg.content);
+                  break;
+                }
+              }
+              
+              // 2. FALLBACK: Mensagens com "gastei" mas extrair o produto
+              if (msg.content.includes('gastei') || msg.content.includes('comprei') || msg.content.includes('paguei')) {
+                const itemMatch = msg.content.match(/(?:gastei|comprei|paguei).*?(?:com|no|na|de|em|para|pro)\s+([a-záêçã\s]+?)(?:\s|$)/i);
+                if (itemMatch) {
+                  descricao = itemMatch[1].trim();
+                  console.log('📝 DESCRIÇÃO EXTRAÍDA:', descricao, 'da mensagem:', msg.content);
+                  break;
+                }
+                // Fallback final: remover palavras de ação
+                const fallbackMatch = msg.content
+                  .replace(/\d+([.,]\d+)?/g, '') // Remove números
+                  .replace(/r\$|reais?/gi, '') // Remove R$ e reais
+                  .replace(/\b(gastei|comprei|paguei|foi|com|no|na|de|em|para|pro|um|uma|o|a)\b/gi, '') // Remove palavras de ação
+                  .trim();
+                if (fallbackMatch && fallbackMatch.length > 3) {
+                  descricao = fallbackMatch;
+                  console.log('📝 DESCRIÇÃO FALLBACK MELHORADA:', descricao);
+                  break;
+                }
+              }
+            }
+          }
+          
+          console.log('🎉 FINALIZANDO GASTO:', valor, dataFormatada);
+          
+          return {
+            response: `Show demais! R$ ${valor.toFixed(2)} do dia ${dataFormatada} registrado! 🎉\n\nGasto salvo com sucesso!\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
+            extraction: {
+              valor: valor,
+              categoria: categoria,
+              descricao: descricao,
+              data: dataISO,
+              isValid: true // FINALIZA!
+            }
+          };
+        }
+      }
+    }
+    
+    // PRIORITY #3: RESPOSTA NEGATIVA PARA MAIS GASTOS
+    const negativeResponses = ['rolou não', 'rolou nao', 'não rolou', 'nao rolou', 'nada', 'sem mais', 'por hoje não', 'hoje não', 'acabou', 'só isso', 'nenhum', 'não tem', 'nao tem'];
+    const isNegativeResponse = negativeResponses.some(phrase => currentMessage.includes(phrase)) || 
+                              (currentMessage === 'não' || currentMessage === 'nao');
+    
+    if (isNegativeResponse) {
+      const lastBotMessage = [...conversationHistory]
+        .reverse()
+        .find(msg => msg.type === 'assistant');
+      
+      if (lastBotMessage && lastBotMessage.content.includes('mais algum gasto')) {
+        console.log('❌ RESPOSTA NEGATIVA PARA MAIS GASTOS DETECTADA');
+        
+        return {
+          response: 'Show! Qualquer coisa, se aparecer mais algum gasto, é só me chamar! Tô sempre aqui pra te ajudar! 😊✌️',
+          extraction: {
+            valor: 0,
+            categoria: '',
+            descricao: '',
+            data: new Date().toISOString().split('T')[0],
+            isValid: false
+          }
+        };
+      }
+    }
+    
+    if (currentMessage.includes('foi dia') && /\d{2}\/\d{2}\/\d{4}/.test(currentMessage)) {
+      console.log('📅 DETECTADO: Resposta de data!');
+      
+      // Buscar qualquer gasto recente no histórico
+      const allMessages = [...conversationHistory];
+      console.log('📋 TOTAL DE MENSAGENS NO HISTÓRICO:', allMessages.length);
+      
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        const msg = allMessages[i];
+        if (msg.type === 'assistant' && msg.content.includes('R$')) {
+          const valorMatch = msg.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+          if (valorMatch) {
+            console.log('💰 GASTO ENCONTRADO NA MENSAGEM:', msg.content);
+            const valor = parseFloat(valorMatch[1].replace(',', '.'));
+            
+            // Extrair data
+            const dataMatch = userMessage.match(/\d{2}\/\d{2}\/\d{4}/);
+            if (dataMatch) {
+              const dataFormatada = dataMatch[0];
+              const partesData = dataFormatada.split('/');
+              const dataISO = `${partesData[2]}-${partesData[1].padStart(2, '0')}-${partesData[0].padStart(2, '0')}`;
+              
+              console.log('✅ PROCESSANDO DATA:', dataFormatada);
+              
+              return {
+                response: `Perfeito! Então foi dia ${dataFormatada}? 📅\n\nR$ ${valor.toFixed(2)} no dia ${dataFormatada}.\n\nResponde "sim" pra confirmar ou "não" se a data tá errada!`,
+                extraction: {
+                  valor: valor,
+                  categoria: 'pendente',
+                  descricao: `Confirmando data: ${dataFormatada}`,
+                  data: dataISO,
+                  isValid: false
+                }
+              };
+            }
+          }
+        }
+      }
+      
+      console.log('❌ NENHUM GASTO ENCONTRADO NO HISTÓRICO');
+    }
     
     const personalityContext = userPersonality ? `
 PERFIL DO USUÁRIO (aprenda e se adapte):
@@ -114,6 +525,12 @@ REGRAS DE CONEXÃO CONTEXTUAL (MUITO IMPORTANTE):
 5. 🎯 Se encontrar VALOR + CATEGORIA (mesmo em mensagens separadas), pergunte confirmação primeiro
 6. 🤔 Se não conseguir conectar, pergunte de forma específica
 
+CONEXÃO INTELIGENTE DE VALOR + CATEGORIA:
+- Se bot perguntou "em que categoria" e usuário responde com categoria/produto → CONECTE com valor anterior
+- Se usuário disse "gastei 1000" e depois "paguei agua e luz" → R$ 1000 em contas (água e luz)
+- Se usuário disse "gastei 50" e depois "hambúrguer" → R$ 50 em alimentação (hambúrguer)
+- SEMPRE conecte valor de mensagem anterior com categoria de mensagem atual
+
 DETECÇÃO DE CONFIRMAÇÕES:
 - Positivas: sim, ta sim, certo, isso mesmo, exato, correto, confirmo, pode ser, tá certo, é isso, isso aí
 - Negativas: não, nao, errado, não é isso, tá errado
@@ -126,7 +543,12 @@ DETECÇÃO INTELIGENTE DE CATEGORIAS (com sinônimos e abreviações):
 - lazer: cinema, festa, show, teatro, jogo, parque, balada, rolê, diversão, netflix, streaming, spotify, ingresso, entretenimento, passeio, viagem, turismo, clube, academia
 - saúde: remédio, médico, farmácia, hospital, dentista, consulta, exame, tratamento, medicamento, drogaria, clínica, laboratório, check-up, fisioterapia
 - casa: móvel, sofá, mesa, decoração, limpeza, reforma, casa, lar, móveis, eletrodomésticos, geladeira, fogão, microondas, tv, televisão, cama, colchão
-- contas: luz, água, internet, telefone, energia, gás, conta, fatura, boleto, prestação, financiamento, cartão, taxa, iptu, ipva, seguro
+- contas: luz, água, internet, telefone, energia, gás, conta, fatura, boleto, prestação, financiamento, cartão, taxa, iptu, ipva, seguro, agua e luz, água e luz, paguei agua, paguei luz
+
+DETECÇÃO ESPECIAL DE CONEXÃO:
+- Se usuário disse valor antes e agora menciona "paguei agua e luz" → CONECTE com valor anterior em categoria "contas"
+- Se usuário disse valor antes e agora menciona categoria/produto → CONECTE sempre
+- "paguei agua e luz" após "gastei X" = R$ X em contas (água e luz)
 
 NÚMEROS POR EXTENSO E VARIAÇÕES:
 - dez = 10, vinte = 20, trinta = 30, quarenta = 40, cinquenta = 50
@@ -154,6 +576,18 @@ Usuário: "hambúrguer"
 Bot: "Show! R$ 200 no hambúrguer! Tá certo?" (isValid: false - aguardando confirmação)
 Usuário: "ta sim"
 Bot: "Massa! R$ 200 em alimentação registrado! 🎉" (isValid: true - confirma e registra)
+
+EXEMPLO CONEXÃO INTELIGENTE:
+Usuário: "gastei 1000"
+Bot: "Opa, R$ 1000 anotado! Em que categoria?"
+Usuário: "paguei agua e luz"
+Bot: "Show! Conectei as informações! R$ 1000 em contas (água e luz)! Tá certo?" (CONECTA valor anterior)
+
+EXEMPLO CONEXÃO COM CATEGORIA:
+Usuário: "gastei 50"
+Bot: "Opa, R$ 50 anotado! Em que categoria?"
+Usuário: "cinema"
+Bot: "Show! R$ 50 no cinema! Tá certo?" (CONECTA valor anterior)
 
 IMPORTANTE: 
 - SEMPRE confirme antes de registrar gastos
@@ -197,6 +631,28 @@ IMPORTANTE:
             const valor = parseFloat(valorMatch[1].replace(',', '.'));
             let categoria = categoriaMatch[1].toLowerCase();
             
+            // 🔥 EXTRAÇÃO INTELIGENTE DA DESCRIÇÃO
+            let descricao = 'Gasto registrado';
+            
+            // 1. PRIORIDADE: Buscar nas mensagens do usuário que mencionaram categoria/produto
+            for (let i = conversationHistory.length - 1; i >= 0; i--) {
+              const msg = conversationHistory[i];
+              if (msg.type === 'user' && !msg.content.includes('gastei') && !msg.content.includes('sim') && !msg.content.includes('não')) {
+                // Esta é provavelmente a mensagem com a categoria/produto
+                const cleanDescription = msg.content
+                  .replace(/\d+([.,]\d+)?/g, '') // Remove números
+                  .replace(/r\$|reais?/gi, '') // Remove R$ e reais
+                  .replace(/\b(gastei|comprei|paguei|foi|com|no|na|de|em|para|pro|um|uma|o|a|esse|essa|isso)\b/gi, '') // Remove palavras de ação
+                  .trim();
+                
+                if (cleanDescription && cleanDescription.length > 2) {
+                  descricao = cleanDescription;
+                  console.log('✨ DESCRIÇÃO INTELIGENTE EXTRAÍDA:', descricao, 'da mensagem:', msg.content);
+                  break;
+                }
+              }
+            }
+            
             // Mapear categorias corretamente
             console.log(`🔧 Categoria original detectada: "${categoria}"`);
             
@@ -216,7 +672,7 @@ IMPORTANTE:
               }
             }
             
-            console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria}`);
+            console.log(`🎉 CONFIRMAÇÃO PROCESSADA: R$ ${valor} em ${categoria} - ${descricao}`);
             
             // NOVO FLUXO: Perguntar sobre a data
             const hoje = formatBrazilDate(getBrazilDate());
@@ -226,7 +682,7 @@ IMPORTANTE:
               extraction: {
                 valor: valor,
                 categoria: categoria,
-                descricao: `Aguardando confirmação de data`,
+                descricao: descricao, // 🔥 AGORA COM A DESCRIÇÃO CORRETA!
                 data: '', // Vazio até confirmar data
                 isValid: false // Ainda não finalizado
               }
@@ -236,151 +692,56 @@ IMPORTANTE:
         
         // NOVO: Detectar negativa para data "hoje" - quando não foi hoje
         
-        // NOVO: Detectar entrada de data específica
-        if (lastBotMessage && lastBotMessage.content.includes('quando foi esse gasto')) {
-          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
+        // DETECÇÃO ROBUSTA DE DATA: Se a mensagem for "foi dia DD/MM/YYYY", buscar gasto pendente no histórico
+        if (/^foi dia \d{2}\/\d{2}\/\d{4}$/.test(currentMessage.trim())) {
+          console.log('🔍 DETECTADO: Resposta de data no formato correto');
           
-          if (valorMatch && categoriaMatch) {
-            const valor = parseFloat(valorMatch[1].replace(',', '.'));
-            const categoria = categoriaMatch[1].toLowerCase();
+          // Buscar qualquer mensagem recente do bot que contenha valor e categoria
+          const recentBotMessages = [...conversationHistory]
+            .reverse()
+            .filter(msg => msg.type === 'assistant')
+            .slice(0, 10); // Últimas 10 mensagens do bot
+          
+          let gastoEncontrado = null;
+          
+          for (const botMsg of recentBotMessages) {
+            const valorMatch = botMsg.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
+            const categoriaMatch = botMsg.content.match(/\b(alimentação|vestuário|transporte|mercado|lazer|saúde|casa|contas|educação|beleza|pets|tecnologia|outros)\b/i);
             
-            // Tentar interpretar a data informada
-            let dataInterpretada = '';
-            let dataFormatada = '';
-            
-            if (currentMessage.includes('ontem')) {
-              const ontem = getBrazilDate();
-              ontem.setDate(ontem.getDate() - 1);
-              dataInterpretada = ontem.toISOString().split('T')[0];
-              dataFormatada = formatBrazilDate(ontem);
-            } else if (currentMessage.includes('anteontem') || currentMessage.includes('antes de ontem')) {
-              const anteontem = getBrazilDate();
-              anteontem.setDate(anteontem.getDate() - 2);
-              dataInterpretada = anteontem.toISOString().split('T')[0];
-              dataFormatada = formatBrazilDate(anteontem);
-            } else {
-              // Verificar dias da semana
-              const dayMappings = {
-                'segunda': 1, 'segunda-feira': 1, 'segunda feira': 1,
-                'terça': 2, 'terça-feira': 2, 'terca': 2, 'terca-feira': 2, 'terça feira': 2, 'terca feira': 2,
-                'quarta': 3, 'quarta-feira': 3, 'quarta feira': 3,
-                'quinta': 4, 'quinta-feira': 4, 'quinta feira': 4,
-                'sexta': 5, 'sexta-feira': 5, 'sexta feira': 5,
-                'sábado': 6, 'sabado': 6,
-                'domingo': 0
+            if (valorMatch && categoriaMatch) {
+              gastoEncontrado = {
+                valor: parseFloat(valorMatch[1].replace(',', '.')),
+                categoria: categoriaMatch[1].toLowerCase(),
+                botMessage: botMsg.content
               };
-              
-              let targetDay = -1;
-              for (const [dayName, dayNum] of Object.entries(dayMappings)) {
-                if (currentMessage.toLowerCase().includes(dayName)) {
-                  targetDay = dayNum;
-                  break;
-                }
-              }
-              
-              if (targetDay !== -1) {
-                const today = getBrazilDate();
-                const currentDay = today.getDay();
-                let daysBack = currentDay - targetDay;
-                if (daysBack <= 0) daysBack += 7; // Se for no futuro, assumir semana passada
-                
-                const targetDate = getBrazilDate();
-                targetDate.setDate(targetDate.getDate() - daysBack);
-                dataInterpretada = targetDate.toISOString().split('T')[0];
-                dataFormatada = formatBrazilDate(targetDate);
-              } else {
-                // Tentar extrair data no formato DD/MM ou DD/MM/YYYY
-                const dateMatch = currentMessage.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-                if (dateMatch) {
-                  const dia = parseInt(dateMatch[1]);
-                  const mes = parseInt(dateMatch[2]) - 1; // Mês base 0
-                  const ano = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : getBrazilDate().getFullYear();
-                  
-                  const dataParsed = new Date(ano, mes, dia);
-                  dataInterpretada = dataParsed.toISOString().split('T')[0];
-                  dataFormatada = formatBrazilDate(dataParsed);
-                } else {
-                  // Se não conseguiu interpretar, pedir novamente
-                  return {
-                    response: `Hmm, não consegui entender essa data... 🤔\n\nPode tentar de novo? Exemplos:\n• "ontem"\n• "dia 15/12"\n• "15/12/2024"\n• "anteontem"\n• "segunda-feira"`,
-                    extraction: {
-                      valor: 0,
-                      categoria: '',
-                      descricao: 'Data não compreendida',
-                      data: '',
-                      isValid: false
-                    }
-                  };
-                }
-              }
+              console.log('💰 GASTO ENCONTRADO:', gastoEncontrado);
+              break;
             }
-            
-            if (dataInterpretada) {
+          }
+          
+          if (gastoEncontrado) {
+            // Extrair a data da mensagem do usuário
+            const dataMatch = currentMessage.match(/\d{2}\/\d{2}\/\d{4}/);
+            if (dataMatch) {
+              const dataFormatada = dataMatch[0];
+              const partesData = dataFormatada.split('/');
+              const dataISO = `${partesData[2]}-${partesData[1].padStart(2, '0')}-${partesData[0].padStart(2, '0')}`;
+              
+              console.log('✅ PROCESSANDO DATA:', dataFormatada, 'ISO:', dataISO);
+              
               return {
-                response: `Perfeito! Então foi dia ${dataFormatada}? 📅\n\nR$ ${valor.toFixed(2)} em ${categoria} no dia ${dataFormatada}.\n\nResponde "sim" pra confirmar ou "não" se a data tá errada!`,
+                response: `Perfeito! Então foi dia ${dataFormatada}? 📅\n\nR$ ${gastoEncontrado.valor.toFixed(2)} em ${gastoEncontrado.categoria} no dia ${dataFormatada}.\n\nResponde "sim" pra confirmar ou "não" se a data tá errada!`,
                 extraction: {
-                  valor: valor,
-                  categoria: categoria,
+                  valor: gastoEncontrado.valor,
+                  categoria: gastoEncontrado.categoria,
                   descricao: `Confirmando data: ${dataFormatada}`,
-                  data: dataInterpretada,
+                  data: dataISO,
                   isValid: false // Aguardando confirmação final
                 }
               };
             }
-          }
-        }
-        
-        // NOVO: Confirmação final da data específica
-        if (lastBotMessage && lastBotMessage.content.includes('Então foi dia') && lastBotMessage.content.includes('pra confirmar')) {
-          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
-          const dataMatch = lastBotMessage.content.match(/no dia (.+?)\./);
-          
-          if (valorMatch && categoriaMatch && dataMatch) {
-            const valor = parseFloat(valorMatch[1].replace(',', '.'));
-            const categoria = categoriaMatch[1].toLowerCase();
-            const dataFormatada = dataMatch[1];
-            
-            // Converter data formatada de volta para ISO
-            const partesData = dataFormatada.split('/');
-            const dataFinal = new Date(parseInt(partesData[2]), parseInt(partesData[1]) - 1, parseInt(partesData[0]));
-            const dataISO = dataFinal.toISOString().split('T')[0];
-            
-            return {
-              response: `Show demais! R$ ${valor.toFixed(2)} em ${categoria} do dia ${dataFormatada} registrado! 🎉\n\nGasto salvo com sucesso!\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
-              extraction: {
-                valor: valor,
-                categoria: categoria,
-                descricao: `Gasto em ${categoria}`,
-                data: dataISO,
-                isValid: true // FINALIZA COM DATA CORRETA!
-              }
-            };
-          }
-        }
-        
-        // NOVO: Detectar confirmação de data "hoje"
-        if (lastBotMessage && lastBotMessage.content.includes('foi hoje')) {
-          // Buscar dados do gasto pendente na mensagem do bot
-          const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
-          const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
-          
-          if (valorMatch && categoriaMatch) {
-            const valor = parseFloat(valorMatch[1].replace(',', '.'));
-            const categoria = categoriaMatch[1].toLowerCase();
-            const dataHoje = getBrazilDate().toISOString().split('T')[0];
-            
-            return {
-              response: `Perfeito! R$ ${valor.toFixed(2)} em ${categoria} de hoje registrado! 🎉\n\nE aí, rolou mais algum gasto que você quer anotar? 😊`,
-              extraction: {
-                valor: valor,
-                categoria: categoria,
-                descricao: `Gasto em ${categoria}`,
-                data: dataHoje,
-                isValid: true // FINALIZA!
-              }
-            };
+          } else {
+            console.log('❌ NENHUM GASTO PENDENTE ENCONTRADO NO HISTÓRICO');
           }
         }
       }
@@ -389,21 +750,28 @@ IMPORTANTE:
       const botMessages = conversationHistory.filter(msg => msg.type === 'assistant');
       const lastBotMessage = botMessages[botMessages.length - 1];
       
-      if (lastBotMessage && lastBotMessage.content.includes('foi hoje') && currentMessage.includes('não')) {
+      // Torna a detecção de 'foi hoje' mais robusta (ignora acentos e variações)
+      function normalize(str) {
+        return str
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, ''); // Remove apenas acentos
+      }
+      if (
+        lastBotMessage &&
+        normalize(lastBotMessage.content).includes('foi hoje') &&
+        normalize(currentMessage).includes('nao')
+      ) {
         console.log(`📅 DETECTADO: Usuário disse que NÃO foi hoje`);
-        
         // Buscar dados do gasto pendente na mensagem do bot
         const valorMatch = lastBotMessage.content.match(/R\$\s*(\d+(?:[.,]\d+)?)/);
         const categoriaMatch = lastBotMessage.content.match(/em\s+([a-záêçã]+(?:\s+[a-záêçã]+)*?)(?:\s+(?:confirmado|registrado|anotado)|[^\w\sá-ú]|$)/i);
-        
         if (valorMatch && categoriaMatch) {
           const valor = parseFloat(valorMatch[1].replace(',', '.'));
           const categoria = categoriaMatch[1].toLowerCase();
-          
           console.log(`📅 PROCESSANDO: R$ ${valor} em ${categoria} - perguntando data específica`);
-          
-            return {
-              response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
+          return {
+            response: `Beleza! Então quando foi esse gasto de R$ ${valor.toFixed(2)} em ${categoria}? 📅\n\nMe fala a data: "foi ontem", "foi dia 15/12" ou "foi segunda-feira"!`,
             extraction: {
               valor: valor,
               categoria: categoria,
@@ -441,44 +809,11 @@ IMPORTANTE:
         }
       }
       
-      // DETECÇÃO DE SAUDAÇÕES E CUMPRIMENTOS
-      const greetingWords = ['ola', 'olá', 'oi ', ' oi', 'eai', 'e ai', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'hello', 'salve', 'fala'];
-      const isGreeting = greetingWords.some(word => 
-        currentMessage.startsWith(word) || 
-        currentMessage.includes(' ' + word + ' ') || 
-        currentMessage.endsWith(' ' + word) ||
-        (word.includes(' ') && currentMessage.includes(word))
-      );
-      
-      console.log(`👋 Verificando saudação para: "${userMessage}"`);
-      console.log(`👋 É saudação? ${isGreeting}`);
-      
-      if (isGreeting) {
-        const greetingResponses = [
-          'E aí! Beleza? 😄 Pronto pra anotar uns gastos? Manda aí: "gastei R$ 50 no mercado" ou algo assim! 💰',
-          'Opa! Tudo jóia? 😊 Vamos registrar seus gastos? É só falar: "gastei R$ 30 no lanche" que eu anoto tudo! 🍔💸',
-          'Salve! Show de bola! 🤙 Bora organizar as finanças? Fala aí qualquer gasto: "gastei R$ 100 na roupa"! 👕',
-          'E aí, tranquilo? 😎 Tô aqui pra te ajudar com os gastos! Manda qualquer coisa tipo: "gastei R$ 80 no uber"! 🚗',
-          'Opa! Beleza demais! 🎉 Pronto pra registrar uns gastos maneiros? Só falar: "gastei R$ 25 no açaí"! 🍨'
-        ];
-        
-        const randomResponse = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
-        
-        return {
-          response: randomResponse,
-          extraction: {
-            valor: 0,
-            categoria: '',
-            descricao: '',
-            data: new Date().toISOString().split('T')[0],
-            isValid: false
-          }
-        };
-      }
+
       
       // DETECÇÃO DE CONFIRMAÇÕES CONVERSACIONAIS (respostas positivas após saudação)
-      const conversationalWords = ['vamos', 'bora', 'ok', 'beleza', 'sim', 'claro', 'dale', 'show', 'massa', 'vamo', 'bora lá', 'pode ser', 'tranquilo', 'fechou'];
-      const isConversational = conversationalWords.some(word => currentMessage.includes(word));
+      const conversationalWords = ['vamos', 'bora', 'ok', 'beleza', 'claro', 'dale', 'show', 'massa', 'vamo', 'bora lá', 'pode ser', 'tranquilo', 'fechou'];
+      const isConversational = conversationalWords.some(word => currentMessage.includes(word)) && !isConfirmation;
       
       console.log(`💬 Verificando resposta conversacional para: "${userMessage}"`);
       console.log(`💬 É conversacional? ${isConversational}`);
@@ -743,8 +1078,8 @@ IMPORTANTE:
       }
       
       // DETECÇÃO DE INTENÇÃO DE GASTO (antes da análise local)
-      const expenseIntentWords = ['gastei', 'gasto', 'comprei', 'paguei', 'saiu', 'foi', 'dinheiro', 'real', 'reais', 'muito', 'abessa', 'bastante', 'hoje', 'ontem'];
-      const hasExpenseIntent = expenseIntentWords.some(word => currentMessage.includes(word));
+      const expenseIntentWords = ['gastei', 'gasto', 'comprei', 'paguei', 'saiu', 'foi', 'dinheiro', 'real', 'reais'];
+      const hasExpenseIntent = expenseIntentWords.some(word => currentMessage.includes(word)) && !isThankYou;
       
       console.log(`💡 Verificando intenção de gasto para: "${userMessage}"`);
       console.log(`💡 Tem intenção de gasto? ${hasExpenseIntent}`);
@@ -948,7 +1283,7 @@ IMPORTANTE:
             console.log('No JSON found, using direct fallback parsing for:', result);
             // Direct fallback parsing for simple cases like "gastei 20"
             let valor = 0;
-            let categoria = 'outros';
+            const categoria = 'outros';
             
             const numberMatch = userMessage.match(/\d+(?:[.,]\d+)?/);
             if (numberMatch) {

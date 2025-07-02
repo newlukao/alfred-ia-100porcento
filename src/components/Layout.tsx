@@ -1,10 +1,12 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Moon, Sun, LogOut, Settings, BarChart3, MessageCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import ResponsiveLayout from '@/components/ResponsiveLayout';
+import { useDevice } from '@/hooks/use-device';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,7 +16,45 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const device = useDevice();
 
+  const getCurrentPage = () => {
+    if (location.pathname === '/') return 'chat';
+    if (location.pathname === '/dashboard') return 'overview';
+    if (location.pathname === '/admin') return 'admin';
+    return 'overview';
+  };
+
+  const handlePageChange = (pageId: string) => {
+    switch (pageId) {
+      case 'chat':
+        window.location.href = '/';
+        break;
+      case 'overview':
+        window.location.href = '/dashboard';
+        break;
+      case 'admin':
+        window.location.href = '/admin';
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Se for mobile/tablet, usar o ResponsiveLayout
+  if (device.isMobile || device.isTablet) {
+    return (
+      <ResponsiveLayout
+        currentPage={getCurrentPage()}
+        onPageChange={handlePageChange}
+        unreadNotifications={0} // TODO: Integrar com sistema de notificações
+      >
+        {children}
+      </ResponsiveLayout>
+    );
+  }
+
+  // Layout desktop original
   const navigation = [
     { name: 'Chat', href: '/', icon: MessageCircle },
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
@@ -55,14 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="w-9 h-9"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </Button>
+            <ThemeToggle />
             
             <div className="flex items-center space-x-2 text-sm">
               <span className="text-muted-foreground">

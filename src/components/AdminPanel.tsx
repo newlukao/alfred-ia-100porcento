@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, AlertCircle, Globe } from 'lucide-react';
+import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, AlertCircle, Globe, Bell, Send, Eye, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, User, Expense, Configuration } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,18 @@ const AdminPanel: React.FC = () => {
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Notification states
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [notificationStats, setNotificationStats] = useState<any>({
+    total: 0,
+    sent_today: 0,
+    read_rate: 0,
+    recent_notifications: []
+  });
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
 
   useEffect(() => {
     if (user?.is_admin) {
@@ -29,15 +41,21 @@ const AdminPanel: React.FC = () => {
   const loadAdminData = async () => {
     setIsLoading(true);
     try {
-      const [configData, usersData, expensesData] = await Promise.all([
+      const [configData, usersData, expensesData, notificationStatsData] = await Promise.all([
         database.getConfiguration(),
         database.getAllUsers(),
-        database.getAllExpenses()
+        database.getAllExpenses(),
+        database.getAdminNotificationStats()
       ]);
+      
+      console.log('👥 AdminPanel - Usuários carregados:', usersData);
+      console.log('🔒 AdminPanel - Usuário logado:', user);
+      console.log('⚙️ AdminPanel - Configuração carregada:', configData);
       
       setConfig(configData);
       setAllUsers(usersData);
       setAllExpenses(expensesData);
+      setNotificationStats(notificationStatsData);
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast({
@@ -83,6 +101,89 @@ const AdminPanel: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSendNotification = async () => {
+    if (!notificationTitle.trim() || !notificationMessage.trim()) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha título e mensagem",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (selectedUsers.length === 0) {
+      toast({
+        title: "Selecione usuários",
+        description: "Selecione pelo menos um usuário",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('🚀 AdminPanel - Iniciando envio de notificação:', {
+      title: notificationTitle,
+      message: notificationMessage,
+      selectedUsers,
+      totalUsers: selectedUsers.length
+    });
+
+    setIsSendingNotification(true);
+    try {
+      // Send notifications using database
+      const sentNotifications = await database.sendAdminNotification(selectedUsers, notificationTitle, notificationMessage);
+      
+      console.log('📬 AdminPanel - Notificações enviadas:', sentNotifications);
+
+      // Reload notification stats
+      const updatedStats = await database.getAdminNotificationStats();
+      setNotificationStats(updatedStats);
+      
+      console.log('📊 AdminPanel - Estatísticas atualizadas:', updatedStats);
+
+      toast({
+        title: "Sucesso! 📨",
+        description: `Notificação enviada para ${selectedUsers.length} usuário(s)`
+      });
+
+      // Clear form
+      setNotificationTitle('');
+      setNotificationMessage('');
+      setSelectedUsers([]);
+      
+      console.log('✅ AdminPanel - Processo concluído com sucesso');
+    } catch (error) {
+      console.error('❌ AdminPanel - Error sending notification:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao enviar notificação",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    console.log('🔄 toggleUserSelection - Usuário clicado:', userId);
+    setSelectedUsers(prev => {
+      const newSelection = prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId];
+      console.log('📝 toggleUserSelection - Nova seleção:', newSelection);
+      return newSelection;
+    });
+  };
+
+  const selectAllUsers = () => {
+    const nonAdminUsers = allUsers.filter(u => !u.is_admin).map(u => u.id);
+    console.log('👥 selectAllUsers - Usuários não-admin:', nonAdminUsers);
+    setSelectedUsers(nonAdminUsers);
+  };
+
+  const clearUserSelection = () => {
+    setSelectedUsers([]);
   };
 
   if (!user?.is_admin) {
@@ -200,6 +301,7 @@ const AdminPanel: React.FC = () => {
         <TabsList>
           <TabsTrigger value="config">Configurações Básicas</TabsTrigger>
           <TabsTrigger value="bot">Configurações do Bot</TabsTrigger>
+          <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="logs">Logs & Estatísticas</TabsTrigger>
         </TabsList>
@@ -255,13 +357,23 @@ const AdminPanel: React.FC = () => {
                 </Select>
               </div>
 
-              <Button 
-                onClick={handleSaveConfig}
-                disabled={isSaving}
-                className="w-full"
-              >
-                {isSaving ? 'Salvando...' : 'Salvar Configurações Básicas'}
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleSaveConfig}
+                  disabled={isSaving}
+                  className="flex-1"
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar Configurações Básicas'}
+                </Button>
+                <Button 
+                  onClick={loadAdminData}
+                  variant="outline"
+                  disabled={isLoading}
+                  className="px-4"
+                >
+                  🔄
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -409,6 +521,263 @@ const AdminPanel: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Send Notification Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Send className="h-5 w-5" />
+                  <span>Enviar Notificação</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    📝 Título da Notificação
+                  </label>
+                  <Input
+                    value={notificationTitle}
+                    onChange={(e) => setNotificationTitle(e.target.value)}
+                    placeholder="Ex: Nova funcionalidade disponível!"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    💬 Mensagem
+                  </label>
+                  <Textarea
+                    value={notificationMessage}
+                    onChange={(e) => setNotificationMessage(e.target.value)}
+                    placeholder="Digite sua mensagem aqui..."
+                    rows={4}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium">
+                      👥 Selecionar Usuários ({selectedUsers.length} selecionados)
+                    </label>
+                    <div className="flex space-x-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={selectAllUsers}
+                        disabled={allUsers.filter(u => !u.is_admin).length === selectedUsers.length}
+                      >
+                        Todos
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={clearUserSelection}
+                        disabled={selectedUsers.length === 0}
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 space-y-2">
+                    {allUsers.filter(u => !u.is_admin).map((userData) => (
+                      <div
+                        key={userData.id}
+                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors ${
+                          selectedUsers.includes(userData.id)
+                            ? 'bg-primary/10 border border-primary'
+                            : 'hover:bg-muted'
+                        }`}
+                        onClick={() => toggleUserSelection(userData.id)}
+                      >
+                        <div className={`w-4 h-4 border-2 rounded ${
+                          selectedUsers.includes(userData.id)
+                            ? 'bg-primary border-primary'
+                            : 'border-muted-foreground'
+                        }`}>
+                          {selectedUsers.includes(userData.id) && (
+                            <CheckCircle className="w-3 h-3 text-white m-0.5" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{userData.nome}</p>
+                          <p className="text-xs text-muted-foreground">{userData.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSendNotification}
+                  disabled={isSendingNotification || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.length === 0}
+                  className="w-full"
+                >
+                  {isSendingNotification ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar Notificação
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Notification Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Eye className="h-5 w-5" />
+                  <span>Estatísticas de Notificações</span>
+                </CardTitle>
+              </CardHeader>
+                             <CardContent>
+                 {notificationStats.total === 0 ? (
+                   <div className="text-center py-8 text-muted-foreground">
+                     <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                     <p>Nenhuma notificação enviada ainda</p>
+                     <p className="text-sm">Envie sua primeira notificação!</p>
+                   </div>
+                 ) : (
+                   <div className="space-y-4">
+                     <div className="grid grid-cols-3 gap-4">
+                       <div className="text-center p-3 bg-muted/50 rounded-lg">
+                         <div className="text-2xl font-bold text-primary">
+                           {notificationStats.total}
+                         </div>
+                         <div className="text-sm text-muted-foreground">
+                           Total Enviadas
+                         </div>
+                       </div>
+                       <div className="text-center p-3 bg-muted/50 rounded-lg">
+                         <div className="text-2xl font-bold text-blue-500">
+                           {notificationStats.sent_today}
+                         </div>
+                         <div className="text-sm text-muted-foreground">
+                           Hoje
+                         </div>
+                       </div>
+                       <div className="text-center p-3 bg-muted/50 rounded-lg">
+                         <div className="text-2xl font-bold text-green-500">
+                           {notificationStats.read_rate.toFixed(1)}%
+                         </div>
+                         <div className="text-sm text-muted-foreground">
+                           Taxa de Leitura
+                         </div>
+                       </div>
+                     </div>
+
+                     <div>
+                       <h3 className="font-medium mb-2">Últimas Notificações</h3>
+                       <div className="space-y-2 max-h-60 overflow-y-auto">
+                         {notificationStats.recent_notifications.map((notification: any) => (
+                           <div key={notification.id} className="border border-border rounded-lg p-3">
+                             <div className="flex items-start justify-between">
+                               <div className="flex-1">
+                                 <h4 className="font-medium text-sm">{notification.titulo}</h4>
+                                 <p className="text-xs text-muted-foreground line-clamp-2">
+                                   {notification.mensagem}
+                                 </p>
+                                 <p className="text-xs text-muted-foreground mt-1">
+                                   Para: {notification.user_name}
+                                 </p>
+                               </div>
+                               <div className="flex flex-col items-end ml-2">
+                                 <Badge 
+                                   variant={notification.lida ? "default" : "secondary"}
+                                   className="text-xs"
+                                 >
+                                   {notification.lida ? 'Lida' : 'Não lida'}
+                                 </Badge>
+                                 <p className="text-xs text-muted-foreground mt-1">
+                                   <Clock className="h-3 w-3 inline mr-1" />
+                                   {new Date(notification.data_criacao).toLocaleDateString('pt-BR')}
+                                 </p>
+                               </div>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   </div>
+                 )}
+               </CardContent>
+            </Card>
+          </div>
+
+          {/* Notification Summary */}
+          {notificationStats.total > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="h-5 w-5" />
+                  <span>Resumo de Notificações</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="font-medium mb-3">Estatísticas Gerais</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total de notificações:</span>
+                        <Badge variant="outline">{notificationStats.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Enviadas hoje:</span>
+                        <Badge variant="outline">{notificationStats.sent_today}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Taxa de leitura:</span>
+                        <Badge variant={notificationStats.read_rate > 70 ? "default" : "secondary"}>
+                          {notificationStats.read_rate.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium mb-3">Performance</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>Taxa de Leitura</span>
+                          <span>{notificationStats.read_rate.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${notificationStats.read_rate}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        {notificationStats.read_rate > 80 ? (
+                          <span className="text-green-600">📈 Excelente engajamento!</span>
+                        ) : notificationStats.read_rate > 60 ? (
+                          <span className="text-yellow-600">📊 Bom engajamento</span>
+                        ) : (
+                          <span className="text-red-600">📉 Baixo engajamento</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Users Tab */}

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, database } from '@/lib/database';
 
@@ -24,11 +23,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth data
+    // LIMPEZA FORÇADA - Remove dados antigos com IDs incorretos
     const storedUser = localStorage.getItem('auth_user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Se o ID não é um UUID válido, remove do localStorage
+        if (!parsedUser.id || parsedUser.id.length < 30) {
+          console.log('🔧 Removendo usuário com ID inválido:', parsedUser.id);
+          localStorage.removeItem('auth_user');
+          setUser(null);
+        } else {
+          setUser(parsedUser);
+        }
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('auth_user');
@@ -39,13 +46,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Simple auth - in real app, this would validate with backend
-      const foundUser = await database.getUserByEmail(email);
+      // Simple auth - usando UUIDs corretos para compatibilidade com Supabase
+      let foundUser: User | null = null;
       
-      if (foundUser && (
-        (email === 'demo@exemplo.com' && password === 'demo') ||
-        (email === 'admin@exemplo.com' && password === 'admin')
-      )) {
+      if (email === 'demo@exemplo.com' && password === 'demo') {
+        foundUser = {
+          id: '550e8400-e29b-41d4-a716-446655440001', // UUID correto para Demo User
+          nome: 'Demo User',
+          email: 'demo@exemplo.com',
+          is_admin: false,
+          data_criacao: new Date().toISOString()
+        };
+      } else if (email === 'admin@exemplo.com' && password === 'admin') {
+        foundUser = {
+          id: '550e8400-e29b-41d4-a716-446655440002', // UUID correto para Admin User
+          nome: 'Admin User',
+          email: 'admin@exemplo.com',
+          is_admin: true,
+          data_criacao: new Date().toISOString()
+        };
+      }
+      
+      if (foundUser) {
         setUser(foundUser);
         localStorage.setItem('auth_user', JSON.stringify(foundUser));
         return true;
