@@ -256,7 +256,7 @@ const SidebarDashboard: React.FC = () => {
               <span className="text-sm">Gastos</span>
               <span className="text-sm font-medium text-red-600">R$ {totalExpenses.toFixed(2)}</span>
             </div>
-            {user?.plan_type === 'ouro' && (
+            {(user?.plan_type === 'ouro' || user?.plan_type === 'trial') && (
               <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                 <span className="text-sm">Recebimentos</span>
                 <span className="text-sm font-medium text-green-600">R$ {totalIncomes.toFixed(2)}</span>
@@ -388,7 +388,7 @@ const SidebarDashboard: React.FC = () => {
               <span className="text-sm">Gastos</span>
               <span className="text-sm font-medium text-red-600">R$ {totalExpenses.toFixed(2)}</span>
             </div>
-            {user?.plan_type === 'ouro' && (
+            {(user?.plan_type === 'ouro' || user?.plan_type === 'trial') && (
               <div className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                 <span className="text-sm">Recebimentos</span>
                 <span className="text-sm font-medium text-green-600">R$ {totalIncomes.toFixed(2)}</span>
