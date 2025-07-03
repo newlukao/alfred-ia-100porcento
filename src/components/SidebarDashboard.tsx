@@ -53,6 +53,13 @@ interface SidebarItem {
   adminRequired?: boolean;
 }
 
+function getPlanoLabel(plan_type) {
+  if (plan_type === 'ouro') return 'Ouro';
+  if (plan_type === 'bronze') return 'Bronze';
+  if (plan_type === 'trial') return 'Trial';
+  return 'Sem Plano';
+}
+
 const SidebarDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -182,7 +189,7 @@ const SidebarDashboard: React.FC = () => {
   // Filter menu items based on user plan and admin status
   const filteredMenuItems = menuItems.filter(item => {
     // Check plan requirement
-    if (item.planRequired && user?.plan_type !== item.planRequired) {
+    if (item.planRequired && (user?.plan_type !== item.planRequired && user?.plan_type !== 'trial')) {
       return false;
     }
     // Check admin requirement
@@ -331,14 +338,14 @@ const SidebarDashboard: React.FC = () => {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
+            <img src="/alfred-logo.png" alt="Logo Alfred IA" style={{ width: 32, height: 32, borderRadius: '50%', background: 'white' }} />
             <div>
-              <h1 className="text-lg font-semibold">FinanceAI</h1>
+              <h1 className="text-lg font-semibold">Alfred IA</h1>
               <p className="text-xs text-muted-foreground">
-                {user?.plan_type === 'ouro' ? 'Plano Ouro' : 'Plano Bronze'}
-                {user?.plan_type === 'ouro' && <Crown className="w-3 h-3 inline ml-1 text-yellow-500" />}
+                {getPlanoLabel(user?.plan_type)}
+                {user?.plan_type === 'trial' && (
+                  <span className="text-xs text-yellow-600 ml-2">Acesso Ouro (Trial)</span>
+                )}
               </p>
             </div>
           </div>
@@ -509,28 +516,35 @@ const SidebarDashboard: React.FC = () => {
 
       {/* Modal de escolha de plano */}
       <Dialog open={isPlanModalOpen}>
-        <DialogContent>
+        <DialogContent className="backdrop-blur-sm bg-black/60 border-none shadow-none flex flex-col items-center justify-center min-h-[40vh]">
           <DialogHeader>
-            <DialogTitle>Escolha seu Plano</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-white text-center">Você está sem plano!</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o plano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bronze">Bronze</SelectItem>
-                <SelectItem value="ouro">Ouro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSavePlan} disabled={!selectedPlan}>
-              Salvar Plano
+          <p className="text-white text-center mb-4">Para acessar o FinanceAI, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
+          <DialogFooter className="w-full mt-4">
+            <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
+              Adquirir um Plano
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal especial de fim de trial */}
+      {!user?.plan_type && user?.trial_start && (
+        <Dialog open={true}>
+          <DialogContent className="backdrop-blur-sm bg-black/60 border-none shadow-none flex flex-col items-center justify-center min-h-[40vh]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-white text-center">Seu período de teste acabou!</DialogTitle>
+            </DialogHeader>
+            <p className="text-white text-center mb-4">O trial gratuito expirou. Adquira um plano para continuar usando o FinanceAI.</p>
+            <DialogFooter className="w-full mt-4">
+              <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
+                Adquirir um Plano
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

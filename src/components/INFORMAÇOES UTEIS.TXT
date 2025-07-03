@@ -1,6 +1,6 @@
 PlanBasedDashboard.tsx  = MEXER NA DASH DESKTOP
 
-Dashboard.tsx = MEXER NO MOBILE DASH
+= Dashboard.tsx MEXER NO MOBILE DASH
 
 Queria ver se é possivel...
 

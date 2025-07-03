@@ -210,7 +210,8 @@ const AdminPanel: React.FC = () => {
         email: newUser.email,
         is_admin: false,
         plan_type: newUser.plano === 'none' ? null : newUser.plano,
-        data_criacao: new Date().toISOString().split('T')[0]
+        data_criacao: new Date().toISOString().split('T')[0],
+        trial_start: new Date().toISOString().split('T')[0]
       };
       const created = await database.createUser(userPayload);
       if (!created) {
@@ -247,7 +248,8 @@ const AdminPanel: React.FC = () => {
         is_admin: editUser.is_admin,
         plan_type: editUser.plano === 'none' ? null : editUser.plano,
         email: editUser.email,
-        data_criacao: editUser.data_criacao
+        data_criacao: editUser.data_criacao,
+        trial_start: editUser.trial_start
       });
       // Atualizar plano
       await database.updateUserPlan(editUser.id, editUser.plano === 'none' ? null : editUser.plano);
@@ -931,6 +933,7 @@ const AdminPanel: React.FC = () => {
                     <SelectItem value="none">Sem Plano</SelectItem>
                     <SelectItem value="bronze">Bronze</SelectItem>
                     <SelectItem value="ouro">Ouro</SelectItem>
+                    <SelectItem value="trial">Trial</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -975,6 +978,7 @@ const AdminPanel: React.FC = () => {
                       <SelectItem value="none">Sem Plano</SelectItem>
                       <SelectItem value="bronze">Bronze</SelectItem>
                       <SelectItem value="ouro">Ouro</SelectItem>
+                      <SelectItem value="trial">Trial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

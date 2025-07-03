@@ -101,6 +101,13 @@ const UserProfile: React.FC = () => {
     });
   };
 
+  function getPlanoLabel(plan_type: string) {
+    if (plan_type === 'ouro') return 'Ouro';
+    if (plan_type === 'bronze') return 'Bronze';
+    if (plan_type === 'trial') return 'Trial';
+    return 'Sem Plano';
+  }
+
   return (
     <div className="space-y-6 p-4 pb-20">
       {/* Header do Perfil */}
@@ -139,7 +146,7 @@ const UserProfile: React.FC = () => {
                   className={user.plan_type === 'ouro' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
                 >
                   {user.plan_type === 'ouro' ? <Crown className="w-3 h-3 mr-1" /> : null}
-                  Plano {user.plan_type === 'ouro' ? 'Ouro' : 'Bronze'}
+                  {getPlanoLabel(user.plan_type)}
                 </Badge>
                 
                 {user.is_admin && (
@@ -147,6 +154,20 @@ const UserProfile: React.FC = () => {
                     <Shield className="w-3 h-3 mr-1" />
                     Admin
                   </Badge>
+                )}
+
+                {user.plan_type === 'trial' && user.trial_start && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {(() => {
+                      const trialStart = new Date(user.trial_start);
+                      const now = new Date();
+                      const diffMs = 24 * 60 * 60 * 1000 - (now.getTime() - trialStart.getTime());
+                      if (diffMs <= 0) return 'Trial expirado';
+                      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      return `Trial expira em: ${hours}h ${minutes}min`;
+                    })()}
+                  </span>
                 )}
               </div>
             </div>
@@ -301,7 +322,7 @@ const UserProfile: React.FC = () => {
                 variant={user.plan_type === 'ouro' ? 'default' : 'secondary'}
                 className={user.plan_type === 'ouro' ? 'bg-yellow-500' : ''}
               >
-                {user.plan_type === 'ouro' ? 'Ouro' : 'Bronze'}
+                {getPlanoLabel(user.plan_type)}
               </Badge>
             </div>
 

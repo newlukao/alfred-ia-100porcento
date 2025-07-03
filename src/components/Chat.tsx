@@ -513,7 +513,7 @@ Me conta seu compromisso:`,
       setMessages(prev => [...prev, responseMessage]);
       await database.addConversationMessage(user!.id, 'assistant', responseMessage.content);
       // Exibir menu principal após finalizar
-      if (user?.plan_type === 'ouro') {
+      if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
         const mainMenu = createOptionsMessage(
           'Se precisar de mais alguma coisa é só me dizer!',
           MAIN_MENU_OPTIONS
@@ -526,7 +526,7 @@ Me conta seu compromisso:`,
       // Reset to initial state para opções não reconhecidas
       setChatState('initial');
       setTransactionType(null);
-      if (user?.plan_type === 'ouro') {
+      if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
         responseMessage = createOptionsMessage(
           'Se precisar de mais alguma coisa é só me dizer!',
           MAIN_MENU_OPTIONS
@@ -708,7 +708,7 @@ Me conta seu compromisso:`,
       await database.addConversationMessage(user.id, 'user', valueToSend);
       setAwaitingReportFollowup(null);
       setInputValue('');
-      if (user?.plan_type === 'ouro') {
+      if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
         const mainMenu = createOptionsMessage(
           'Se precisar de mais alguma coisa é só me dizer!',
           MAIN_MENU_OPTIONS
@@ -835,7 +835,7 @@ Me conta seu compromisso:`,
           });
 
           // Só salvar se for usuário Gold (tem acesso ao calendário)
-          if (user.plan_type === 'ouro') {
+          if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
             try {
               const savedAppointment = await database.addAppointment({
                 user_id: user.id,
@@ -915,7 +915,7 @@ Me conta seu compromisso:`,
         });
 
         // Só salvar se for usuário Gold (tem acesso ao calendário)
-        if (user.plan_type === 'ouro') {
+        if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
           try {
             const savedAppointment = await database.addAppointment({
               user_id: user.id,
@@ -995,7 +995,7 @@ Me conta seu compromisso:`,
         console.log('💰 Chat - user.plan_type:', user.plan_type);
         console.log('💰 Chat - database.addIncome exists:', !!database.addIncome);
         
-        if (isIncome && user.plan_type === 'ouro' && database.addIncome) {
+        if (isIncome && user.plan_type === 'ouro' || user.plan_type === 'trial' && database.addIncome) {
           console.log('💎 Chat - ENTRANDO na condição de recebimento para usuário OURO');
           // Save as income for gold plan users
           console.log('💎 Chat - Salvando recebimento no banco (Plano Ouro):', {
@@ -1079,7 +1079,7 @@ Me conta seu compromisso:`,
           console.log('🥉 Chat - ENTRANDO na condição de recebimento para usuário BRONZE (sugerindo upgrade)');
           // Suggest upgrade for bronze users trying to add income
           toast({
-            title: "🥇 Upgrade para Plano Ouro!",
+            title: "�� Upgrade para Plano Ouro!",
             description: "Para registrar recebimentos, você precisa do plano ouro!",
             variant: "default"
           });
@@ -1269,7 +1269,7 @@ Me conta seu compromisso:`,
       return "Ex: 'compromisso dia 20 no dentista às 15h' 📅";
     }
     
-    if (user?.plan_type === 'ouro') {
+    if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
       return "Ex: 'gastei 50 no mercado' ou 'compromisso amanhã às 14h' 😎💎";
     }
     
@@ -1348,7 +1348,7 @@ Me conta seu compromisso:`,
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           <span className="text-sm text-muted-foreground">Online</span>
-          {(chatState !== 'initial' && user?.plan_type === 'ouro') && (
+          {(chatState !== 'initial' && user?.plan_type === 'ouro' || user?.plan_type === 'trial') && (
             <Button
               variant="ghost"
               size="sm"

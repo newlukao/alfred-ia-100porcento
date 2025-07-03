@@ -24,10 +24,11 @@ import {
   List,
   Grid3X3
 } from 'lucide-react';
+import { isGold } from '../lib/utils';
 
 interface User {
   id: string;
-  plan_type: 'bronze' | 'ouro';
+  plan_type: 'bronze' | 'ouro' | 'trial';
 }
 
 interface Appointment {
@@ -98,10 +99,10 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
   };
 
   useEffect(() => {
-    if (user.plan_type === 'ouro') {
+    if (isGold(user)) {
       loadAppointments();
     }
-  }, [user.id, user.plan_type]);
+  }, [user.id]);
 
   const loadAppointments = async () => {
     try {
@@ -294,15 +295,17 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
   };
 
   // Verificar se é plano Gold
-  if (user.plan_type !== 'ouro') {
+  if (!isGold(user)) {
     return (
       <div className="space-y-6">
         <Card className="border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
           <CardHeader className="text-center">
             <CalendarIcon className="h-12 w-12 text-yellow-600 mx-auto mb-2" />
-            <CardTitle>Meus Compromissos - Plano Gold</CardTitle>
+            <CardTitle>Meus Compromissos - Plano {isGold(user) ? 'Gold' : 'Bronze'}</CardTitle>
             <CardDescription>
-              Organize seus compromissos e receba notificações automáticas
+              {isGold(user)
+                ? 'Aproveite seu período de teste Gold!'
+                : 'Organize seus compromissos e receba notificações automáticas'}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
@@ -321,11 +324,13 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
               </div>
             </div>
             
-            <div className="pt-4">
-              <Button className="bg-yellow-600 hover:bg-yellow-700">
-                🥇 Fazer Upgrade para Gold
-              </Button>
-            </div>
+            {!isGold(user) && (
+              <div className="pt-4">
+                <Button className="bg-yellow-600 hover:bg-yellow-700">
+                  🥇 Fazer Upgrade para Gold
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

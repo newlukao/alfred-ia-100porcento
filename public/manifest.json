@@ -1,21 +1,26 @@
 {
-  "name": "FinanceAI",
-  "short_name": "FinanceAI",
+  "name": "Alfred IA",
+  "short_name": "Alfred IA",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
-  "description": "Seu assistente financeiro com IA.",
+  "description": "Seu assistente financeiro inteligente - Alfred IA.",
   "icons": [
+    {
+      "src": "alfred-logo.png",
+      "sizes": "192x192 256x256 512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "alfred-logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    },
     {
       "src": "favicon.ico",
       "sizes": "32x32 48x48 64x64 128x128 256x256",
       "type": "image/x-icon"
-    },
-    {
-      "src": "placeholder.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
     }
   ]
 } 

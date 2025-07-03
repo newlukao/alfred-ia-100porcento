@@ -6,8 +6,9 @@ export interface AppUser {
   nome: string;
   email: string;
   is_admin: boolean;
-  plan_type: 'bronze' | 'ouro';
+  plan_type: 'bronze' | 'ouro' | 'trial' | null;
   data_criacao: string;
+  trial_start?: string | null;
 }
 
 // Cache simples para usuários
@@ -145,7 +146,7 @@ class SupabaseAuthService {
       // Adicionar ao cache
       this.setCacheUser(authUserId, user);
       
-      return user;
+      return await this.checkAndExpireTrial(user);
     } catch (error) {
       console.error('❌ Erro/timeout na busca do usuário:', error);
       // Em caso de timeout ou erro, usar fallback apenas se não há cache
@@ -202,7 +203,8 @@ class SupabaseAuthService {
         email,
         nome,
         is_admin: isAdmin,
-        plan_type: isAdmin ? 'ouro' as const : 'bronze' as const
+        plan_type: isAdmin ? 'ouro' as const : 'trial',
+        trial_start: isAdmin ? null : new Date().toISOString()
       };
 
       console.log('➕ Criando usuário com timeout:', userData);
@@ -222,7 +224,26 @@ class SupabaseAuthService {
 
       if (error) {
         console.error('❌ Erro ao criar usuário:', error);
-        return this.createFallbackUser(authUserId, email, nome);
+        console.error('❌ Código do erro:', error.code);
+        console.error('❌ Detalhes:', error.details, error.hint, error.message);
+        // Se usuário já existe, atualizar para trial
+        if (error.code === '23505') {
+          console.log('�� Usuário já existe, atualizando para trial...');
+          await supabase
+            .from('users')
+            .update({ plan_type: 'trial', trial_start: new Date().toISOString() })
+            .eq('id', authUserId);
+          // Buscar registro atualizado
+          const { data: updatedUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUserId)
+            .single();
+          return updatedUser as AppUser;
+        }
+        // Fallback - retornar null
+        console.log('❌ Criação falhou');
+        return null;
       }
 
       console.log('✅ Usuário criado:', data);
@@ -246,15 +267,14 @@ class SupabaseAuthService {
       email: fallbackEmail,
       nome: fallbackNome,
       is_admin: isAdmin,
-      plan_type: isAdmin ? 'ouro' : 'bronze',
+      plan_type: isAdmin ? 'ouro' : 'trial',
+      trial_start: isAdmin ? null : new Date().toISOString(),
       data_criacao: new Date().toISOString()
     };
     
     console.log('✅ Usuário fallback criado:', fallbackUser);
     return fallbackUser;
   }
-
-
 
   // ➕ CRIAR USUÁRIO NA TABELA
   private async createAppUser(authUserId: string, email: string, nome: string): Promise<AppUser | null> {
@@ -267,10 +287,10 @@ class SupabaseAuthService {
         email,
         nome,
         is_admin: isAdmin,
-        plan_type: isAdmin ? 'ouro' as const : 'bronze' as const
+        plan_type: isAdmin ? 'ouro' as const : 'trial',
+        trial_start: isAdmin ? null : new Date().toISOString()
       };
-
-      console.log('📝 Dados para inserção:', userData);
+      console.log('📝 Dados para inserção (createAppUser):', userData);
 
       const { data, error } = await supabase
         .from('users')
@@ -284,18 +304,21 @@ class SupabaseAuthService {
         console.error('❌ Erro ao criar usuário:', error);
         console.error('❌ Código do erro:', error.code);
         console.error('❌ Detalhes:', error.details, error.hint, error.message);
-        
-        // Se usuário já existe, tentar buscar rapidamente
+        // Se usuário já existe, atualizar para trial
         if (error.code === '23505') {
-          console.log('🔄 Usuário já existe, tentando buscar rapidamente...');
-          try {
-            const existingUser = await this.getAppUser(authUserId);
-            if (existingUser) return existingUser;
-          } catch (e) {
-            console.log('⚠️ Busca rápida falhou, usando emergência');
-          }
+          console.log('🔄 Usuário já existe, atualizando para trial...');
+          await supabase
+            .from('users')
+            .update({ plan_type: 'trial', trial_start: new Date().toISOString() })
+            .eq('id', authUserId);
+          // Buscar registro atualizado
+          const { data: updatedUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUserId)
+            .single();
+          return updatedUser as AppUser;
         }
-        
         // Fallback - retornar null
         console.log('❌ Criação falhou');
         return null;
@@ -340,6 +363,21 @@ class SupabaseAuthService {
         callback(null);
       }
     });
+  }
+
+  private async checkAndExpireTrial(user: AppUser): Promise<AppUser> {
+    if (user.plan_type === 'trial' && user.trial_start) {
+      const trialStart = new Date(user.trial_start);
+      const now = new Date();
+      const diffMs = now.getTime() - trialStart.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays >= 1) {
+        // Trial expirou, atualizar para sem plano
+        await supabase.from('users').update({ plan_type: null, trial_start: null }).eq('id', user.id);
+        return { ...user, plan_type: null, trial_start: null };
+      }
+    }
+    return user;
   }
 }
 

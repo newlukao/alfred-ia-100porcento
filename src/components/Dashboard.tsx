@@ -21,6 +21,7 @@ import SimpleExpenseTemplates from './SimpleExpenseTemplates';
 import PlanBasedDashboard from './PlanBasedDashboard';
 import MobileBottomNav from './MobileBottomNav';
 import { useDevice } from '@/hooks/use-device';
+import { isGold } from '../lib/utils';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -150,7 +151,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     // Buscar compromissos do dia
-    if (user.plan_type === 'ouro' && database.getAppointmentsByUser) {
+    if (isGold(user) && database.getAppointmentsByUser) {
       database.getAppointmentsByUser(user.id).then(userAppointments => {
         const today = new Date().toISOString().split('T')[0];
         const todayAppointments = userAppointments.filter(apt => apt.date === today);
@@ -175,7 +176,7 @@ const Dashboard: React.FC = () => {
       setExpenses(userExpenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       
       // Load incomes (for gold plan users)
-      if (user.plan_type === 'ouro' && database.getIncomesByUser) {
+      if (isGold(user) && database.getIncomesByUser) {
         const userIncomes = await database.getIncomesByUser(user.id);
         setIncomes(userIncomes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       }
@@ -354,7 +355,7 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    if (user.plan_type !== 'ouro') {
+    if (!isGold(user)) {
       toast({
         title: "Upgrade Necessário! 🥇",
         description: "Para registrar recebimentos, você precisa do Plano Ouro!",
@@ -628,6 +629,13 @@ const Dashboard: React.FC = () => {
     });
   };
 
+  function getPlanoLabel(plan_type) {
+    if (plan_type === 'ouro') return 'Ouro';
+    if (plan_type === 'bronze') return 'Bronze';
+    if (plan_type === 'trial') return 'Trial';
+    return 'Sem Plano';
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -723,9 +731,7 @@ const Dashboard: React.FC = () => {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">📊 Dashboard</h1>
         <p className="text-muted-foreground">
-          {user?.plan_type === 'ouro' 
-            ? 'Controle completo do seu fluxo de caixa' 
-            : 'Visão geral dos seus gastos'}
+          {isGold(user) ? 'Controle completo do seu fluxo de caixa' : 'Visão geral dos seus gastos'}
         </p>
         
         {/* Botão Ver Opções - Mobile */}
@@ -750,7 +756,7 @@ const Dashboard: React.FC = () => {
             <span className="text-lg font-bold mr-2">-</span>
             Saída
           </Button>
-          {user?.plan_type === 'ouro' && (
+          {isGold(user) && (
             <Button 
               onClick={() => setIsIncomeDialogOpen(true)} 
               variant="outline" 
@@ -796,7 +802,7 @@ const Dashboard: React.FC = () => {
             </Button>
             {/* Botões de ação principal apenas no desktop */}
             <div className="hidden md:flex gap-2">
-              {user?.plan_type === 'ouro' && (
+              {isGold(user) && (
                 <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
@@ -1063,7 +1069,7 @@ const Dashboard: React.FC = () => {
                 <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
             <TrendingUp className="h-4 w-4 text-green-600" />
                 </div>
-                {user?.plan_type !== 'ouro' && (
+                {isGold(user) && (
                   <div className="w-5 h-5 rounded-full bg-yellow-100 flex items-center justify-center">
                     <span className="text-xs">🔒</span>
                   </div>
@@ -1147,7 +1153,7 @@ const Dashboard: React.FC = () => {
                 <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                   <TrendingUp className="h-5 w-5 text-green-600" />
                 </div>
-            {user?.plan_type !== 'ouro' && (
+            {isGold(user) && (
                   <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
                     <span className="text-sm">🔒</span>
                   </div>
@@ -1161,7 +1167,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-green-600 opacity-80">
                   {filteredIncomes.length} registros
                 </p>
-                {user?.plan_type !== 'ouro' && (
+                {isGold(user) && (
                   <p className="text-xs text-yellow-600 mt-2">
                 🥇 Upgrade para Ouro para registrar
               </p>
@@ -1546,7 +1552,7 @@ const Dashboard: React.FC = () => {
     <TabsContent value="analytics" className="space-y-6">
       <AdvancedAnalytics 
         expenses={expenses} 
-        incomes={user?.plan_type === 'ouro' ? incomes : []} 
+        incomes={isGold(user) ? incomes : []} 
       />
     </TabsContent>
 

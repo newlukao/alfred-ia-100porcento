@@ -137,8 +137,9 @@ const LoginForm: React.FC = () => {
       <div className="w-full max-w-md space-y-6">
         {/* Logo/Header */}
         <div className="text-center">
+          <img src="/alfred-logo.png" alt="Logo Alfred IA" style={{ width: 90, height: 90, margin: '0 auto', borderRadius: '50%', background: 'white' }} />
           <h1 className="text-4xl font-bold financial-gradient bg-clip-text text-transparent mb-2">
-            💰 FinanceAI
+            Alfred IA
           </h1>
           <p className="text-muted-foreground">
             Seu assistente financeiro pessoal com inteligência artificial
@@ -156,7 +157,7 @@ const LoginForm: React.FC = () => {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="w-full">
                 <TabsTrigger value="login">Entrar</TabsTrigger>
-                {/* <TabsTrigger value="register">Registrar</TabsTrigger> */}
+                <TabsTrigger value="register">Registrar</TabsTrigger>
               </TabsList>
               
               <TabsContent value="login">
@@ -192,7 +193,6 @@ const LoginForm: React.FC = () => {
               </Button>
             </form>
               </TabsContent>
-              {/*
               <TabsContent value="register">
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -252,7 +252,6 @@ const LoginForm: React.FC = () => {
                   </Button>
                 </form>
               </TabsContent>
-              */}
             </Tabs>
 
             {/* Demo Alert - apenas na aba login */}

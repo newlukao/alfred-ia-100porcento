@@ -141,7 +141,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   ];
 
   // Adicionar calendário apenas para plano Gold
-  const navigationItems = user?.plan_type === 'ouro' 
+  const navigationItems = user?.plan_type === 'ouro' || user?.plan_type === 'trial' 
     ? [
         ...baseNavigationItems.slice(0, 3), // Chat, Dashboard, Análises
         { 
@@ -188,15 +188,16 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     return (
       <div className="flex flex-col h-screen bg-background overflow-hidden">
         {/* Mobile Header - Redesigned */}
-        <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border/50 shadow-sm">
+        <header
+          className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border/50 shadow-sm"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
           <div className="flex items-center justify-between h-16 px-6">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-base">AI</span>
-              </div>
+              <img src="/alfred-logo.png" alt="Logo Alfred IA" style={{ width: 40, height: 40, borderRadius: '50%', background: '#0a2233' }} />
               <div>
-                <h1 className="font-bold text-xl text-foreground">FinanceAI</h1>
+                <h1 className="font-bold text-xl text-foreground">Alfred IA</h1>
                 <p className="text-xs text-muted-foreground -mt-1">Assistente Financeiro</p>
               </div>
             </div>
@@ -247,11 +248,9 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                     {/* User Info */}
                     <div className="bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 p-4 text-white shrink-0">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                          <User className="h-5 w-5 text-white" />
-                        </div>
+                        <img src="/alfred-logo.png" alt="Logo Alfred IA" style={{ width: 40, height: 40, borderRadius: '50%', background: '#0a2233' }} />
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-base truncate">{user?.nome || 'Usuário'}</p>
+                          <p className="font-bold text-base truncate">Alfred IA</p>
                           <p className="text-white/80 text-xs truncate">{user?.email}</p>
                         </div>
                       </div>
@@ -378,14 +377,23 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 pt-16 pb-20 overflow-auto">
+        <main
+          className="flex-1 overflow-auto"
+          style={{
+            paddingTop: 'calc(4rem + env(safe-area-inset-top))',
+            paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))',
+          }}
+        >
           <div className="p-6 h-full">
             {children}
           </div>
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border shadow-lg">
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border shadow-lg"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
           <div className="flex items-center justify-center px-4 py-2">
             <div className="flex items-center justify-between w-full max-w-sm space-x-2">
               {navigationItems.map((item) => {
@@ -468,12 +476,23 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                   <div className="flex justify-center gap-2 mt-2">
                     <Badge 
-                      variant={user?.plan_type === 'ouro' ? 'default' : 'secondary'}
-                      className={user?.plan_type === 'ouro' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                      variant={user?.plan_type === 'trial' ? 'destructive' : user?.plan_type === 'ouro' ? 'default' : 'secondary'}
                     >
-                      {user?.plan_type === 'ouro' ? <Crown className="w-3 h-3 mr-1" /> : null}
-                      Plano {user?.plan_type === 'ouro' ? 'Ouro' : 'Bronze'}
+                      {`Plano ${getPlanoLabel(user?.plan_type)}`}
                     </Badge>
+                    {user?.plan_type === 'trial' && user?.trial_start && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {(() => {
+                          const trialStart = new Date(user.trial_start);
+                          const now = new Date();
+                          const diffMs = 24 * 60 * 60 * 1000 - (now.getTime() - trialStart.getTime());
+                          if (diffMs <= 0) return 'Trial expirado';
+                          const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                          const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                          return `Trial expira em: ${hours}h ${minutes}min`;
+                        })()}
+                      </span>
+                    )}
                     {user?.is_admin && (
                       <Badge variant="destructive">
                         <Shield className="w-3 h-3 mr-1" />
@@ -601,30 +620,37 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
           </DialogContent>
         </Dialog>
 
-        {/* Modal de escolha de plano */}
+        {/* Modal de bloqueio de plano */}
         <Dialog open={isPlanModalOpen}>
-          <DialogContent>
+          <DialogContent className="backdrop-blur-sm bg-black/60 border-none shadow-none flex flex-col items-center justify-center min-h-[40vh]">
             <DialogHeader>
-              <DialogTitle>Escolha seu Plano</DialogTitle>
+              <DialogTitle className="text-2xl font-bold text-white text-center">Você está sem plano!</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o plano" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bronze">Bronze</SelectItem>
-                  <SelectItem value="ouro">Ouro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleSavePlan} disabled={!selectedPlan}>
-                Salvar Plano
+            <p className="text-white text-center mb-4">Para acessar o FinanceAI, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
+            <DialogFooter className="w-full mt-4">
+              <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
+                Adquirir um Plano
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal especial de fim de trial */}
+        {!user?.plan_type && user?.trial_start && (
+          <Dialog open={true}>
+            <DialogContent className="backdrop-blur-sm bg-black/60 border-none shadow-none flex flex-col items-center justify-center min-h-[40vh]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold text-white text-center">Seu período de teste acabou!</DialogTitle>
+              </DialogHeader>
+              <p className="text-white text-center mb-4">O trial gratuito expirou. Adquira um plano para continuar usando o FinanceAI.</p>
+              <DialogFooter className="w-full mt-4">
+                <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
+                  Adquirir um Plano
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     );
   }
@@ -763,7 +789,7 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
       "💰 Controle de recebimentos", 
       "🤖 Alfred IA completo",
       "📈 Relatórios avançados",
-      "🎯 Metas e orçamentos",
+      "�� Metas e orçamentos",
       "📱 Acesso prioritário",
       "💾 Backup premium",
       "🏆 Conquistas exclusivas"
@@ -884,5 +910,12 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
     </div>
   );
 };
+
+function getPlanoLabel(plan_type) {
+  if (plan_type === 'ouro') return 'Ouro';
+  if (plan_type === 'bronze') return 'Bronze';
+  if (plan_type === 'trial') return 'Trial';
+  return 'Sem Plano';
+}
 
 export default ResponsiveLayout; 

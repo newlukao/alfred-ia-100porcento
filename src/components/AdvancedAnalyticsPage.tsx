@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { database, Expense, Income } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import AdvancedAnalytics from './AdvancedAnalytics';
+import { isGold } from '../lib/utils';
 
 const AdvancedAnalyticsPage: React.FC = () => {
   const { user } = useAuth();
@@ -74,7 +75,7 @@ const AdvancedAnalyticsPage: React.FC = () => {
   }
 
   // Verificar se usuário tem acesso (plano ouro para análises avançadas)
-  if (user?.plan_type !== 'ouro') {
+  if (!isGold(user)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <div className="text-6xl">🥇</div>

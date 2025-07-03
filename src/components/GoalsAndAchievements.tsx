@@ -16,13 +16,14 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { database, Goal, Achievement, UserStats, Expense } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { isGold } from '../lib/utils';
 
 const GoalsAndAchievements: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
   // 🥇 ACESSO EXCLUSIVO PLANO OURO
-  if (!user || user.plan_type !== 'ouro') {
+  if (!user || !isGold(user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50">
         <Card className="max-w-md mx-auto text-center border-2 border-yellow-300">

@@ -27,6 +27,7 @@ import {
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
+import { isGold } from '../lib/utils';
 
 interface PlanBasedDashboardProps {
   user: User;
@@ -120,7 +121,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
       setExpenses(userExpenses);
 
       // Load incomes (only for gold plan)
-      if (user.plan_type === 'ouro' && database.getIncomesByUser) {
+      if (isGold(user) && database.getIncomesByUser) {
         const userIncomes = await database.getIncomesByUser(user.id);
         setIncomes(userIncomes);
       }
@@ -441,6 +442,14 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   const totalIncomes = monthlyIncomes.reduce((sum, i) => sum + i.amount, 0);
   const balance = totalIncomes - totalExpenses;
 
+  // Adicionar função utilitária para exibir o nome do plano
+  function getPlanoLabel(plan_type: string) {
+    if (plan_type === 'ouro') return 'Ouro';
+    if (plan_type === 'bronze') return 'Bronze';
+    if (plan_type === 'trial') return 'Gold (Trial)';
+    return 'Sem Plano';
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -452,24 +461,24 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   return (
     <div className="space-y-6 min-h-full w-full">
       {/* Plan Header */}
-      <Card className={`border-2 ${user.plan_type === 'ouro' ? 'border-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50' : 'border-gray-300 bg-gray-50'}`}>
+      <Card className={`border-2 ${isGold(user) ? 'border-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50' : 'border-gray-300 bg-gray-50'}`}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {user.plan_type === 'ouro' ? (
+              {isGold(user) ? (
                 <Crown className="h-8 w-8 text-yellow-600" />
               ) : (
                 <Shield className="h-8 w-8 text-gray-600" />
               )}
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  Plano {user.plan_type === 'ouro' ? 'Ouro' : 'Bronze'}
-                  <Badge variant={user.plan_type === 'ouro' ? 'default' : 'secondary'} className={user.plan_type === 'ouro' ? 'bg-yellow-600' : ''}>
-                    {user.plan_type === 'ouro' ? 'Premium' : 'Básico'}
+                  Plano {isGold(user) ? 'Ouro' : 'Bronze'}
+                  <Badge variant={isGold(user) ? 'default' : 'secondary'} className={isGold(user) ? 'bg-yellow-600' : ''}>
+                    {isGold(user) ? 'Premium' : 'Básico'}
                   </Badge>
                 </CardTitle>
                 <CardDescription>
-                  {user.plan_type === 'ouro' 
+                  {isGold(user) 
                     ? 'Acesso completo a gastos e recebimentos' 
                     : 'Controle básico de gastos'
                   }
@@ -477,7 +486,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
               </div>
             </div>
             
-            {user.plan_type === 'bronze' && (
+            {!isGold(user) && (
               <Button onClick={() => setShowUpgrade(true)} className="bg-yellow-600 hover:bg-yellow-700">
                 <Crown className="h-4 w-4 mr-2" />
                 Upgrade para Ouro
@@ -509,7 +518,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
         </div>
 
         {/* Card Total de Entradas */}
-        {user.plan_type === 'ouro' ? (
+        {isGold(user) ? (
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-xl p-4 relative overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -540,18 +549,20 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-500">Entradas</p>
               <p className="text-2xl font-bold text-gray-500">
-                Plano Ouro
+                Plano {getPlanoLabel(user.plan_type)}
               </p>
-              <p className="text-sm text-gray-400 opacity-80">
-                Upgrade necessário
-              </p>
+              {!isGold(user) && (
+                <p className="text-sm text-gray-400 opacity-80">
+                  Upgrade necessário
+                </p>
+              )}
             </div>
             <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-gray-200 rounded-full opacity-20"></div>
           </div>
         )}
 
         {/* Card Saldo Líquido */}
-        {user.plan_type === 'ouro' ? (
+        {isGold(user) ? (
           <div className={`bg-gradient-to-br ${balance >= 0 ? 'from-blue-50 to-indigo-50 border-blue-100' : 'from-orange-50 to-amber-50 border-orange-100'} border rounded-xl p-4 relative overflow-hidden`}>
             <div className="flex items-center justify-between mb-3">
               <div className={`w-10 h-10 rounded-lg ${balance >= 0 ? 'bg-blue-100' : 'bg-orange-100'} flex items-center justify-center`}>
@@ -582,11 +593,13 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-500">Saldo</p>
               <p className="text-2xl font-bold text-gray-500">
-                Plano Ouro
+                Plano {getPlanoLabel(user.plan_type)}
               </p>
-              <p className="text-sm text-gray-400 opacity-80">
-                Upgrade necessário
-              </p>
+              {!isGold(user) && (
+                <p className="text-sm text-gray-400 opacity-80">
+                  Upgrade necessário
+                </p>
+              )}
             </div>
             <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-gray-200 rounded-full opacity-20"></div>
           </div>
@@ -630,7 +643,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                 <span className="text-lg font-bold mr-2">-</span>
                 Saída
               </Button>
-              {user.plan_type === 'ouro' && (
+              {isGold(user) && (
                 <Button onClick={() => setShowIncomeForm(true)} variant="outline" size="sm" className="text-green-600 border-green-300 hover:bg-green-50 w-full sm:w-auto">
                   <span className="text-lg font-bold mr-2">+</span>
                   Entrada
@@ -643,7 +656,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
           </div>
         </CardHeader>
         
-        {showIncomeForm && user.plan_type === 'ouro' && (
+        {showIncomeForm && isGold(user) && (
           <CardContent className="border-t">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -829,7 +842,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                 date: expense.data,
                 created_at: expense.created_at
               })),
-              ...(user.plan_type === 'ouro' ? incomes.map(income => ({
+              ...(isGold(user) ? incomes.map(income => ({
                 id: income.id,
                 type: 'income' as const,
                 description: income.description,
@@ -863,7 +876,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
               return (
                 <p className="text-gray-500 text-center py-4">
                   Nenhuma transação encontrada. Use os botões acima para cadastrar diretamente
-                  {user.plan_type === 'ouro' ? ' ou converse com o Alfred IA!' : ' ou use o Alfred IA!'}
+                  {isGold(user) ? ' ou converse com o Alfred IA!' : ' ou use o Alfred IA!'}
                 </p>
               );
             }
@@ -937,7 +950,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                               </AlertDialog>
                             </>
                           ) : (
-                            user.plan_type === 'ouro' && (
+                            isGold(user) && (
                               <>
                                 <button
                                   onClick={() => handleEditIncome(transaction)}
