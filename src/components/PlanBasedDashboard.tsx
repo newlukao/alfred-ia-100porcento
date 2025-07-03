@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { useToast } from '../hooks/use-toast';
-import { database } from '../lib/database';
-import { User, Expense, Income } from '../lib/database';
+import { supabaseDatabase } from '../lib/supabase-database';
+import { User, Expense, Income } from '../lib/supabase-database';
 import { 
   Crown, 
   Shield, 
@@ -117,12 +117,12 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
       setLoading(true);
       
       // Load expenses (available for all plans)
-      const userExpenses = await database.getExpensesByUser(user.id);
+      const userExpenses = await supabaseDatabase.getExpensesByUser(user.id);
       setExpenses(userExpenses);
 
       // Load incomes (only for gold plan)
-      if (isGold(user) && database.getIncomesByUser) {
-        const userIncomes = await database.getIncomesByUser(user.id);
+      if (isGold(user) && supabaseDatabase.getIncomesByUser) {
+        const userIncomes = await supabaseDatabase.getIncomesByUser(user.id);
         setIncomes(userIncomes);
       }
     } catch (error) {
@@ -162,7 +162,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleUpdateExpense = async () => {
-    if (!database.updateExpense || !editingExpense) {
+    if (!supabaseDatabase.updateExpense || !editingExpense) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -172,7 +172,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      const updatedExpense = await database.updateExpense(editingExpense.id, {
+      const updatedExpense = await supabaseDatabase.updateExpense(editingExpense.id, {
         descricao: editExpense.descricao,
         valor: parseFloat(editExpense.valor),
         categoria: editExpense.categoria,
@@ -200,7 +200,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    if (!database.deleteExpense) {
+    if (!supabaseDatabase.deleteExpense) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -210,7 +210,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      await database.deleteExpense(expenseId);
+      await supabaseDatabase.deleteExpense(expenseId);
       setExpenses(expenses.filter(e => e.id !== expenseId));
       
       toast({
@@ -241,7 +241,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleUpdateIncome = async () => {
-    if (!database.updateIncome || !editingIncome) {
+    if (!supabaseDatabase.updateIncome || !editingIncome) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -251,7 +251,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      const updatedIncome = await database.updateIncome(editingIncome.id, {
+      const updatedIncome = await supabaseDatabase.updateIncome(editingIncome.id, {
         description: editIncome.description,
         amount: parseFloat(editIncome.amount),
         category: editIncome.category,
@@ -280,7 +280,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleDeleteIncome = async (incomeId: string) => {
-    if (!database.deleteIncome) {
+    if (!supabaseDatabase.deleteIncome) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -290,7 +290,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      await database.deleteIncome(incomeId);
+      await supabaseDatabase.deleteIncome(incomeId);
       setIncomes(incomes.filter(i => i.id !== incomeId));
       
       toast({
@@ -308,7 +308,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleAddIncome = async () => {
-    if (!database.addIncome) {
+    if (!supabaseDatabase.addIncome) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -318,7 +318,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      const newIncome = await database.addIncome({
+      const newIncome = await supabaseDatabase.addIncome({
         user_id: user.id,
         description: incomeForm.description,
         amount: parseFloat(incomeForm.amount),
@@ -354,7 +354,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleAddExpense = async () => {
-    if (!database.addExpense) {
+    if (!supabaseDatabase.addExpense) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -364,7 +364,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      const newExpense = await database.addExpense({
+      const newExpense = await supabaseDatabase.addExpense({
         usuario_id: user.id,
         descricao: expenseForm.descricao,
         valor: parseFloat(expenseForm.valor),
@@ -403,7 +403,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   };
 
   const handleUpgradePlan = async () => {
-    if (!database.updateUserPlan) {
+    if (!supabaseDatabase.updateUserPlan) {
       toast({
         title: "Erro",
         description: "Funcionalidade não disponível",
@@ -413,7 +413,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     }
 
     try {
-      const updatedUser = await database.updateUserPlan(user.id, 'ouro');
+      const updatedUser = await supabaseDatabase.updateUserPlan(user.id, 'ouro');
       if (updatedUser) {
         // Force page reload to update user context
         window.location.reload();

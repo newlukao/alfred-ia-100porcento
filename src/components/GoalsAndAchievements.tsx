@@ -14,7 +14,7 @@ import {
   Flame, Crown, Award, CheckCircle, Clock, Zap 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { database, Goal, Achievement, UserStats, Expense } from '@/lib/database';
+import { supabaseDatabase, Goal, Achievement, UserStats, Expense } from '@/lib/supabase-database';
 import { useToast } from '@/hooks/use-toast';
 import { isGold } from '../lib/utils';
 
@@ -119,7 +119,7 @@ const GoalsAndAchievements: React.FC = () => {
     setIsLoading(true);
     try {
       // Carregar dados básicos
-      const userExpenses = await database.getExpensesByUser(user.id);
+      const userExpenses = await supabaseDatabase.getExpensesByUser(user.id);
       setExpenses(userExpenses);
 
       // Simular dados para demonstração (já que nem todos os métodos estão implementados no Supabase)
@@ -369,7 +369,7 @@ const GoalsAndAchievements: React.FC = () => {
   ) => {
     // Check for "primeiro_gasto"
     if (userExpenses.length >= 1 && !userAchievements.find(a => a.tipo === 'primeiro_gasto' && a.desbloqueado)) {
-      const achievement = await database.unlockAchievement(userId, 'primeiro_gasto');
+      const achievement = await supabaseDatabase.unlockAchievement(userId, 'primeiro_gasto');
       if (achievement) {
         toast({
           title: "🎉 Conquista Desbloqueada!",
@@ -379,9 +379,9 @@ const GoalsAndAchievements: React.FC = () => {
     }
 
     // Check for "sequencia_7_dias"
-    const streak = await database.checkAndUpdateStreak(userId);
+    const streak = await supabaseDatabase.checkAndUpdateStreak(userId);
     if (streak >= 7 && !userAchievements.find(a => a.tipo === 'sequencia_7_dias' && a.desbloqueado)) {
-      const achievement = await database.unlockAchievement(userId, 'sequencia_7_dias');
+      const achievement = await supabaseDatabase.unlockAchievement(userId, 'sequencia_7_dias');
       if (achievement) {
         toast({
           title: "🔥 Conquista Desbloqueada!",
@@ -393,7 +393,7 @@ const GoalsAndAchievements: React.FC = () => {
     // Check for "economista"
     const completedGoals = userGoals.filter(g => g.status === 'concluida');
     if (completedGoals.length >= 1 && !userAchievements.find(a => a.tipo === 'economista' && a.desbloqueado)) {
-      const achievement = await database.unlockAchievement(userId, 'economista');
+      const achievement = await supabaseDatabase.unlockAchievement(userId, 'economista');
       if (achievement) {
         toast({
           title: "💰 Conquista Desbloqueada!",
@@ -404,7 +404,7 @@ const GoalsAndAchievements: React.FC = () => {
 
     // Check for "mestre_economia"
     if (completedGoals.length >= 5 && !userAchievements.find(a => a.tipo === 'mestre_economia' && a.desbloqueado)) {
-      const achievement = await database.unlockAchievement(userId, 'mestre_economia');
+      const achievement = await supabaseDatabase.unlockAchievement(userId, 'mestre_economia');
       if (achievement) {
         toast({
           title: "👑 Conquista Desbloqueada!",
@@ -414,10 +414,10 @@ const GoalsAndAchievements: React.FC = () => {
     }
 
     // Reload achievements after checking
-    const updatedAchievements = await database.getUserAchievements(userId);
+    const updatedAchievements = await supabaseDatabase.getUserAchievements(userId);
     setAchievements(updatedAchievements);
     
-    const updatedStats = await database.getUserStats(userId);
+    const updatedStats = await supabaseDatabase.getUserStats(userId);
     setUserStats(updatedStats);
   };
 
@@ -538,17 +538,17 @@ const GoalsAndAchievements: React.FC = () => {
     const newStatus = percentage >= 100 ? 'concluida' : 'ativa';
 
     if (newStatus !== goal.status) {
-      await database.updateGoal(goal.id, { valor_atual: valorAtual, status: newStatus });
+      await supabaseDatabase.updateGoal(goal.id, { valor_atual: valorAtual, status: newStatus });
       
       if (newStatus === 'concluida') {
-        await database.updateUserStats(user.id, { metas_concluidas: 1, pontos_totais: 50 });
+        await supabaseDatabase.updateUserStats(user.id, { metas_concluidas: 1, pontos_totais: 50 });
         toast({
           title: "🎉 Meta Concluída!",
           description: `Parabéns! Você completou: ${goal.titulo}`,
         });
       }
     } else {
-      await database.updateGoal(goal.id, { valor_atual: valorAtual });
+      await supabaseDatabase.updateGoal(goal.id, { valor_atual: valorAtual });
     }
   };
 

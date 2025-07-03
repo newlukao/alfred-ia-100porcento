@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Expense, Income, NotificationSettings, NotificationHistory, Appointment } from './database';
+import { User, Expense, Income, NotificationSettings, NotificationHistory, Appointment, Goal, Achievement, UserStats } from './database';
 
 // 🔥 Função auxiliar para data brasileira em formato string
 function getBrazilDateString(): string {
@@ -202,7 +202,7 @@ export class SupabaseDatabase {
       
       // First check if user has gold plan
       const user = await this.getUserById(userId);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         console.log('🚫 Usuário não tem plano ouro, retornando array vazio');
         return [];
       }
@@ -229,7 +229,7 @@ export class SupabaseDatabase {
       
       // Check if user has gold plan
       const user = await this.getUserById(income.user_id);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         console.log('🚫 Usuário não tem plano ouro, recebimento negado');
         return null;
       }
@@ -291,7 +291,7 @@ export class SupabaseDatabase {
       
       // First check if user has gold plan
       const user = await this.getUserById(userId);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         console.log('🚫 Usuário não tem plano ouro, retornando array vazio');
         return [];
       }
@@ -319,7 +319,7 @@ export class SupabaseDatabase {
       
       // Check if user has gold plan
       const user = await this.getUserById(appointment.user_id);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         console.log('🚫 Usuário não tem plano ouro, compromisso negado');
         return null;
       }
@@ -374,7 +374,7 @@ export class SupabaseDatabase {
   async getAppointmentsByDate(userId: string, date: string): Promise<Appointment[]> {
     try {
       const user = await this.getUserById(userId);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         return [];
       }
 
@@ -396,7 +396,7 @@ export class SupabaseDatabase {
   async getUpcomingAppointments(userId: string, days: number = 7): Promise<Appointment[]> {
     try {
       const user = await this.getUserById(userId);
-      if (!user || user.plan_type !== 'ouro') {
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
         return [];
       }
 
@@ -517,7 +517,8 @@ export class SupabaseDatabase {
       push_enabled: true,
       email_enabled: false,
       quiet_hours_start: '22:00',
-      quiet_hours_end: '08:00'
+      quiet_hours_end: '08:00',
+      appointment_alerts: false
     };
 
     try {

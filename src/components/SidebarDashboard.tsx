@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { database, Expense, Income } from '@/lib/database';
+import { supabaseDatabase, Expense, Income } from '@/lib/supabase-database';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -94,26 +94,26 @@ const SidebarDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       // Load expenses
-      const userExpenses = await database.getExpensesByUser(user.id);
+      const userExpenses = await supabaseDatabase.getExpensesByUser(user.id);
       setExpenses(userExpenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       
       // Load incomes (for gold plan users)
-      if (user?.plan_type === 'ouro' && database.getIncomesByUser) {
-        const userIncomes = await database.getIncomesByUser(user.id);
+      if ((user?.plan_type === 'ouro' || user?.plan_type === 'trial') && supabaseDatabase.getIncomesByUser) {
+        const userIncomes = await supabaseDatabase.getIncomesByUser(user.id);
         setIncomes(userIncomes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       }
       
       // 🔥 NOVO: Carregar compromissos do dia (apenas para plano ouro)
-      if (user?.plan_type === 'ouro' && database.getAppointmentsByUser) {
-        const userAppointments = await database.getAppointmentsByUser(user.id);
+      if ((user?.plan_type === 'ouro' || user?.plan_type === 'trial') && supabaseDatabase.getAppointmentsByUser) {
+        const userAppointments = await supabaseDatabase.getAppointmentsByUser(user.id);
         const today = new Date().toISOString().split('T')[0];
         const todayAppointments = userAppointments.filter(apt => apt.date === today);
         setTodayAppointmentsCount(todayAppointments.length);
       }
       
       // 🔥 NOVO: Carregar notificações não lidas
-      if (database.getUnreadNotificationCount) {
-        const unreadCount = await database.getUnreadNotificationCount(user.id);
+      if (supabaseDatabase.getUnreadNotificationCount) {
+        const unreadCount = await supabaseDatabase.getUnreadNotificationCount(user.id);
         setUnreadNotificationsCount(unreadCount);
       }
     } catch (error) {
@@ -130,7 +130,7 @@ const SidebarDashboard: React.FC = () => {
 
   const handleSavePlan = async () => {
     if (selectedPlan !== 'bronze' && selectedPlan !== 'ouro') return;
-    await database.updateUserPlan(user.id, selectedPlan as 'bronze' | 'ouro');
+    await supabaseDatabase.updateUserPlan(user.id, selectedPlan as 'bronze' | 'ouro');
     setIsPlanModalOpen(false);
     window.location.reload();
   };

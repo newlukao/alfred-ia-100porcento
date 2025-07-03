@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/hooks/use-device';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useToast } from '@/hooks/use-toast';
-import { database } from '../lib/database';
+import { supabaseDatabase } from '../lib/supabase-database';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ResponsiveLayoutProps {
@@ -85,15 +85,15 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     const loadBadges = async () => {
       if (!user) return;
       // Compromissos do dia (apenas para plano ouro)
-      if (user.plan_type === 'ouro' && database.getAppointmentsByUser) {
-        const userAppointments = await database.getAppointmentsByUser(user.id);
+      if ((user.plan_type === 'ouro' || user.plan_type === 'trial') && supabaseDatabase.getAppointmentsByUser) {
+        const userAppointments = await supabaseDatabase.getAppointmentsByUser(user.id);
         const today = new Date().toISOString().split('T')[0];
         const todayAppointments = userAppointments.filter(apt => apt.date === today);
         setTodayAppointmentsCount(todayAppointments.length);
       }
       // Notificações não lidas
-      if (database.getUnreadNotificationCount) {
-        const unreadCount = await database.getUnreadNotificationCount(user.id);
+      if (supabaseDatabase.getUnreadNotificationCount) {
+        const unreadCount = await supabaseDatabase.getUnreadNotificationCount(user.id);
         setUnreadNotificationsCount(unreadCount);
       }
     };
@@ -110,7 +110,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
 
   const handleSavePlan = async () => {
     if (selectedPlan !== 'bronze' && selectedPlan !== 'ouro') return;
-    await database.updateUserPlan(user.id, selectedPlan as 'bronze' | 'ouro');
+    await supabaseDatabase.updateUserPlan(user.id, selectedPlan as 'bronze' | 'ouro');
     setIsPlanModalOpen(false);
     window.location.reload();
   };

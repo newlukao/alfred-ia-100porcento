@@ -12,7 +12,7 @@ import {
   Clock, Check, X, Trash2, Lock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { database, NotificationSettings, NotificationHistory } from '@/lib/database';
+import { supabaseDatabase, NotificationSettings, NotificationHistory } from '@/lib/supabase-database';
 import { notificationService } from '@/lib/notifications';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -40,9 +40,9 @@ const NotificationCenter: React.FC = () => {
     setIsLoading(true);
     try {
       const [userSettings, userHistory, count] = await Promise.all([
-        database.getNotificationSettings(user.id),
-        database.getNotificationHistory(user.id),
-        database.getUnreadNotificationCount(user.id)
+        supabaseDatabase.getNotificationSettings(user.id),
+        supabaseDatabase.getNotificationHistory(user.id),
+        supabaseDatabase.getUnreadNotificationCount(user.id)
       ]);
 
       setSettings(userSettings);
@@ -69,7 +69,7 @@ const NotificationCenter: React.FC = () => {
     if (!user || !settings) return;
 
     try {
-      const updatedSettings = await database.updateNotificationSettings(user.id, {
+      const updatedSettings = await supabaseDatabase.updateNotificationSettings(user.id, {
         [key]: value
       });
 
@@ -91,7 +91,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await database.markNotificationAsRead(id);
+      await supabaseDatabase.markNotificationAsRead(id);
       setHistory(prev => prev.map(n => 
         n.id === id ? { ...n, lida: true, data_leitura: new Date().toISOString() } : n
       ));
@@ -103,7 +103,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const promises = history.filter(n => !n.lida).map(n => database.markNotificationAsRead(n.id));
+      const promises = history.filter(n => !n.lida).map(n => supabaseDatabase.markNotificationAsRead(n.id));
       await Promise.all(promises);
       
       setHistory(prev => prev.map(n => ({ 
@@ -139,7 +139,7 @@ const NotificationCenter: React.FC = () => {
 
     // Add to history
     if (user) {
-      await database.addNotificationHistory({
+      await supabaseDatabase.addNotificationHistory({
         usuario_id: user.id,
         tipo: 'daily_reminder',
         titulo: '🧪 Teste de Notificação',

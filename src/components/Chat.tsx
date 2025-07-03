@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Send, Bot, User, Loader2, AlertTriangle, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenAIService } from '@/lib/openai';
-import { database } from '@/lib/database';
+import { supabaseDatabase } from '@/lib/supabase-database';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar } from '@/components/ui/calendar';
 
@@ -59,13 +59,13 @@ const Chat: React.FC = () => {
     if (!user) return;
     
     try {
-      const history = await database.getConversationHistory(user.id, 20);
+      const history = await supabaseDatabase.getConversationHistory(user.id, 20);
       
       if (history.length === 0) {
         // First time user - show welcome message based on plan
         let welcomeMessage: Message;
         
-        if (user.plan_type === 'ouro') {
+        if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
           welcomeMessage = {
             id: '1',
             type: 'assistant',
@@ -98,7 +98,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         setMessages([welcomeMessage]);
         
         // Save welcome message to history
-        await database.addConversationMessage(user.id, 'assistant', welcomeMessage.content);
+        await supabaseDatabase.addConversationMessage(user.id, 'assistant', welcomeMessage.content);
       } else {
         // Load existing conversation but ALWAYS show options after the last message
         const loadedMessages: Message[] = history.map(h => ({
@@ -114,7 +114,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         
         if (needsOptions) {
           let optionsMessage: Message;
-          if (user.plan_type === 'ouro') {
+          if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
             optionsMessage = {
               id: Date.now().toString(),
               type: 'assistant',
@@ -163,7 +163,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         return;
       }
       
-      const config = await database.getConfiguration();
+      const config = await supabaseDatabase.getConfiguration();
       console.log('🔧 Chat - Configuração recebida:', config);
       console.log('🔑 Chat - API Key:', config.openai_api_key ? `${config.openai_api_key.substring(0, 10)}...` : 'VAZIA');
       
@@ -202,7 +202,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
   const createCompletionMessage = (): Message => {
     console.log('🎉 Creating completion message for plan type:', user?.plan_type);
     
-    if (user?.plan_type === 'ouro') {
+    if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
       const message = createOptionsMessage(
         '🎉 Perfeito! Registrado com sucesso!\n\nPosso te ajudar com mais alguma coisa?',
         MAIN_MENU_OPTIONS
@@ -232,7 +232,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         if (option === 'report_today') {
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const todayExpenses = expenses.filter(e => e.data === todayStr);
           const total = todayExpenses.reduce((sum, e) => sum + e.valor, 0);
           if (todayExpenses.length === 0) {
@@ -250,7 +250,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
           firstDay.setDate(now.getDate() - now.getDay());
           const lastDay = new Date(firstDay);
           lastDay.setDate(firstDay.getDate() + 6);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const weekExpenses = expenses.filter(e => {
             const d = new Date(e.data);
             return d >= firstDay && d <= lastDay;
@@ -268,7 +268,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         } else if (option === 'report_month') {
           const now = new Date();
           const monthStr = now.toISOString().slice(0, 7);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
           const total = monthExpenses.reduce((sum, e) => sum + e.valor, 0);
           if (monthExpenses.length === 0) {
@@ -283,7 +283,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         } else if (option === 'report_category') {
           const now = new Date();
           const monthStr = now.toISOString().slice(0, 7);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
           const byCategory: Record<string, { total: number, items: { valor: number, descricao: string, data: string }[] }> = {};
           monthExpenses.forEach(e => {
@@ -312,7 +312,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         if (option === 'appointments_today') {
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
-          const appointments = await database.getAppointmentsByDate(user!.id, todayStr);
+          const appointments = await supabaseDatabase.getAppointmentsByDate(user!.id, todayStr);
           if (appointments.length === 0) {
             reportText = 'Você não tem compromissos para hoje.';
           } else {
@@ -329,7 +329,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
           const lastDay = new Date(firstDay);
           lastDay.setDate(firstDay.getDate() + 6); // Sábado
           // Buscar todos os compromissos do usuário
-          const allAppointments = await database.getAppointmentsByUser(user!.id);
+          const allAppointments = await supabaseDatabase.getAppointmentsByUser(user!.id);
           // Filtrar compromissos da semana
           const weekAppointments = allAppointments.filter(a => {
             const d = new Date(a.date);
@@ -348,7 +348,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
           // Compromissos do mês
           const now = new Date();
           const monthStr = now.toISOString().slice(0, 7); // YYYY-MM
-          const allAppointments = await database.getAppointmentsByUser(user!.id);
+          const allAppointments = await supabaseDatabase.getAppointmentsByUser(user!.id);
           const monthAppointments = allAppointments.filter(a => a.date.startsWith(monthStr));
           if (monthAppointments.length === 0) {
             reportText = 'Você não tem compromissos para este mês.';
@@ -369,7 +369,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, reportMsg]);
-      await database.addConversationMessage(user!.id, 'assistant', reportMsg.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', reportMsg.content);
       // Pergunta contextual
       let followupMsg: Message;
       if (followupType === 'gastos') {
@@ -395,7 +395,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         };
       }
       setMessages(prev => [...prev, followupMsg]);
-      await database.addConversationMessage(user!.id, 'assistant', followupMsg.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', followupMsg.content);
       setAwaitingReportFollowup(followupType);
       return;
     }
@@ -416,7 +416,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
         reportOptions
       );
       setMessages(prev => [...prev, reportMenu]);
-      await database.addConversationMessage(user!.id, 'assistant', reportMenu.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', reportMenu.content);
       setAwaitingReportFollowup('gastos');
       return;
     }
@@ -440,7 +440,7 @@ Posso te ajudar a controlar seus gastos! O que você quer fazer?`,
     };
     
     setMessages(prev => [...prev, userMessage]);
-    await database.addConversationMessage(user!.id, 'user', userMessage.content);
+    await supabaseDatabase.addConversationMessage(user!.id, 'user', userMessage.content);
     
     let responseMessage: Message;
     
@@ -511,7 +511,7 @@ Me conta seu compromisso:`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, responseMessage]);
-      await database.addConversationMessage(user!.id, 'assistant', responseMessage.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', responseMessage.content);
       // Exibir menu principal após finalizar
       if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
         const mainMenu = createOptionsMessage(
@@ -519,7 +519,7 @@ Me conta seu compromisso:`,
           MAIN_MENU_OPTIONS
         );
         setMessages(prev => [...prev, mainMenu]);
-        await database.addConversationMessage(user.id, 'assistant', mainMenu.content);
+        await supabaseDatabase.addConversationMessage(user.id, 'assistant', mainMenu.content);
       }
       return;
     } else {
@@ -542,7 +542,7 @@ Me conta seu compromisso:`,
     }
     
     setMessages(prev => [...prev, responseMessage]);
-    await database.addConversationMessage(user!.id, 'assistant', responseMessage.content);
+    await supabaseDatabase.addConversationMessage(user!.id, 'assistant', responseMessage.content);
 
     // Relatórios
     if (option.startsWith('report_') || option.startsWith('appointments_')) {
@@ -554,7 +554,7 @@ Me conta seu compromisso:`,
         if (option === 'report_today') {
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const todayExpenses = expenses.filter(e => e.data === todayStr);
           const total = todayExpenses.reduce((sum, e) => sum + e.valor, 0);
           if (todayExpenses.length === 0) {
@@ -572,7 +572,7 @@ Me conta seu compromisso:`,
           firstDay.setDate(now.getDate() - now.getDay());
           const lastDay = new Date(firstDay);
           lastDay.setDate(firstDay.getDate() + 6);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const weekExpenses = expenses.filter(e => {
             const d = new Date(e.data);
             return d >= firstDay && d <= lastDay;
@@ -590,7 +590,7 @@ Me conta seu compromisso:`,
         } else if (option === 'report_month') {
           const now = new Date();
           const monthStr = now.toISOString().slice(0, 7);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
           const total = monthExpenses.reduce((sum, e) => sum + e.valor, 0);
           if (monthExpenses.length === 0) {
@@ -605,7 +605,7 @@ Me conta seu compromisso:`,
         } else if (option === 'report_category') {
           const now = new Date();
           const monthStr = now.toISOString().slice(0, 7);
-          const expenses = await database.getExpensesByUser(user!.id);
+          const expenses = await supabaseDatabase.getExpensesByUser(user!.id);
           const monthExpenses = expenses.filter(e => e.data.startsWith(monthStr));
           const byCategory: Record<string, { total: number, items: { valor: number, descricao: string, data: string }[] }> = {};
           monthExpenses.forEach(e => {
@@ -632,7 +632,7 @@ Me conta seu compromisso:`,
         // Compromissos
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
-        const appointments = await database.getAppointmentsByDate(user!.id, todayStr);
+        const appointments = await supabaseDatabase.getAppointmentsByDate(user!.id, todayStr);
         if (appointments.length === 0) {
           reportText = 'Você não tem compromissos para hoje.';
         } else {
@@ -650,7 +650,7 @@ Me conta seu compromisso:`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, reportMsg]);
-      await database.addConversationMessage(user!.id, 'assistant', reportMsg.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', reportMsg.content);
       // Pergunta contextual
       let followupMsg: Message;
       if (followupType === 'gastos') {
@@ -676,7 +676,7 @@ Me conta seu compromisso:`,
         };
       }
       setMessages(prev => [...prev, followupMsg]);
-      await database.addConversationMessage(user!.id, 'assistant', followupMsg.content);
+      await supabaseDatabase.addConversationMessage(user!.id, 'assistant', followupMsg.content);
       setAwaitingReportFollowup(followupType);
       return;
     }
@@ -705,7 +705,7 @@ Me conta seu compromisso:`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, userMessage]);
-      await database.addConversationMessage(user.id, 'user', valueToSend);
+      await supabaseDatabase.addConversationMessage(user.id, 'user', valueToSend);
       setAwaitingReportFollowup(null);
       setInputValue('');
       if (user?.plan_type === 'ouro' || user?.plan_type === 'trial') {
@@ -714,7 +714,7 @@ Me conta seu compromisso:`,
           MAIN_MENU_OPTIONS
         );
         setMessages(prev => [...prev, mainMenu]);
-        await database.addConversationMessage(user.id, 'assistant', mainMenu.content);
+        await supabaseDatabase.addConversationMessage(user.id, 'assistant', mainMenu.content);
       }
       return;
     }
@@ -730,16 +730,16 @@ Me conta seu compromisso:`,
 
     setMessages(prev => [...prev, userMessage]);
     
-    await database.addConversationMessage(user.id, 'user', valueToSend);
+    await supabaseDatabase.addConversationMessage(user.id, 'user', valueToSend);
     
     if (!customValue) setInputValue('');
     
     setIsLoading(true);
 
     try {
-      const config = await database.getConfiguration();
+      const config = await supabaseDatabase.getConfiguration();
       
-      const userPersonality = await database.getUserPersonality(user.id);
+      const userPersonality = await supabaseDatabase.getUserPersonality(user.id);
       
       console.log('🚀 Processando com sistema otimizado');
       
@@ -797,10 +797,10 @@ Me conta seu compromisso:`,
 
       setMessages(prev => [...prev, finalAssistantMessage]);
       
-      await database.addConversationMessage(user.id, 'assistant', result.response);
+      await supabaseDatabase.addConversationMessage(user.id, 'assistant', result.response);
       
       if (result.personalityUpdate && result.personalityUpdate.trim().length > 0) {
-        await database.updateUserPersonality(user.id, result.personalityUpdate);
+        await supabaseDatabase.updateUserPersonality(user.id, result.personalityUpdate);
         console.log('Personality updated:', result.personalityUpdate);
       }
 
@@ -837,7 +837,7 @@ Me conta seu compromisso:`,
           // Só salvar se for usuário Gold (tem acesso ao calendário)
           if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
             try {
-              const savedAppointment = await database.addAppointment({
+              const savedAppointment = await supabaseDatabase.addAppointment({
                 user_id: user.id,
                 title: appointmentResult.extraction.titulo,
                 description: appointmentResult.extraction.descricao,
@@ -881,14 +881,14 @@ Me conta seu compromisso:`,
                 };
                 
                 setMessages(prev => [...prev, funMessage]);
-                database.addConversationMessage(user.id, 'assistant', randomMessage);
+                supabaseDatabase.addConversationMessage(user.id, 'assistant', randomMessage);
                 
                 // Completion message com delay
                 setTimeout(() => {
                   const completionMessage = createCompletionMessage();
                   setMessages(prev => [...prev, completionMessage]);
                   // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
-                  // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                  // supabaseDatabase.addConversationMessage(user.id, 'assistant', completionMessage.content);
                 }, 1500);
               }, 1000);
               
@@ -917,7 +917,7 @@ Me conta seu compromisso:`,
         // Só salvar se for usuário Gold (tem acesso ao calendário)
         if (user.plan_type === 'ouro' || user.plan_type === 'trial') {
           try {
-            const savedAppointment = await database.addAppointment({
+            const savedAppointment = await supabaseDatabase.addAppointment({
               user_id: user.id,
               title: result.extraction.titulo,
               description: result.extraction.descricao,
@@ -961,14 +961,14 @@ Me conta seu compromisso:`,
                 };
                 
                 setMessages(prev => [...prev, funMessage]);
-                database.addConversationMessage(user.id, 'assistant', randomMessage);
+                supabaseDatabase.addConversationMessage(user.id, 'assistant', randomMessage);
                 
                 // Completion message com delay
                 setTimeout(() => {
                   const completionMessage = createCompletionMessage();
                   setMessages(prev => [...prev, completionMessage]);
                   // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
-                  // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                  // supabaseDatabase.addConversationMessage(user.id, 'assistant', completionMessage.content);
                 }, 1500);
               }, 1000);
             
@@ -991,101 +991,13 @@ Me conta seu compromisso:`,
         console.log('💰 Chat - Descrição:', result.extraction?.descricao);
         // 🔥 USAR NOVO CAMPO TYPE da extração
         const isIncome = result.extraction.type === 'income';
+        const isExpense = result.extraction.type === 'expense';
         console.log('💰 Chat - isIncome:', isIncome);
+        console.log('💰 Chat - isExpense:', isExpense);
         console.log('💰 Chat - user.plan_type:', user.plan_type);
-        console.log('💰 Chat - database.addIncome exists:', !!database.addIncome);
+        console.log('💰 Chat - supabaseDatabase.addIncome exists:', !!supabaseDatabase.addIncome);
         
-        if (isIncome && user.plan_type === 'ouro' || user.plan_type === 'trial' && database.addIncome) {
-          console.log('💎 Chat - ENTRANDO na condição de recebimento para usuário OURO');
-          // Save as income for gold plan users
-          console.log('💎 Chat - Salvando recebimento no banco (Plano Ouro):', {
-            user_id: user.id,
-            amount: result.extraction?.valor,
-            category: result.extraction?.categoria,
-            description: result.extraction?.descricao,
-            date: result.extraction?.data
-          });
-          
-          try {
-              console.log('💎 Chat - TENTANDO salvar recebimento...');
-            const savedIncome = await database.addIncome({
-              user_id: user.id,
-              amount: result.extraction.valor,
-              category: result.extraction.categoria,
-              description: result.extraction.descricao,
-              date: result.extraction.data,
-              tags: []
-            });
-            console.log('✅ Chat - Recebimento salvo com sucesso:', savedIncome);
-            
-            const incomeSuccessMessages = [
-              "Aê! Chegou dinheiro! Tu é fera! 💎",
-              "Boaaa! Chuva de grana! Parabéns, meu rei! 🎉",
-              "Show de bola! Mais um recebimento no bolso! ✨",
-              "Dahoraaa! Tu tá bombando! 🔥",
-              "Caraca, que onda boa! Recebeu e eu anotei! 📈",
-              "Eitaaa! Olha a grana chegando! Tu é o cara! 🚀",
-              "Aêêê! Gordinho no bolso! Sucesso total! 💪",
-              "Iradooo! Mais dinheiro na conta! 💰",
-              "Topzera! A grana tá rolando! 🎯",
-              "Massaaa! Tu mandou muito bem! 🏆",
-              "Showzaço! Dinheiro na veia! 🔥",
-              "Dahora demais! Tá rico, patrão! 💎"
-            ];
-            
-            const randomMessage = incomeSuccessMessages[Math.floor(Math.random() * incomeSuccessMessages.length)];
-
-            // Toast de sucesso
-            toast({
-              title: "Recebimento salvo!",
-              description: `R$ ${result.extraction.valor.toFixed(2)} em ${result.extraction.categoria}`,
-            });
-            
-            // Reset state and show completion options
-            setChatState('completed');
-            setTransactionType(null);
-            
-            // Mensagem divertida no chat + completion options
-            setTimeout(() => {
-              const funMessage: Message = {
-                id: (Date.now() + 2).toString(),
-                type: 'assistant',
-                content: randomMessage,
-                timestamp: new Date()
-              };
-              
-              setMessages(prev => [...prev, funMessage]);
-              database.addConversationMessage(user.id, 'assistant', randomMessage);
-              
-              // Completion message com delay
-              setTimeout(() => {
-                const completionMessage = createCompletionMessage();
-                setMessages(prev => [...prev, completionMessage]);
-                // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
-                // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
-              }, 1500);
-            }, 1000);
-            
-          } catch (incomeError) {
-            console.error('❌ Chat - Erro ao salvar recebimento:', incomeError);
-              console.error('❌ Chat - Stack trace:', incomeError.stack);
-              toast({
-                title: "Erro ao salvar recebimento!",
-                description: "Verifique o console para mais detalhes.",
-                variant: "destructive"
-              });
-          }
-        } else if (isIncome && user.plan_type === 'bronze') {
-          console.log('🥉 Chat - ENTRANDO na condição de recebimento para usuário BRONZE (sugerindo upgrade)');
-          // Suggest upgrade for bronze users trying to add income
-          toast({
-            title: "�� Upgrade para Plano Ouro!",
-            description: "Para registrar recebimentos, você precisa do plano ouro!",
-            variant: "default"
-          });
-        } else {
-          console.log('💸 Chat - ENTRANDO na condição de GASTO (default behavior)');
-          // Save as expense (default behavior)
+        if (isExpense) {
           console.log('💾 Chat - Salvando gasto no banco:', {
             usuario_id: user.id,
             valor: result.extraction?.valor,
@@ -1096,7 +1008,7 @@ Me conta seu compromisso:`,
           
           try {
               console.log('💸 Chat - TENTANDO salvar gasto...');
-            const savedExpense = await database.addExpense({
+            const savedExpense = await supabaseDatabase.addExpense({
               usuario_id: user.id,
               valor: result.extraction.valor,
               categoria: result.extraction.categoria,
@@ -1142,14 +1054,14 @@ Me conta seu compromisso:`,
               };
               
               setMessages(prev => [...prev, funMessage]);
-              database.addConversationMessage(user.id, 'assistant', randomMessage);
+              supabaseDatabase.addConversationMessage(user.id, 'assistant', randomMessage);
               
               // Completion message com delay
               setTimeout(() => {
                 const completionMessage = createCompletionMessage();
                 setMessages(prev => [...prev, completionMessage]);
                 // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
-                // database.addConversationMessage(user.id, 'assistant', completionMessage.content);
+                // supabaseDatabase.addConversationMessage(user.id, 'assistant', completionMessage.content);
               }, 1500);
             }, 1000);
             
@@ -1162,6 +1074,100 @@ Me conta seu compromisso:`,
                 variant: "destructive"
               });
             }
+        } else if (isIncome && user.plan_type === 'ouro' || user.plan_type === 'trial') {
+          console.log('💎 Chat - ENTRANDO na condição de recebimento para usuário OURO');
+          // Save as income for gold plan users
+          console.log('💎 Chat - Salvando recebimento no banco (Plano Ouro):', {
+            user_id: user.id,
+            amount: result.extraction?.valor,
+            category: result.extraction?.categoria,
+            description: result.extraction?.descricao,
+            date: result.extraction?.data
+          });
+          
+          try {
+              console.log('💎 Chat - TENTANDO salvar recebimento...');
+            const savedIncome = await supabaseDatabase.addIncome({
+              user_id: user.id,
+              amount: result.extraction.valor,
+              category: result.extraction.categoria,
+              description: result.extraction.descricao,
+              date: result.extraction.data,
+              tags: []
+            });
+            console.log('✅ Chat - Recebimento salvo com sucesso:', savedIncome);
+            
+            const incomeSuccessMessages = [
+              "Aê! Chegou dinheiro! Tu é fera! 💎",
+              "Boaaa! Chuva de grana! Parabéns, meu rei! 🎉",
+              "Show de bola! Mais um recebimento no bolso! ✨",
+              "Dahoraaa! Tu tá bombando! 🔥",
+              "Caraca, que onda boa! Recebeu e eu anotei! ��",
+              "Eitaaa! Olha a grana chegando! Tu é o cara! 🚀",
+              "Aêêê! Gordinho no bolso! Sucesso total! 💪",
+              "Iradooo! Mais dinheiro na conta! 💰",
+              "Topzera! A grana tá rolando! 🎯",
+              "Massaaa! Tu mandou muito bem! 🏆",
+              "Showzaço! Dinheiro na veia! 🔥",
+              "Dahora demais! Tá rico, patrão! 💎"
+            ];
+            
+            const randomMessage = incomeSuccessMessages[Math.floor(Math.random() * incomeSuccessMessages.length)];
+
+            // Toast de sucesso
+            toast({
+              title: "Recebimento salvo!",
+              description: `R$ ${result.extraction.valor.toFixed(2)} em ${result.extraction.categoria}`,
+            });
+            
+            // Reset state and show completion options
+            setChatState('completed');
+            setTransactionType(null);
+            
+            // Mensagem divertida no chat + completion options
+            setTimeout(() => {
+              const funMessage: Message = {
+                id: (Date.now() + 2).toString(),
+                type: 'assistant',
+                content: randomMessage,
+                timestamp: new Date()
+              };
+              
+              setMessages(prev => [...prev, funMessage]);
+              supabaseDatabase.addConversationMessage(user.id, 'assistant', randomMessage);
+              
+              // Completion message com delay
+              setTimeout(() => {
+                const completionMessage = createCompletionMessage();
+                setMessages(prev => [...prev, completionMessage]);
+                // NÃO salvar mensagem de completion no histórico para evitar problemas com botões
+                // supabaseDatabase.addConversationMessage(user.id, 'assistant', completionMessage.content);
+              }, 1500);
+            }, 1000);
+            
+          } catch (incomeError) {
+            console.error('❌ Chat - Erro ao salvar recebimento:', incomeError);
+              console.error('❌ Chat - Stack trace:', incomeError.stack);
+              toast({
+                title: "Erro ao salvar recebimento!",
+                description: "Verifique o console para mais detalhes.",
+                variant: "destructive"
+              });
+          }
+        } else if (isIncome && user.plan_type === 'bronze') {
+          console.log('🥉 Chat - ENTRANDO na condição de recebimento para usuário BRONZE (sugerindo upgrade)');
+          // Suggest upgrade for bronze users trying to add income
+          toast({
+            title: "🥇 Upgrade para Plano Ouro!",
+            description: "Para registrar recebimentos, você precisa do plano ouro!",
+            variant: "default"
+          });
+        } else {
+          console.log('❌ Chat - NÃO entrou na condição de processar transação financeira');
+          console.log('❌ Chat - isValid:', result.extraction?.isValid);
+          console.log('❌ Chat - valor:', result.extraction?.valor);
+          console.log('❌ Chat - valor > 0:', result.extraction?.valor > 0);
+          console.log('❌ Chat - type:', result.extraction?.type);
         }
       } else {
         console.log('❌ Chat - NÃO entrou na condição de processar transação financeira');
@@ -1193,7 +1199,7 @@ Me conta seu compromisso:`,
 
       setMessages(prev => [...prev, errorMessageObj]);
       
-      await database.addConversationMessage(user.id, 'assistant', errorMessage);
+      await supabaseDatabase.addConversationMessage(user.id, 'assistant', errorMessage);
       
       toast({
         title: "Oops!",
