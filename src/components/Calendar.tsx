@@ -22,7 +22,10 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
-  Grid3X3
+  Grid3X3,
+  CheckCircle,
+  XCircle,
+  RotateCcw
 } from 'lucide-react';
 import { isGold } from '../lib/utils';
 
@@ -41,6 +44,7 @@ interface Appointment {
   location?: string;
   category: string;
   created_at: string;
+  status?: 'pendente' | 'concluido' | 'cancelado';
 }
 
 interface CalendarProps {
@@ -98,6 +102,9 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
     outros: 'bg-gray-100 text-gray-800 border-gray-200'
   };
 
+  // Adicionar estado para filtro de status
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'pendente' | 'concluido' | 'cancelado'>('todos');
+
   useEffect(() => {
     if (isGold(user)) {
       loadAppointments();
@@ -145,7 +152,8 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
         date: appointmentForm.date,
         time: appointmentForm.time,
         location: appointmentForm.location,
-        category: appointmentForm.category as any
+        category: appointmentForm.category as any,
+        status: 'pendente',
       });
 
       if (newAppointment) {
@@ -207,7 +215,8 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
         date: appointmentForm.date,
         time: appointmentForm.time,
         location: appointmentForm.location,
-        category: appointmentForm.category as any
+        category: appointmentForm.category as any,
+        status: editingAppointment.status,
       });
 
       if (updatedAppointment) {
@@ -256,6 +265,23 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
         description: "Erro ao excluir compromisso",
         variant: "destructive"
       });
+    }
+  };
+
+  // Função para alterar status
+  const handleChangeStatus = async (appointment: Appointment, newStatus: 'pendente' | 'concluido' | 'cancelado') => {
+    try {
+      const updated = await database.updateAppointment(appointment.id, { status: newStatus });
+      if (updated) {
+        setAppointments(appointments.map(a => a.id === appointment.id ? { ...a, status: newStatus } : a));
+        setSelectedDayAppointments(prev => ({
+          ...prev,
+          appointments: prev.appointments.map(a => a.id === appointment.id ? { ...a, status: newStatus } : a)
+        }));
+        toast({ title: 'Status atualizado!', description: `Compromisso marcado como ${newStatus}.` });
+      }
+    } catch (err) {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o status.', variant: 'destructive' });
     }
   };
 
@@ -355,13 +381,15 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       const dayAppointments = getAppointmentsForDate(date);
       const isToday = date.toDateString() === new Date().toDateString();
+      const isPast = date < new Date(new Date().setHours(0,0,0,0));
       
       if (dayAppointments.length > 0 || isToday) {
         daysWithAppointments.push({
           day,
           date,
           appointments: dayAppointments,
-          isToday
+          isToday,
+          isPast
         });
       }
     }
@@ -376,14 +404,14 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
             </CardContent>
           </Card>
         ) : (
-          daysWithAppointments.map(({ day, date, appointments, isToday }) => (
+          daysWithAppointments.map(({ day, date, appointments, isToday, isPast }) => (
             <Card
               key={day}
-              className={`cursor-pointer transition-all ${
-                isToday ? 'border-blue-400 bg-blue-50' : ''
-              } ${
-                appointments.length > 0 ? 'hover:shadow-md' : ''
-              }`}
+              className={`cursor-pointer transition-all
+                ${isToday ? 'border-blue-400 bg-blue-50' : ''}
+                ${appointments.length > 0 ? 'hover:shadow-md' : ''}
+                ${isPast && !isToday ? 'bg-gray-100 text-gray-400' : ''}
+              `}
               onClick={() => {
                 setSelectedDate(date);
                 if (appointments.length > 0) {
@@ -395,13 +423,13 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">{day}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className={`text-2xl font-bold ${isPast && !isToday ? 'text-gray-400' : 'text-gray-900'}`}>{day}</div>
+                      <div className={`text-xs ${isPast && !isToday ? 'text-gray-300' : 'text-gray-500'}`}>
                         {date.toLocaleDateString('pt-BR', { weekday: 'short' })}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-700">
+                      <div className={`text-sm font-medium ${isPast && !isToday ? 'text-gray-400' : 'text-gray-700'}`}>
                         {date.toLocaleDateString('pt-BR', { month: 'long' })}
                       </div>
                       {isToday && (
@@ -423,14 +451,12 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                     {appointments.slice(0, 2).map((apt, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 text-sm"
+                        className={`flex items-center gap-2 text-sm ${isPast && !isToday ? 'line-through opacity-60' : ''}`}
                       >
                         <Clock className="h-3 w-3 text-gray-400" />
-                        <span className="font-medium text-gray-700">{apt.time}</span>
-                        <span className="text-gray-600 truncate flex-1">{apt.title}</span>
-                        <Badge className={`text-xs ${categoryColors[apt.category as keyof typeof categoryColors]}`}>
-                          {apt.category}
-                        </Badge>
+                        <span className={`font-medium ${isPast && !isToday ? 'text-gray-400' : 'text-gray-700'}`}>{apt.time}</span>
+                        <span className={`truncate flex-1 ${isPast && !isToday ? 'text-gray-400' : 'text-gray-600'}`}>{apt.title}</span>
+                        <Badge className={`text-xs ${categoryColors[apt.category as keyof typeof categoryColors]}`}>{apt.category}</Badge>
                       </div>
                     ))}
                     {appointments.length > 2 && (
@@ -473,28 +499,25 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
       const dayAppointments = getAppointmentsForDate(date);
       const isToday = date.toDateString() === new Date().toDateString();
       const isSelected = selectedDate?.toDateString() === date.toDateString();
+      const isPast = date < new Date(new Date().setHours(0,0,0,0));
 
       days.push(
         <div
           key={day}
-          className={`h-20 border border-gray-100 p-1 cursor-pointer transition-colors ${
-            dayAppointments.length > 0 
-              ? 'hover:bg-blue-50 hover:border-blue-200 hover:shadow-sm' 
-              : 'hover:bg-gray-50'
-          } ${
-            isToday ? 'bg-blue-100 border-blue-300' : ''
-          } ${
-            isSelected ? 'bg-blue-200 border-blue-400' : ''
-          }`}
+          className={`h-20 border border-gray-100 p-1 cursor-pointer transition-colors
+            ${dayAppointments.length > 0 ? 'hover:bg-blue-50 hover:border-blue-200 hover:shadow-sm' : 'hover:bg-gray-50'}
+            ${isToday ? 'bg-blue-100 border-blue-300' : ''}
+            ${isSelected ? 'bg-blue-200 border-blue-400' : ''}
+            ${isPast && !isToday ? 'bg-gray-100 text-gray-400' : ''}
+          `}
           onClick={() => {
             setSelectedDate(date);
-            // 🔥 Se tem compromissos, abre o modal automaticamente
             if (dayAppointments.length > 0) {
               handleShowAllDayAppointments(date, dayAppointments);
             }
           }}
         >
-          <div className={`font-medium text-sm ${dayAppointments.length > 0 ? 'text-blue-700' : ''}`}>
+          <div className={`font-medium text-sm ${dayAppointments.length > 0 ? 'text-blue-700' : ''} ${isPast && !isToday ? 'text-gray-400' : ''}`}>
             {day}
             {dayAppointments.length > 0 && (
               <span className="ml-1 w-1.5 h-1.5 bg-blue-500 rounded-full inline-block"></span>
@@ -504,7 +527,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
             {dayAppointments.slice(0, 2).map((apt, index) => (
               <div
                 key={index}
-                className={`text-xs px-1 py-0.5 rounded truncate ${categoryColors[apt.category as keyof typeof categoryColors]}`}
+                className={`text-xs px-1 py-0.5 rounded truncate ${categoryColors[apt.category as keyof typeof categoryColors]} ${isPast && !isToday ? 'line-through opacity-60' : ''}`}
               >
                 {apt.time} {apt.title}
               </div>
@@ -717,7 +740,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
               <CardContent>
                 <div className="space-y-3">
                   {todayAppointments.map((appointment) => (
-                    <div key={appointment.id} className="group flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div key={appointment.id} className={`group flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 ${appointment.status === 'cancelado' ? 'bg-red-50' : appointment.status === 'concluido' ? 'bg-green-50' : ''}`}>
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-center">
                           <Clock className="h-4 w-4 text-blue-600" />
@@ -725,10 +748,16 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium">{appointment.title}</h3>
-                            <Badge className={`text-xs ${categoryColors[appointment.category as keyof typeof categoryColors]}`}>
-                              {appointment.category}
-                            </Badge>
+                            <h3 className={`font-medium ${appointment.status !== 'pendente' ? 'line-through opacity-60' : ''}`}>
+                              {appointment.title}
+                              {appointment.status === 'concluido' && (
+                                <Badge className="bg-green-200 text-green-800 ml-1">Concluído</Badge>
+                              )}
+                              {appointment.status === 'cancelado' && (
+                                <Badge className="bg-red-200 text-red-800 ml-1">Cancelado</Badge>
+                              )}
+                            </h3>
+                            <Badge className={`text-xs ${categoryColors[appointment.category as keyof typeof categoryColors]}`}>{appointment.category}</Badge>
                           </div>
                           {appointment.location && (
                             <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -742,7 +771,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -776,6 +805,22 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        {/* Botões de status */}
+                        {appointment.status !== 'concluido' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Marcar como concluído" onClick={() => handleChangeStatus(appointment, 'concluido')}>
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        {appointment.status !== 'cancelado' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Cancelar compromisso" onClick={() => handleChangeStatus(appointment, 'cancelado')}>
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          </Button>
+                        )}
+                        {appointment.status !== 'pendente' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Desfazer status" onClick={() => handleChangeStatus(appointment, 'pendente')}>
+                            <RotateCcw className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -793,7 +838,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
               <CardContent>
                 <div className="space-y-3">
                   {upcomingAppointments.map((appointment) => (
-                    <div key={appointment.id} className="group flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div key={appointment.id} className={`group flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 ${appointment.status === 'cancelado' ? 'bg-red-50' : appointment.status === 'concluido' ? 'bg-green-50' : ''}`}>
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-center min-w-[60px]">
                           <span className="text-xs font-medium text-gray-500">
@@ -803,10 +848,16 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium">{appointment.title}</h3>
-                            <Badge className={`text-xs ${categoryColors[appointment.category as keyof typeof categoryColors]}`}>
-                              {appointment.category}
-                            </Badge>
+                            <h3 className={`font-medium ${appointment.status !== 'pendente' ? 'line-through opacity-60' : ''}`}>
+                              {appointment.title}
+                              {appointment.status === 'concluido' && (
+                                <Badge className="bg-green-200 text-green-800 ml-1">Concluído</Badge>
+                              )}
+                              {appointment.status === 'cancelado' && (
+                                <Badge className="bg-red-200 text-red-800 ml-1">Cancelado</Badge>
+                              )}
+                            </h3>
+                            <Badge className={`text-xs ${categoryColors[appointment.category as keyof typeof categoryColors]}`}>{appointment.category}</Badge>
                           </div>
                           {appointment.location && (
                             <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -817,7 +868,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -851,6 +902,22 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        {/* Botões de status */}
+                        {appointment.status !== 'concluido' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Marcar como concluído" onClick={() => handleChangeStatus(appointment, 'concluido')}>
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        {appointment.status !== 'cancelado' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Cancelar compromisso" onClick={() => handleChangeStatus(appointment, 'cancelado')}>
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          </Button>
+                        )}
+                        {appointment.status !== 'pendente' && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Desfazer status" onClick={() => handleChangeStatus(appointment, 'pendente')}>
+                            <RotateCcw className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -988,7 +1055,16 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
           </DialogHeader>
           
           <div className="space-y-3 mt-4">
+            {/* Filtro de status acima da lista de compromissos do dia/modal */}
+            <div className="flex gap-2 mb-2">
+              <Button size="sm" variant={statusFilter === 'todos' ? 'default' : 'outline'} onClick={() => setStatusFilter('todos')}>Todos</Button>
+              <Button size="sm" variant={statusFilter === 'pendente' ? 'default' : 'outline'} onClick={() => setStatusFilter('pendente')}>Pendentes</Button>
+              <Button size="sm" variant={statusFilter === 'concluido' ? 'default' : 'outline'} onClick={() => setStatusFilter('concluido')}>Concluídos</Button>
+              <Button size="sm" variant={statusFilter === 'cancelado' ? 'default' : 'outline'} onClick={() => setStatusFilter('cancelado')}>Cancelados</Button>
+            </div>
+
             {selectedDayAppointments.appointments
+              .filter(a => statusFilter === 'todos' || (a.status || 'pendente') === statusFilter)
               .sort((a, b) => a.time.localeCompare(b.time))
               .map((appointment, index) => (
               <div 
@@ -1006,11 +1082,33 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                       <Badge className={`text-xs flex-shrink-0 ${categoryColors[appointment.category as keyof typeof categoryColors]}`}>
                         {appointment.category}
                       </Badge>
+                      {/* Ícones de status ao lado do Badge */}
+                      {appointment.status !== 'concluido' && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Marcar como concluído" onClick={() => handleChangeStatus(appointment, 'concluido')}>
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        </Button>
+                      )}
+                      {appointment.status !== 'cancelado' && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Cancelar compromisso" onClick={() => handleChangeStatus(appointment, 'cancelado')}>
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </Button>
+                      )}
+                      {appointment.status !== 'pendente' && (
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Desfazer status" onClick={() => handleChangeStatus(appointment, 'pendente')}>
+                          <RotateCcw className="h-4 w-4 text-gray-500" />
+                        </Button>
+                      )}
                     </div>
                     
                     {/* Título */}
-                    <h3 className="font-medium text-gray-900 mb-2 break-words">
+                    <h3 className="font-medium text-gray-900 mb-2 break-words flex items-center gap-2">
                       {appointment.title}
+                      {appointment.status === 'concluido' && (
+                        <Badge className="bg-green-200 text-green-800 ml-1">Concluído</Badge>
+                      )}
+                      {appointment.status === 'cancelado' && (
+                        <Badge className="bg-red-200 text-red-800 ml-1">Cancelado</Badge>
+                      )}
                     </h3>
                     
                     {/* Local */}
@@ -1030,7 +1128,7 @@ const Calendar: React.FC<CalendarProps> = ({ user }) => {
                   </div>
                   
                   {/* Ações - sempre visíveis no mobile, hover no desktop */}
-                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, AlertCircle, Globe, Bell, Send, Eye, Clock, Calendar, DollarSign, Ban } from 'lucide-react';
+import { Users, Settings, Activity, Database, Key, MessageSquare, CheckCircle, AlertCircle, Globe, Bell, Send, Eye, Clock, Calendar, DollarSign, Ban, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { database, User, Expense, Configuration, Income, Appointment } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ import SalesForm from './SalesForm';
 import { Label } from '@/components/ui/label';
 import { supabaseDatabase } from '@/lib/supabase-database';
 import { getWebhooks, createWebhook, updateWebhook, deleteWebhook, Webhook } from '@/lib/webhooks';
+import { formatPhone } from '@/lib/utils';
 
 // Função utilitária para converter data local (YYYY-MM-DD) para UTC-3 corretamente
 function toUTCISOStringWithOffset(dateStr, hour = 0, min = 0, sec = 0) {
@@ -485,6 +486,9 @@ const AdminPanel: React.FC = () => {
 
   // 2. Adicionar estado para aba selecionada
   const [selectedTab, setSelectedTab] = useState('users');
+
+  // Adicionar estado e Dialog para breakdown detalhado:
+  const [showBreakdown, setShowBreakdown] = useState<{ type: 'incomes' | 'expenses' | 'appointments', userId: string } | null>(null);
 
   useEffect(() => {
     if (user?.is_admin) {
@@ -1068,6 +1072,7 @@ const AdminPanel: React.FC = () => {
   // Calculate statistics
   const totalExpenses = allExpenses.length;
   const totalValue = allExpenses.reduce((sum, expense) => sum + expense.valor, 0);
+  const totalIncomesValue = allIncomes.reduce((sum, inc) => sum + (inc.amount || 0), 0);
   const activeUsers = allUsers.filter(user => !user.is_admin).length;
 
   const userExpenseStats = allUsers
@@ -1110,6 +1115,16 @@ const AdminPanel: React.FC = () => {
   const blockedUsersCount = allUsers.filter(u => !u.is_admin && u.is_blocked).length;
   const inactiveUsersCount = allUsers.filter(u => !u.is_admin && !u.is_blocked && (!u.plan_type || u.plan_type === 'none' || u.plan_type === null)).length;
 
+  // Cálculo dos visualizados hoje e total (usando notificationStats, mas se possível, use notificationStats.all_notifications)
+  const today = new Date().toISOString().slice(0, 10);
+  const allNotifications = notificationStats.all_notifications || notificationStats.recent_notifications || [];
+  const read_today = allNotifications.filter(n =>
+    (n.lida === true || n.lida === 'true') && n.data_criacao.slice(0, 10) === today
+  ).length;
+  const read_total = allNotifications.filter(n => n.lida === true || n.lida === 'true').length;
+
+  const totalRegistros = (allExpenses?.length || 0) + (allIncomes?.length || 0) + (allAppointments?.length || 0);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1140,19 +1155,23 @@ const AdminPanel: React.FC = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeUsers}</div>
-            <p className="text-xs text-muted-foreground">usuários ativos</p>
+            <div className="flex flex-col items-center gap-1">
+              <div className="text-2xl font-bold">{totalActiveUsers}</div>
+              <span className="text-xs text-muted-foreground">ativos (exceto trial)</span>
+              <div className="text-lg font-semibold text-yellow-600">{allUsers.filter(u => !u.is_admin && !u.is_blocked && u.plan_type === 'trial').length} trial</div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Usuários ativos = plano bronze/ouro. Usuários trial exibidos separadamente.</p>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Gastos</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de registros</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalExpenses}</div>
-            <p className="text-xs text-muted-foreground">registros salvos</p>
+          <CardContent className="flex-1 flex flex-col justify-center items-center min-h-[100px]">
+            <div className="text-2xl font-bold">{totalRegistros}</div>
+            <p className="text-xs text-muted-foreground">gastos, recebimentos e agendamentos</p>
           </CardContent>
         </Card>
         
@@ -1162,10 +1181,13 @@ const AdminPanel: React.FC = () => {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
-              R$ {totalValue.toFixed(2)}
+            <div className="flex flex-col items-center gap-1">
+              <div className="text-2xl font-bold text-red-500">R$ {totalValue.toFixed(2)}</div>
+              <span className="text-xs text-muted-foreground">em gastos registrados</span>
+              <div className="text-xl font-bold text-green-600">R$ {totalIncomesValue.toFixed(2)}</div>
+              <span className="text-xs text-muted-foreground">em recebimentos registrados</span>
             </div>
-            <p className="text-xs text-muted-foreground">em gastos registrados</p>
+            <p className="text-xs text-muted-foreground mt-2">Valores totais de gastos e recebimentos registrados no sistema.</p>
           </CardContent>
         </Card>
         
@@ -1174,10 +1196,8 @@ const AdminPanel: React.FC = () => {
             <CardTitle className="text-sm font-medium">Status API</CardTitle>
             <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className={`text-lg font-bold ${isApiKeyConfigured ? 'text-green-500' : 'text-red-500'}`}>
-              {isApiKeyConfigured ? 'Configurada' : 'Não configurada'}
-            </div>
+          <CardContent className="flex-1 flex flex-col justify-center items-center min-h-[100px]">
+            <div className={`text-lg font-bold ${isApiKeyConfigured ? 'text-green-500' : 'text-red-500'}`}>{isApiKeyConfigured ? 'Configurada' : 'Não configurada'}</div>
             <p className="text-xs text-muted-foreground">OpenAI API Key</p>
           </CardContent>
         </Card>
@@ -1563,7 +1583,7 @@ const AdminPanel: React.FC = () => {
                  ) : (
                    <div className="space-y-4">
                      <div className="grid grid-cols-3 gap-4">
-                       <div className="text-center p-3 bg-muted/50 rounded-lg">
+                       <div className="text-center p-3 bg-muted/50 rounded-lg flex flex-col items-center justify-center">
                          <div className="text-2xl font-bold text-primary">
                            {notificationStats.total}
                          </div>
@@ -1571,8 +1591,8 @@ const AdminPanel: React.FC = () => {
                            Total Enviadas
                          </div>
                        </div>
-                       <div className="text-center p-3 bg-muted/50 rounded-lg">
-                         <div className="text-2xl font-bold text-blue-500">
+                       <div className="text-center p-3 bg-muted/50 rounded-lg flex flex-col items-center justify-center">
+                         <div className="text-2xl font-bold text-green-500">
                            {notificationStats.sent_today}
                          </div>
                          <div className="text-sm text-muted-foreground">
@@ -1580,11 +1600,17 @@ const AdminPanel: React.FC = () => {
                          </div>
                        </div>
                        <div className="text-center p-3 bg-muted/50 rounded-lg">
-                         <div className="text-2xl font-bold text-green-500">
-                           {notificationStats.read_rate.toFixed(1)}%
+                         <div className="text-2xl font-bold text-blue-500">
+                           {read_today}
                          </div>
                          <div className="text-sm text-muted-foreground">
-                           Taxa de Leitura
+                           Visualizados HOJE
+                         </div>
+                         <div className="text-lg font-bold text-green-500 mt-2">
+                           {read_total}
+                         </div>
+                         <div className="text-sm text-muted-foreground">
+                           Visualizados TOTAL
                          </div>
                        </div>
                      </div>
@@ -1648,12 +1674,6 @@ const AdminPanel: React.FC = () => {
                       <div className="flex justify-between">
                         <span>Enviadas hoje:</span>
                         <Badge variant="outline">{notificationStats.sent_today}</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Taxa de leitura:</span>
-                        <Badge variant={notificationStats.read_rate > 70 ? "default" : "secondary"}>
-                          {notificationStats.read_rate.toFixed(1)}%
-                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -1997,14 +2017,41 @@ const AdminPanel: React.FC = () => {
               </DialogHeader>
               {viewUser && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Card 1: Gastos */}
+                  {/* Card 1: Registros do Usuário com ícones, tooltip e breakdown */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Gastos</CardTitle>
+                      <CardTitle>Registros</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-red-500">R$ {viewUser.totalSpent.toFixed(2)}</div>
-                      <div className="text-xs text-muted-foreground">{viewUser.expenseCount} gastos</div>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          className="flex items-center gap-2 text-green-600 font-bold hover:underline"
+                          title="Clique para ver todos os recebimentos"
+                          type="button"
+                          onClick={() => setShowBreakdown({ type: 'incomes', userId: viewUser.id })}
+                        >
+                          <DollarSign className="h-5 w-5" />
+                          {allIncomes.filter(inc => inc.user_id === viewUser.id).length} recebimentos
+                        </button>
+                        <button
+                          className="flex items-center gap-2 text-red-500 font-bold hover:underline"
+                          title="Clique para ver todos os gastos"
+                          type="button"
+                          onClick={() => setShowBreakdown({ type: 'expenses', userId: viewUser.id })}
+                        >
+                          <ArrowDownCircle className="h-5 w-5" />
+                          {allExpenses.filter(exp => exp.usuario_id === viewUser.id).length} gastos
+                        </button>
+                        <button
+                          className="flex items-center gap-2 text-blue-600 font-bold hover:underline"
+                          title="Clique para ver todos os agendamentos"
+                          type="button"
+                          onClick={() => setShowBreakdown({ type: 'appointments', userId: viewUser.id })}
+                        >
+                          <Calendar className="h-5 w-5" />
+                          {allAppointments.filter(app => app.user_id === viewUser.id).length} agendamentos
+                        </button>
+                      </div>
                     </CardContent>
                   </Card>
                   {/* Card 2: Plano */}
@@ -2015,7 +2062,7 @@ const AdminPanel: React.FC = () => {
                     <CardContent>
                       <PlanBadge plan={viewUser.plan_type} />
                       {viewUser.plan_expiration && (
-                        <div className="text-xs text-muted-foreground mt-2">{getPlanExpirationText(viewUser)}</div>
+                        <div className="text-xs text-muted-foreground mt-2">Expira em: {new Date(viewUser.plan_expiration).toLocaleDateString('pt-BR')}</div>
                       )}
                       <StatusBadge status={getPlanStatus(viewUser)} isBlocked={viewUser.is_blocked} />
                     </CardContent>
@@ -2029,13 +2076,14 @@ const AdminPanel: React.FC = () => {
                       <div className="text-lg">{new Date(viewUser.data_criacao).toLocaleDateString('pt-BR')}</div>
                     </CardContent>
                   </Card>
-                  {/* Card 4: E-mail */}
+                  {/* Card 4: Nome e WhatsApp formatado */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Email</CardTitle>
+                      <CardTitle>Contato</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-lg">{viewUser.email}</div>
+                      <div className="text-lg font-bold">{viewUser.nome}</div>
+                      <div className="text-md text-muted-foreground">{formatPhone(viewUser.whatsapp)}</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -2382,6 +2430,54 @@ const AdminPanel: React.FC = () => {
           <WebhooksTab />
         </TabsContent>
       </Tabs>
+
+      {/* Modal de breakdown detalhado */}
+      <Dialog open={!!showBreakdown} onOpenChange={() => setShowBreakdown(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {showBreakdown?.type === 'incomes' && 'Recebimentos'}
+              {showBreakdown?.type === 'expenses' && 'Gastos'}
+              {showBreakdown?.type === 'appointments' && 'Agendamentos'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            {showBreakdown?.type === 'incomes' && (
+              <ul>
+                {allIncomes.filter(inc => inc.user_id === showBreakdown.userId).map(inc => (
+                  <li key={inc.id} className="mb-2 border-b pb-1">
+                    <span className="font-semibold">R$ {inc.amount?.toFixed(2)}</span> — {inc.description || inc.categoria || ''}<br/>
+                    <span className="text-xs text-muted-foreground">{inc.date ? new Date(inc.date).toLocaleDateString('pt-BR') : ''}</span>
+                  </li>
+                ))}
+                {allIncomes.filter(inc => inc.user_id === showBreakdown.userId).length === 0 && <li>Nenhum recebimento.</li>}
+              </ul>
+            )}
+            {showBreakdown?.type === 'expenses' && (
+              <ul>
+                {allExpenses.filter(exp => exp.usuario_id === showBreakdown.userId).map(exp => (
+                  <li key={exp.id} className="mb-2 border-b pb-1">
+                    <span className="font-semibold">R$ {exp.valor?.toFixed(2)}</span> — {exp.descricao || exp.categoria || ''}<br/>
+                    <span className="text-xs text-muted-foreground">{exp.data ? new Date(exp.data).toLocaleDateString('pt-BR') : ''}</span>
+                  </li>
+                ))}
+                {allExpenses.filter(exp => exp.usuario_id === showBreakdown.userId).length === 0 && <li>Nenhum gasto.</li>}
+              </ul>
+            )}
+            {showBreakdown?.type === 'appointments' && (
+              <ul>
+                {allAppointments.filter(app => app.user_id === showBreakdown.userId).map(app => (
+                  <li key={app.id} className="mb-2 border-b pb-1">
+                    <span className="font-semibold">{app.title || app.category || 'Agendamento'}</span><br/>
+                    <span className="text-xs text-muted-foreground">{app.date ? new Date(app.date).toLocaleDateString('pt-BR') : ''} {app.time || ''}</span>
+                  </li>
+                ))}
+                {allAppointments.filter(app => app.user_id === showBreakdown.userId).length === 0 && <li>Nenhum agendamento.</li>}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

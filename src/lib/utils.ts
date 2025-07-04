@@ -26,3 +26,22 @@ export function addMonthsToToday(periodo: string): string {
   // Se for personalizado mas não é data, retorna nulo
   return '';
 }
+
+// Formata número de telefone/whatsapp brasileiro
+export function formatPhone(phone: string): string {
+  if (!phone) return '';
+  // Remove tudo que não é número
+  const digits = phone.replace(/\D/g, '');
+  // Formato: +55 (11) 91234-5678 ou (11) 91234-5678
+  if (digits.length === 13 && digits.startsWith('55')) {
+    // +55DD9XXXXXXXX
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  } else if (digits.length === 11) {
+    // DDD9XXXXXXXX
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 10) {
+    // DDDXXXXXXXX
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}

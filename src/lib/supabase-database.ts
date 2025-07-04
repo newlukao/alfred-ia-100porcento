@@ -729,6 +729,7 @@ export class SupabaseDatabase {
     sent_today: number;
     read_rate: number;
     recent_notifications: any[];
+    all_notifications: NotificationHistory[];
   }> {
     try {
       // Get all admin notifications
@@ -777,7 +778,8 @@ export class SupabaseDatabase {
         total,
         sent_today: sentToday,
         read_rate: readRate,
-        recent_notifications: recentWithUserNames
+        recent_notifications: recentWithUserNames,
+        all_notifications: allAdminNotifications
       };
     } catch (error) {
       console.error('Error getting admin notification stats:', error);
@@ -785,7 +787,8 @@ export class SupabaseDatabase {
         total: 0,
         sent_today: 0,
         read_rate: 0,
-        recent_notifications: []
+        recent_notifications: [],
+        all_notifications: []
       };
     }
   }

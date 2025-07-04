@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 export interface User {
   id: string;
   nome: string;
@@ -208,6 +210,7 @@ export interface Appointment {
   category: 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
   created_at: string;
   updated_at: string;
+  status: 'pendente' | 'concluido' | 'cancelado';
 }
 
 export interface Sale {
@@ -374,37 +377,42 @@ class MockDatabase {
   }
 
   async addAppointment(appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<Appointment | null> {
-    const user = this.users.find(u => u.id === appointment.user_id);
-    if (!user || user.plan_type !== 'ouro') {
+    try {
+      console.log('📅 addAppointment - Adicionando compromisso:', appointment);
+      // Check if user has gold plan
+      const user = await this.getUserById(appointment.user_id);
+      if (!user || (user.plan_type !== 'ouro' && user.plan_type !== 'trial')) {
+        console.log('🚫 Usuário não tem plano ouro, compromisso negado');
+        return null;
+      }
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([{ ...appointment, status: appointment.status || 'pendente' }])
+        .select()
+        .single();
+      if (error) throw error;
+      console.log('✅ Compromisso adicionado ao Supabase:', data);
+      return data as Appointment;
+    } catch (error) {
+      console.error('Error adding appointment:', error);
       return null;
     }
-
-    const newAppointment: Appointment = {
-      ...appointment,
-      id: (this.appointments.length + 1).toString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    this.appointments.push(newAppointment);
-
-    // Update user stats
-    await this.updateUserStats(appointment.user_id, { pontos_totais: 3 }); // 3 points per appointment
-
-    console.log('✅ MockDatabase - Compromisso adicionado:', newAppointment);
-    return newAppointment;
   }
 
   async updateAppointment(id: string, updates: Partial<Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Appointment | null> {
-    const index = this.appointments.findIndex(appointment => appointment.id === id);
-    if (index > -1) {
-      this.appointments[index] = {
-        ...this.appointments[index],
-        ...updates,
-        updated_at: new Date().toISOString()
-      };
-      return this.appointments[index];
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .update({ ...updates, status: updates.status || 'pendente' })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Appointment;
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      return null;
     }
-    return null;
   }
 
   async deleteAppointment(id: string): Promise<void> {
