@@ -2,11 +2,5 @@
   "version": 2,
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron-webhooks",
-      "schedule": "*/5 * * * *"
-    }
   ]
 }
