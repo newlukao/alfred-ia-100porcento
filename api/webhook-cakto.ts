@@ -2,25 +2,47 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY!;
+
+// Validar se as variáveis existem
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[Webhook] Variáveis do Supabase não configuradas:', {
+    url: !!supabaseUrl,
+    key: !!supabaseKey
+  });
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Segredo do webhook - configure na Vercel como CAKTO_WEBHOOK_SECRET
 const SECRET = process.env.CAKTO_WEBHOOK_SECRET || 'sua_chave_secreta_aqui';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('[Cakto Webhook] Requisição recebida:', {
+    method: req.method,
+    headers: req.headers,
+    body: req.body ? 'presente' : 'ausente'
+  });
+
   // Só aceita POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
   try {
+    // Verificar se o body existe
+    if (!req.body) {
+      console.error('[Cakto Webhook] Body da requisição está vazio');
+      return res.status(400).json({ error: 'Body da requisição é obrigatório' });
+    }
+
     const { secret, event, data } = req.body;
 
     // Log para debug
     console.log('[Cakto Webhook] Evento recebido:', event);
-    console.log('[Cakto Webhook] Dados:', JSON.stringify(data, null, 2));
+    console.log('[Cakto Webhook] Secret recebido:', secret ? 'presente' : 'ausente');
+    console.log('[Cakto Webhook] Data recebida:', data ? 'presente' : 'ausente');
 
     // Validação do segredo (segurança)
     if (secret !== SECRET) {
