@@ -714,6 +714,11 @@ const AdminPanel: React.FC = () => {
     setSelectedUsers([]);
   };
 
+  const selectAllByPlan = (plan) => {
+    const usersByPlan = allUsers.filter(u => u.plan_type === plan && !u.is_admin).map(u => u.id);
+    setSelectedUsers(usersByPlan);
+  };
+
   // Função para criar usuário
   const handleCreateUser = async () => {
     setIsCreatingUser(true);
@@ -1457,6 +1462,30 @@ const AdminPanel: React.FC = () => {
                         disabled={allUsers.filter(u => !u.is_admin).length === selectedUsers.length}
                       >
                         Todos
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => selectAllByPlan('trial')}
+                        disabled={allUsers.filter(u => u.plan_type === 'trial' && !u.is_admin).length === selectedUsers.length}
+                      >
+                        Todos Trial
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => selectAllByPlan('ouro')}
+                        disabled={allUsers.filter(u => u.plan_type === 'ouro' && !u.is_admin).length === selectedUsers.length}
+                      >
+                        Todos Ouro
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => selectAllByPlan('bronze')}
+                        disabled={allUsers.filter(u => u.plan_type === 'bronze' && !u.is_admin).length === selectedUsers.length}
+                      >
+                        Todos Bronze
                       </Button>
                       <Button 
                         size="sm" 
