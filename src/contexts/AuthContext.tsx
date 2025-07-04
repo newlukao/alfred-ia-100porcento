@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { authService, AppUser } from '@/lib/supabase-auth';
+import { triggerWebhooks } from '@/lib/webhooks';
 
 interface AuthContextType {
   user: AppUser | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string, nome: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, nome: string, whatsapp: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -85,11 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-    const register = useCallback(async (email: string, password: string, nome: string): Promise<{ success: boolean; error?: string }> => {
+    const register = useCallback(async (email: string, password: string, nome: string, whatsapp: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('📝 AuthContext - Registrando usuário:', email, nome);
+      console.log('📝 AuthContext - Registrando usuário:', email, nome, whatsapp);
       
-      const { user: newUser, error } = await authService.signUp(email, password, nome);
+      const { user: newUser, error } = await authService.signUp(email, password, nome, whatsapp);
       
       if (error) {
         console.error('❌ AuthContext - Erro no registro:', error);
@@ -99,6 +100,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (newUser) {
         console.log('✅ AuthContext - Registro bem-sucedido:', newUser);
         setUser(newUser);
+        // Disparar webhook de criação de conta
+        await triggerWebhooks('criou_conta', {
+          id: newUser.id,
+          email: newUser.email,
+          nome: newUser.nome,
+          whatsapp: newUser.whatsapp,
+          data_criacao: newUser.data_criacao
+        });
         return { success: true };
       }
 

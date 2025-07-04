@@ -42,6 +42,7 @@ import { useDevice } from '@/hooks/use-device';
 import CalendarPage from './CalendarPage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarItem {
   id: string;
@@ -51,6 +52,7 @@ interface SidebarItem {
   badge?: string;
   planRequired?: 'bronze' | 'ouro';
   adminRequired?: boolean;
+  route: string;
 }
 
 function getPlanoLabel(plan_type) {
@@ -63,12 +65,13 @@ function getPlanoLabel(plan_type) {
 const SidebarDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [activeItem, setActiveItem] = useState('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const device = useDevice();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // 🔥 NOVO: Estado para contar compromissos do dia e notificações
   const [todayAppointmentsCount, setTodayAppointmentsCount] = useState(0);
@@ -141,20 +144,23 @@ const SidebarDashboard: React.FC = () => {
       id: 'chat',
       label: 'Alfred IA',
       icon: <MessageCircle className="w-5 h-5" />,
-      component: <Chat />
+      component: <Chat />,
+      route: '/'
     },
     {
       id: 'overview',
       label: 'Visão Geral',
       icon: <Home className="w-5 h-5" />,
-      component: <PlanBasedDashboard user={user!} />
+      component: <PlanBasedDashboard user={user!} />,
+      route: '/dashboard'
     },
     {
       id: 'analytics',
       label: 'Análises Avançadas',
       icon: <BarChart3 className="w-5 h-5" />,
       component: <AdvancedAnalytics expenses={expenses} incomes={incomes} />,
-      planRequired: 'ouro'
+      planRequired: 'ouro',
+      route: '/advanced-analytics'
     },
     {
       id: 'calendar',
@@ -162,27 +168,31 @@ const SidebarDashboard: React.FC = () => {
       icon: <Calendar className="w-5 h-5" />,
       component: <CalendarPage />,
       planRequired: 'ouro',
-      badge: todayAppointmentsCount > 0 ? todayAppointmentsCount.toString() : undefined
+      badge: todayAppointmentsCount > 0 ? todayAppointmentsCount.toString() : undefined,
+      route: '/calendar'
     },
     {
       id: 'notifications',
       label: 'Notificações',
       icon: <Bell className="w-5 h-5" />,
       component: <NotificationCenter />,
-      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount.toString() : undefined
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount.toString() : undefined,
+      route: '/notification-center'
     },
     {
       id: 'profile',
       label: 'Perfil',
       icon: <User className="w-5 h-5" />,
-      component: <UserProfile />
+      component: <UserProfile />,
+      route: '/profile'
     },
     {
       id: 'admin',
       label: 'Admin',
       icon: <Shield className="w-5 h-5" />,
       component: <AdminPanel />,
-      adminRequired: true
+      adminRequired: true,
+      route: '/admin'
     }
   ];
 
@@ -199,6 +209,8 @@ const SidebarDashboard: React.FC = () => {
     return true;
   });
 
+  // Determinar item ativo pela URL
+  const activeItem = filteredMenuItems.find(item => location.pathname === item.route)?.id;
   const activeMenuItem = filteredMenuItems.find(item => item.id === activeItem);
 
   // Calculate quick stats
@@ -320,7 +332,10 @@ const SidebarDashboard: React.FC = () => {
         <div className="absolute bottom-0 left-0 right-0">
           <MobileBottomNav 
             active={activeItem} 
-            onChange={setActiveItem}
+            onChange={id => {
+              const item = filteredMenuItems.find(i => i.id === id);
+              if (item) navigate(item.route);
+            }}
           />
         </div>
       </div>
@@ -409,7 +424,7 @@ const SidebarDashboard: React.FC = () => {
             <button
               key={item.id}
               onClick={() => {
-                setActiveItem(item.id);
+                navigate(item.route);
                 setIsSidebarOpen(false);
               }}
               className={cn(
@@ -501,7 +516,10 @@ const SidebarDashboard: React.FC = () => {
         <div className="md:hidden">
           <MobileBottomNav 
             active={activeItem} 
-            onChange={setActiveItem}
+            onChange={id => {
+              const item = filteredMenuItems.find(i => i.id === id);
+              if (item) navigate(item.route);
+            }}
           />
         </div>
       </div>
@@ -520,11 +538,19 @@ const SidebarDashboard: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-white text-center">Você está sem plano!</DialogTitle>
           </DialogHeader>
-          <p className="text-white text-center mb-4">Para acessar o FinanceAI, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
-          <DialogFooter className="w-full mt-4">
+          <p className="text-white text-center mb-4">Para acessar o Alfred IA, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
+          <DialogFooter className="w-full mt-4 flex flex-col gap-2 items-center !flex-col">
             <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
               Adquirir um Plano
             </Button>
+            <button
+              type="button"
+              onClick={logout}
+              className="block mt-4 text-xs text-white/70 hover:underline hover:text-white transition text-center bg-transparent border-none p-0"
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              Desconectar
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -536,7 +562,7 @@ const SidebarDashboard: React.FC = () => {
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold text-white text-center">Seu período de teste acabou!</DialogTitle>
             </DialogHeader>
-            <p className="text-white text-center mb-4">O trial gratuito expirou. Adquira um plano para continuar usando o FinanceAI.</p>
+            <p className="text-white text-center mb-4">O trial gratuito expirou. Adquira um plano para continuar usando o Alfred IA.</p>
             <DialogFooter className="w-full mt-4">
               <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
                 Adquirir um Plano

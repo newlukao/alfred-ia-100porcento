@@ -16,6 +16,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useToast } from '@/hooks/use-toast';
 import { supabaseDatabase } from '../lib/supabase-database';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, parseISO } from 'date-fns';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -41,7 +42,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   const [profileForm, setProfileForm] = useState({
     nome: user?.nome || '',
     email: user?.email || '',
-    telefone: '(11) 99999-9999' // Telefone fixo apenas para visualização
+    whatsapp: user?.whatsapp || ''
   });
 
   // Estados para badges
@@ -61,13 +62,23 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   };
 
   const handleProfileSave = async () => {
-    // TODO: Implementar salvamento do perfil
-    toast({
-      title: "Perfil atualizado! ✨",
-      description: "Suas informações foram salvas com sucesso."
-    });
-    setIsProfileDialogOpen(false);
-    setIsMobileMenuOpen(false);
+    if (!profileForm.nome || !profileForm.whatsapp) {
+      toast({ title: 'Campos obrigatórios', description: 'Preencha nome e WhatsApp.', variant: 'destructive' });
+      return;
+    }
+    const whatsappNum = profileForm.whatsapp.replace(/\D/g, '');
+    if (whatsappNum.length !== 11) {
+      toast({ title: 'WhatsApp inválido', description: 'Informe um WhatsApp válido (11 dígitos)', variant: 'destructive' });
+      return;
+    }
+    const updated = await supabaseDatabase.updateUser(user.id, { nome: profileForm.nome, whatsapp: profileForm.whatsapp });
+    if (updated) {
+      toast({ title: 'Perfil atualizado! ✨', description: 'Suas informações foram salvas com sucesso.' });
+      setIsProfileDialogOpen(false);
+      setIsMobileMenuOpen(false);
+    } else {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o perfil.', variant: 'destructive' });
+    }
   };
 
   // Atualizar formulário quando usuário mudar
@@ -76,7 +87,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
       setProfileForm({
         nome: user.nome || '',
         email: user.email || '',
-        telefone: '(11) 99999-9999'
+        whatsapp: user.whatsapp || ''
       });
     }
   }, [user]);
@@ -475,22 +486,22 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                   <h3 className="font-bold text-lg">{user?.nome}</h3>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                   <div className="flex justify-center gap-2 mt-2">
-                    <Badge 
-                      variant={user?.plan_type === 'trial' ? 'destructive' : user?.plan_type === 'ouro' ? 'default' : 'secondary'}
+                    <span
+                      className={
+                        user?.plan_type === 'ouro'
+                          ? 'ml-2 px-2 py-0.5 rounded text-xs font-semibold border inline-block align-middle bg-yellow-400 text-yellow-900 border-yellow-500'
+                          : user?.plan_type === 'bronze'
+                          ? 'ml-2 px-2 py-0.5 rounded text-xs font-semibold border inline-block align-middle bg-orange-300 text-orange-900 border-orange-400'
+                          : user?.plan_type === 'trial'
+                          ? 'ml-2 px-2 py-0.5 rounded text-xs font-semibold border inline-block align-middle bg-gray-300 text-gray-700 border-gray-400'
+                          : 'ml-2 px-2 py-0.5 rounded text-xs font-semibold border inline-block align-middle bg-black text-white border-black'
+                      }
                     >
                       {`Plano ${getPlanoLabel(user?.plan_type)}`}
-                    </Badge>
-                    {user?.plan_type === 'trial' && user?.trial_start && (
+                    </span>
+                    {(user as any)?.plan_expiration && (
                       <span className="text-xs text-muted-foreground ml-2">
-                        {(() => {
-                          const trialStart = new Date(user.trial_start);
-                          const now = new Date();
-                          const diffMs = 24 * 60 * 60 * 1000 - (now.getTime() - trialStart.getTime());
-                          if (diffMs <= 0) return 'Trial expirado';
-                          const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                          const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                          return `Trial expira em: ${hours}h ${minutes}min`;
-                        })()}
+                        {getPlanExpirationText(user)}
                       </span>
                     )}
                     {user?.is_admin && (
@@ -529,13 +540,23 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                 </div>
                 
                 <div>
-                  <Label htmlFor="telefone" className="text-sm font-medium">Telefone</Label>
+                  <Label htmlFor="whatsapp" className="text-sm font-medium">WhatsApp</Label>
                   <Input
-                    id="telefone"
-                    value={profileForm.telefone}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, telefone: e.target.value }))}
+                    id="whatsapp"
+                    value={profileForm.whatsapp}
+                    onChange={(e) => {
+                      let num = e.target.value.replace(/\D/g, '');
+                      if (num.length > 11) num = num.slice(0, 11);
+                      let masked = num;
+                      if (num.length > 2) masked = `(${num.slice(0,2)}) ${num.slice(2)}`;
+                      if (num.length > 7) masked = `(${num.slice(0,2)}) ${num.slice(2,7)}-${num.slice(7)}`;
+                      setProfileForm(prev => ({ ...prev, whatsapp: masked }));
+                    }}
                     placeholder="(11) 99999-9999"
                     className="mt-1"
+                    required
+                    maxLength={15}
+                    inputMode="tel"
                   />
                 </div>
               </div>
@@ -557,7 +578,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Membro desde:</span>
-                    <span>{new Date(user?.data_criacao || '').toLocaleDateString('pt-BR')}</span>
+                    <span>{user?.data_criacao ? new Date(user.data_criacao).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: undefined, minute: undefined, second: undefined }) : ''}</span>
                   </div>
                 </div>
               </div>
@@ -626,11 +647,19 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold text-white text-center">Você está sem plano!</DialogTitle>
             </DialogHeader>
-            <p className="text-white text-center mb-4">Para acessar o FinanceAI, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
-            <DialogFooter className="w-full mt-4">
+            <p className="text-white text-center mb-4">Para acessar o Alfred IA, adquira um plano. Seu acesso está bloqueado até a confirmação do pagamento.</p>
+            <DialogFooter className="w-full mt-4 flex flex-col gap-2">
               <Button className="w-full" onClick={() => window.location.href = 'https://seu-checkout.com/plano'}>
                 Adquirir um Plano
               </Button>
+              <button
+                type="button"
+                onClick={logout}
+                className="mt-2 text-xs text-white/70 hover:underline hover:text-white transition text-center self-center bg-transparent border-none p-0"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Desconectar
+              </button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -789,7 +818,7 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
       "💰 Controle de recebimentos", 
       "🤖 Alfred IA completo",
       "📈 Relatórios avançados",
-      "�� Metas e orçamentos",
+      " Metas e orçamentos",
       "📱 Acesso prioritário",
       "💾 Backup premium",
       "🏆 Conquistas exclusivas"
@@ -817,12 +846,11 @@ const UserPlanInfo: React.FC<{ user: any }> = ({ user }) => {
             <h2 className="text-lg font-bold">
               Plano {currentPlan === 'ouro' ? 'Ouro' : 'Bronze'}
             </h2>
-            <p className="text-sm text-muted-foreground">
-              {currentPlan === 'ouro' 
-                ? 'Acesso completo' 
-                : 'Funcionalidades básicas'
-              }
-            </p>
+            {(user as any)?.plan_expiration && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {getPlanExpirationText(user)}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -916,6 +944,13 @@ function getPlanoLabel(plan_type) {
   if (plan_type === 'bronze') return 'Bronze';
   if (plan_type === 'trial') return 'Trial';
   return 'Sem Plano';
+}
+
+// Função auxiliar para exibir expiração
+function getPlanExpirationText(user) {
+  if (!(user as any)?.plan_expiration) return null;
+  const date = new Date((user as any).plan_expiration);
+  return `Seu plano expira dia ${format(date, 'dd/MM/yyyy')} às ${format(date, 'HH:mm')}`;
 }
 
 export default ResponsiveLayout; 

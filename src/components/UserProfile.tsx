@@ -24,6 +24,8 @@ import {
   MapPin,
   Briefcase
 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { supabaseDatabase } from '@/lib/supabase-database';
 
 const UserProfile: React.FC = () => {
   const { user, logout } = useAuth();
@@ -33,7 +35,7 @@ const UserProfile: React.FC = () => {
   const [formData, setFormData] = useState({
     nome: user?.nome || '',
     email: user?.email || '',
-    telefone: '',
+    whatsapp: user?.whatsapp || '',
     endereco: '',
     profissao: ''
   });
@@ -46,21 +48,31 @@ const UserProfile: React.FC = () => {
     );
   }
 
-  const handleSave = () => {
-    // Aqui você implementaria a lógica para salvar os dados
-    toast({
-      title: "Perfil atualizado! ✅",
-      description: "Suas informações foram salvas com sucesso"
-    });
-    setIsEditing(false);
-    setEditingField(null);
+  const handleSave = async () => {
+    if (!formData.nome || !formData.whatsapp) {
+      toast({ title: 'Campos obrigatórios', description: 'Preencha nome e WhatsApp.', variant: 'destructive' });
+      return;
+    }
+    const whatsappNum = formData.whatsapp.replace(/\D/g, '');
+    if (whatsappNum.length !== 11) {
+      toast({ title: 'WhatsApp inválido', description: 'Informe um WhatsApp válido (11 dígitos)', variant: 'destructive' });
+      return;
+    }
+    const updated = await supabaseDatabase.updateUser(user.id, { nome: formData.nome, whatsapp: formData.whatsapp });
+    if (updated) {
+      toast({ title: 'Perfil atualizado! ✅', description: 'Suas informações foram salvas com sucesso' });
+      setIsEditing(false);
+      setEditingField(null);
+    } else {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o perfil.', variant: 'destructive' });
+    }
   };
 
   const handleCancel = () => {
     setFormData({
       nome: user?.nome || '',
       email: user?.email || '',
-      telefone: '',
+      whatsapp: user?.whatsapp || '',
       endereco: '',
       profissao: ''
     });
@@ -108,6 +120,12 @@ const UserProfile: React.FC = () => {
     return 'Sem Plano';
   }
 
+  function getPlanExpirationText(user) {
+    if (!(user as any)?.plan_expiration) return null;
+    const date = new Date((user as any).plan_expiration);
+    return `Seu plano expira dia ${format(date, 'dd/MM/yyyy')} às ${format(date, 'HH:mm')}`;
+  }
+
   return (
     <div className="space-y-6 p-4 pb-20">
       {/* Header do Perfil */}
@@ -148,14 +166,12 @@ const UserProfile: React.FC = () => {
                   {user.plan_type === 'ouro' ? <Crown className="w-3 h-3 mr-1" /> : null}
                   {getPlanoLabel(user.plan_type)}
                 </Badge>
-                
                 {user.is_admin && (
                   <Badge variant="destructive">
                     <Shield className="w-3 h-3 mr-1" />
                     Admin
                   </Badge>
                 )}
-
                 {user.plan_type === 'trial' && user.trial_start && (
                   <span className="text-xs text-muted-foreground ml-2">
                     {(() => {
@@ -170,6 +186,11 @@ const UserProfile: React.FC = () => {
                   </span>
                 )}
               </div>
+              {(user as any)?.plan_expiration && (
+                <div className="block text-xs text-muted-foreground mt-1 text-center">
+                  {getPlanExpirationText(user)}
+                </div>
+              )}
             </div>
 
             {/* Botões de Ação */}
@@ -240,20 +261,30 @@ const UserProfile: React.FC = () => {
             </div>
           </div>
 
-          {/* Telefone */}
+          {/* WhatsApp */}
           <div className="space-y-2">
-            <Label htmlFor="telefone">Telefone</Label>
+            <Label htmlFor="whatsapp">WhatsApp</Label>
             {isEditing ? (
               <Input
-                id="telefone"
-                value={formData.telefone}
-                onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
-                placeholder="(11) 99999-9999"
+                id="whatsapp"
+                value={formData.whatsapp}
+                onChange={e => {
+                  let num = e.target.value.replace(/\D/g, '');
+                  if (num.length > 11) num = num.slice(0, 11);
+                  let masked = num;
+                  if (num.length > 2) masked = `(${num.slice(0,2)}) ${num.slice(2)}`;
+                  if (num.length > 7) masked = `(${num.slice(0,2)}) ${num.slice(2,7)}-${num.slice(7)}`;
+                  setFormData(prev => ({ ...prev, whatsapp: masked }));
+                }}
+                placeholder="(99) 99999-9999"
+                required
+                maxLength={15}
+                inputMode="tel"
               />
             ) : (
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm">{formData.telefone || 'Não informado'}</p>
+                <p className="text-sm">{formData.whatsapp || 'Não informado'}</p>
               </div>
             )}
           </div>

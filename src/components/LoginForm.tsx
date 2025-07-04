@@ -19,6 +19,7 @@ const LoginForm: React.FC = () => {
   const [registerData, setRegisterData] = useState({
     nome: '',
     email: '',
+    whatsapp: '',
     password: '',
     confirmPassword: ''
   });
@@ -67,7 +68,7 @@ const LoginForm: React.FC = () => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!registerData.nome || !registerData.email || !registerData.password || !registerData.confirmPassword) {
+    if (!registerData.nome || !registerData.email || !registerData.whatsapp || !registerData.password || !registerData.confirmPassword) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
@@ -94,9 +95,19 @@ const LoginForm: React.FC = () => {
       return;
     }
 
+    const whatsappNum = registerData.whatsapp.replace(/\D/g, '');
+    if (whatsappNum.length !== 11) {
+      toast({
+        title: "Erro",
+        description: "Informe um WhatsApp válido (11 dígitos)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { success, error } = await register(registerData.email, registerData.password, registerData.nome);
+      const { success, error } = await register(registerData.email, registerData.password, registerData.nome, registerData.whatsapp);
       
       if (success) {
         toast({
@@ -129,6 +140,15 @@ const LoginForm: React.FC = () => {
 
   const handleRegisterInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    if (name === 'whatsapp') {
+      let num = value.replace(/\D/g, '');
+      if (num.length > 11) num = num.slice(0, 11);
+      let masked = num;
+      if (num.length > 2) masked = `(${num.slice(0,2)}) ${num.slice(2)}`;
+      if (num.length > 7) masked = `(${num.slice(0,2)}) ${num.slice(2,7)}-${num.slice(7)}`;
+      setRegisterData(prev => ({ ...prev, whatsapp: masked }));
+      return;
+    }
     setRegisterData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -218,6 +238,21 @@ const LoginForm: React.FC = () => {
                       onChange={handleRegisterInputChange}
                       placeholder="seu@email.com"
                       required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-whatsapp">WhatsApp</Label>
+                    <Input
+                      id="register-whatsapp"
+                      name="whatsapp"
+                      type="text"
+                      value={registerData.whatsapp}
+                      onChange={handleRegisterInputChange}
+                      placeholder="(99) 99999-9999"
+                      required
+                      maxLength={15}
+                      inputMode="tel"
                     />
                   </div>
                   

@@ -2,9 +2,12 @@ export interface User {
   id: string;
   nome: string;
   email: string;
+  whatsapp: string;
   is_admin: boolean;
-  plan_type: 'bronze' | 'ouro';
+  plan_type: 'bronze' | 'ouro' | 'trial' | null;
+  plan_expiration: string | null;
   data_criacao: string;
+  is_blocked?: boolean;
 }
 
 export interface Income {
@@ -207,24 +210,66 @@ export interface Appointment {
   updated_at: string;
 }
 
+export interface Sale {
+  id: string;
+  admin_id: string;
+  email: string;
+  plano: 'ouro' | 'bronze' | 'trial' | 'none';
+  tempo_plano: string;
+  valor: number;
+  data_venda: string;
+  created_at: string;
+}
+
+export interface Webhook {
+  id: string;
+  url: string;
+  evento: 'criou_conta' | 'trial_expirou' | 'trial_expira_1h' | 'plano_expirou' | 'venda_realizada' | 'compromisso';
+  criado_em: string;
+}
+
 class MockDatabase {
   private static instance: MockDatabase;
   
   private users: User[] = [
     {
-      id: '550e8400-e29b-41d4-a716-446655440001',
-      nome: 'Demo User',
-      email: 'demo@exemplo.com',
+      id: '1',
+      nome: 'Usuário Demo',
+      email: 'demo@demo.com',
+      whatsapp: '1234567890',
       is_admin: false,
       plan_type: 'bronze',
+      plan_expiration: null,
       data_criacao: new Date().toISOString()
     },
     {
-      id: '550e8400-e29b-41d4-a716-446655440002',
-      nome: 'Admin User',
-      email: 'admin@exemplo.com',
+      id: '2',
+      nome: 'Admin',
+      email: 'admin@admin.com',
+      whatsapp: '0987654321',
       is_admin: true,
       plan_type: 'ouro',
+      plan_expiration: null,
+      data_criacao: new Date().toISOString()
+    },
+    {
+      id: '3',
+      nome: 'Trial User',
+      email: 'trial@demo.com',
+      whatsapp: '1122334455',
+      is_admin: false,
+      plan_type: 'trial',
+      plan_expiration: null,
+      data_criacao: new Date().toISOString()
+    },
+    {
+      id: '4',
+      nome: 'Sem Plano',
+      email: 'semplano@demo.com',
+      whatsapp: '5555555555',
+      is_admin: false,
+      plan_type: null,
+      plan_expiration: null,
       data_criacao: new Date().toISOString()
     }
   ];
@@ -262,6 +307,7 @@ class MockDatabase {
   private notificationHistory: NotificationHistory[] = [];
   private incomes: Income[] = [];
   private appointments: Appointment[] = [];
+  private webhooks: Webhook[] = [];
 
   private constructor() {
     console.log('⚠️ MockDatabase - Backup instance (not used)');
@@ -404,16 +450,19 @@ class MockDatabase {
     return this.users.find(u => u.id === userId) || null;
   }
 
-  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro'): Promise<User | null> {
-    const index = this.users.findIndex(u => u.id === userId);
-    if (index > -1) {
-      this.users[index].plan_type = planType;
-      return this.users[index];
+  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro' | 'trial' | null, plan_expiration?: string | null): Promise<User | null> {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      user.plan_type = planType;
+      if (typeof plan_expiration !== 'undefined') {
+        user.plan_expiration = plan_expiration;
+      }
+      return user;
     }
     return null;
   }
 
-  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | null> {
+  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | 'trial' | null> {
     const user = this.users.find(u => u.id === userId);
     return user?.plan_type || null;
   }
@@ -1326,6 +1375,51 @@ class MockDatabase {
       read_rate: readRate,
       recent_notifications: recentNotifications
     };
+  }
+
+  async createUser(user: Omit<User, 'id' | 'data_criacao'> & { plan_expiration?: string | null }): Promise<User | null> {
+    const newUser: User = {
+      id: (this.users.length + 1).toString(),
+      nome: user.nome,
+      email: user.email,
+      whatsapp: user.whatsapp,
+      is_admin: user.is_admin,
+      plan_type: user.plan_type ?? null,
+      plan_expiration: user.plan_expiration ?? null,
+      data_criacao: new Date().toISOString().split('T')[0],
+    };
+    this.users.push(newUser);
+    return newUser;
+  }
+
+  async getAllIncomes(): Promise<Income[]> {
+    return [...this.incomes];
+  }
+
+  async getAllAppointments(): Promise<Appointment[]> {
+    return [...this.appointments];
+  }
+
+  async getAllUserStats(): Promise<UserStats[]> {
+    return [...this.userStats];
+  }
+
+  async addWebhook(webhook: Omit<Webhook, 'id' | 'criado_em'>): Promise<Webhook> {
+    const newWebhook: Webhook = {
+      ...webhook,
+      id: Math.random().toString(36).substr(2, 9),
+      criado_em: new Date().toISOString(),
+    };
+    this.webhooks.push(newWebhook);
+    return newWebhook;
+  }
+
+  async getWebhooks(): Promise<Webhook[]> {
+    return this.webhooks;
+  }
+
+  async removeWebhook(id: string): Promise<void> {
+    this.webhooks = this.webhooks.filter(w => w.id !== id);
   }
 }
 

@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS public.appointments (
         'outros'
     )),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    notificado_1h BOOLEAN DEFAULT FALSE
 );
 
 -- 2. Criar índices para performance

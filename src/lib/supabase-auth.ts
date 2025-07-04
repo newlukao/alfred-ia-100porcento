@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { User as AuthUser } from '@supabase/supabase-js';
+import { triggerWebhooks } from './webhooks';
 
 export interface AppUser {
   id: string;
@@ -7,8 +8,10 @@ export interface AppUser {
   email: string;
   is_admin: boolean;
   plan_type: 'bronze' | 'ouro' | 'trial' | null;
+  plan_expiration?: string | null;
   data_criacao: string;
   trial_start?: string | null;
+  whatsapp: string;
 }
 
 // Cache simples para usuários
@@ -55,33 +58,29 @@ class SupabaseAuthService {
   }
 
   // 📝 REGISTRO COM SUPABASE AUTH
-  async signUp(email: string, password: string, nome: string): Promise<{ user: AppUser | null; error: string | null }> {
+  async signUp(email: string, password: string, nome: string, whatsapp: string): Promise<{ user: AppUser | null; error: string | null }> {
     try {
-      console.log('📝 SupabaseAuth - Registrando usuário:', email, nome);
-
+      console.log('📝 SupabaseAuth - Registrando usuário:', email, nome, whatsapp);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            nome: nome
+            nome: nome,
+            whatsapp: whatsapp
           }
         }
       });
-
       if (error) {
         console.error('❌ Erro no registro Supabase:', error);
         return { user: null, error: error.message };
       }
-
       if (!data.user) {
         return { user: null, error: 'Falha ao criar usuário' };
       }
-
       // Criar registro na tabela users
-      const appUser = await this.createAppUser(data.user.id, email, nome);
+      const appUser = await this.createAppUser(data.user.id, email, nome, whatsapp);
       console.log('✅ Usuário registrado:', appUser);
-
       return { user: appUser, error: null };
     } catch (error) {
       console.error('❌ Erro no registro:', error);
@@ -179,59 +178,53 @@ class SupabaseAuthService {
   }
 
   // 🔧 CRIAR USUÁRIO NO BANCO (COM TIMEOUT)
-  private async createUserInDatabase(authUserId: string): Promise<AppUser | null> {
+  private async createUserInDatabase(authUserId: string, whatsapp?: string): Promise<AppUser | null> {
     try {
       // Timeout reduzido na busca do usuário auth
       const getUserPromise = supabase.auth.getUser();
       const timeoutPromise = new Promise((resolve) =>
         setTimeout(() => resolve({ data: { user: null } }), this.QUERY_TIMEOUT)
       );
-
       const { data: { user } } = await Promise.race([getUserPromise, timeoutPromise]) as any;
-      
       let email = 'admin@admin.com';
       let nome = 'Admin';
-      
+      let userWhatsapp = whatsapp || '';
       if (user) {
         email = user.email || 'admin@admin.com';
         nome = user.user_metadata?.nome || user.user_metadata?.name || 'Usuário';
+        userWhatsapp = user.user_metadata?.whatsapp || '';
       }
-
       const isAdmin = email === 'admin@admin.com';
       const userData = {
         id: authUserId,
         email,
         nome,
+        whatsapp: userWhatsapp,
         is_admin: isAdmin,
         plan_type: isAdmin ? 'ouro' as const : 'trial',
         trial_start: isAdmin ? null : new Date().toISOString()
       };
-
       console.log('➕ Criando usuário com timeout:', userData);
-
       // Timeout na criação também
       const createPromise = supabase
         .from('users')
         .insert([userData])
         .select()
         .single();
-
       const createTimeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Create timeout')), this.QUERY_TIMEOUT)
       );
-
       const { data, error } = await Promise.race([createPromise, createTimeoutPromise]) as any;
-
       if (error) {
         console.error('❌ Erro ao criar usuário:', error);
         console.error('❌ Código do erro:', error.code);
         console.error('❌ Detalhes:', error.details, error.hint, error.message);
         // Se usuário já existe, atualizar para trial
         if (error.code === '23505') {
-          console.log('�� Usuário já existe, atualizando para trial...');
+          console.log('🔄 Usuário já existe, atualizando para trial...');
           await supabase
             .from('users')
-            .update({ plan_type: 'trial', trial_start: new Date().toISOString() })
+            .update({ plan_type: 'trial', trial_start: new Date().toISOString(), whatsapp: userWhatsapp })
             .eq('id', authUserId);
           // Buscar registro atualizado
           const { data: updatedUser } = await supabase
@@ -245,7 +238,6 @@ class SupabaseAuthService {
         console.log('❌ Criação falhou');
         return null;
       }
-
       console.log('✅ Usuário criado:', data);
       return data as AppUser;
     } catch (error) {
@@ -268,8 +260,10 @@ class SupabaseAuthService {
       nome: fallbackNome,
       is_admin: isAdmin,
       plan_type: isAdmin ? 'ouro' : 'trial',
+      plan_expiration: null,
       trial_start: isAdmin ? null : new Date().toISOString(),
-      data_criacao: new Date().toISOString()
+      data_criacao: new Date().toISOString(),
+      whatsapp: ''
     };
     
     console.log('✅ Usuário fallback criado:', fallbackUser);
@@ -277,41 +271,38 @@ class SupabaseAuthService {
   }
 
   // ➕ CRIAR USUÁRIO NA TABELA
-  private async createAppUser(authUserId: string, email: string, nome: string): Promise<AppUser | null> {
+  private async createAppUser(authUserId: string, email: string, nome: string, whatsapp: string): Promise<AppUser | null> {
     try {
-      console.log('➕ Criando usuário na tabela:', { authUserId, email, nome });
-      
+      console.log('➕ Criando usuário na tabela:', { authUserId, email, nome, whatsapp });
       const isAdmin = email === 'admin@admin.com';
       const userData = {
         id: authUserId,
         email,
         nome,
+        whatsapp,
         is_admin: isAdmin,
         plan_type: isAdmin ? 'ouro' as const : 'trial',
         trial_start: isAdmin ? null : new Date().toISOString()
       };
       console.log('📝 Dados para inserção (createAppUser):', userData);
-
       const { data, error } = await supabase
         .from('users')
         .insert([userData])
         .select()
         .single();
-
-      console.log('📊 Resultado da inserção:', { data, error });
-
+      console.log(' Resultado da inserção:', { data, error });
       if (error) {
         console.error('❌ Erro ao criar usuário:', error);
         console.error('❌ Código do erro:', error.code);
         console.error('❌ Detalhes:', error.details, error.hint, error.message);
-        // Se usuário já existe, atualizar para trial
         if (error.code === '23505') {
-          console.log('🔄 Usuário já existe, atualizando para trial...');
-          await supabase
-            .from('users')
-            .update({ plan_type: 'trial', trial_start: new Date().toISOString() })
-            .eq('id', authUserId);
-          // Buscar registro atualizado
+          // Usuário já existe, garantir que seja trial (exceto admin)
+          if (!isAdmin) {
+            await supabase
+              .from('users')
+              .update({ plan_type: 'trial', trial_start: new Date().toISOString(), whatsapp })
+              .eq('id', authUserId);
+          }
           const { data: updatedUser } = await supabase
             .from('users')
             .select('*')
@@ -323,7 +314,6 @@ class SupabaseAuthService {
         console.log('❌ Criação falhou');
         return null;
       }
-
       console.log('✅ Usuário criado com sucesso:', data);
       return data as AppUser;
     } catch (error) {
@@ -371,9 +361,31 @@ class SupabaseAuthService {
       const now = new Date();
       const diffMs = now.getTime() - trialStart.getTime();
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      const trialDurationMs = 24 * 60 * 60 * 1000; // 1 dia em ms
+      const timeLeftMs = trialDurationMs - diffMs;
+      // Se faltam 1h ou menos e ainda não expirou
+      if (timeLeftMs > 0 && timeLeftMs <= 60 * 60 * 1000) {
+        await triggerWebhooks('trial_expira_1h', {
+          id: user.id,
+          email: user.email,
+          nome: user.nome,
+          whatsapp: user.whatsapp,
+          trial_start: user.trial_start,
+          expira_em: new Date(trialStart.getTime() + trialDurationMs).toISOString()
+        });
+      }
       if (diffDays >= 1) {
         // Trial expirou, atualizar para sem plano
         await supabase.from('users').update({ plan_type: null, trial_start: null }).eq('id', user.id);
+        // Disparar webhook de trial expirado
+        await triggerWebhooks('trial_expirou', {
+          id: user.id,
+          email: user.email,
+          nome: user.nome,
+          whatsapp: user.whatsapp,
+          trial_start: user.trial_start,
+          expirou_em: now.toISOString()
+        });
         return { ...user, plan_type: null, trial_start: null };
       }
     }

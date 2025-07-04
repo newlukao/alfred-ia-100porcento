@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import { User, Expense, Income, NotificationSettings, NotificationHistory, Appointment, Goal, Achievement, UserStats } from './database';
+import { User, Expense, Income, NotificationSettings, NotificationHistory, Appointment, Goal, Achievement, UserStats, Sale } from './database';
+import { triggerWebhooks } from './webhooks';
 
 // 🔥 Função auxiliar para data brasileira em formato string
 function getBrazilDateString(): string {
@@ -11,6 +12,9 @@ function getBrazilDateString(): string {
   const day = String(brazilTime.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export type { User, Expense, Income, Appointment };
+export { supabase };
 
 export class SupabaseDatabase {
   private static instance: SupabaseDatabase;
@@ -281,6 +285,20 @@ export class SupabaseDatabase {
     }
   }
 
+  async getAllIncomes(): Promise<Income[]> {
+    try {
+      const { data, error } = await supabase
+        .from('incomes')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as Income[];
+    } catch (error) {
+      console.error('Error getting all incomes:', error);
+      return [];
+    }
+  }
+
   // ============================================================================
   // APPOINTMENT METHODS (PLANO OURO APENAS)
   // ============================================================================
@@ -443,24 +461,51 @@ export class SupabaseDatabase {
     }
   }
 
+  async getAllAppointments(): Promise<Appointment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+      if (error) throw error;
+      return data as Appointment[];
+    } catch (error) {
+      console.error('Error getting all appointments:', error);
+      return [];
+    }
+  }
+
   // ============================================================================
   // PLAN METHODS
   // ============================================================================
 
-  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro'): Promise<User | null> {
+  async updateUserPlan(userId: string, planType: 'bronze' | 'ouro' | 'trial' | null, plan_expiration?: string | null): Promise<User | null> {
     try {
-      console.log(`📋 updateUserPlan - Atualizando usuário ${userId} para plano ${planType}`);
-      
+      console.log(`📋 updateUserPlan - Atualizando usuário ${userId} para plano ${planType} e expiração ${plan_expiration}`);
+      const updateFields: any = { plan_type: planType };
+      if (typeof plan_expiration !== 'undefined') {
+        updateFields.plan_expiration = plan_expiration;
+      }
       const { data, error } = await supabase
         .from('users')
-        .update({ plan_type: planType })
+        .update(updateFields)
         .eq('id', userId)
         .select()
         .single();
-
       if (error) throw error;
-      
-      console.log('✅ Plano atualizado com sucesso:', data);
+      console.log('✅ Plano e expiração atualizados com sucesso:', data);
+      // Disparar webhook se o plano expirou
+      if (planType === null) {
+        await triggerWebhooks('plano_expirou', {
+          id: data.id,
+          email: data.email,
+          nome: data.nome,
+          whatsapp: data.whatsapp,
+          expirou_em: new Date().toISOString(),
+          plan_expiration: data.plan_expiration
+        });
+      }
       return data as User;
     } catch (error) {
       console.error('Error updating user plan:', error);
@@ -468,7 +513,7 @@ export class SupabaseDatabase {
     }
   }
 
-  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | null> {
+  async getUserPlan(userId: string): Promise<'bronze' | 'ouro' | 'trial' | null> {
     try {
       const user = await this.getUserById(userId);
       return user?.plan_type || null;
@@ -988,6 +1033,228 @@ export class SupabaseDatabase {
         conversation_count: 1,
         last_updated: new Date().toISOString()
       };
+    }
+  }
+
+  async getUserStats(userId: string): Promise<UserStats | null> {
+    try {
+      const { data, error } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('usuario_id', userId)
+        .single();
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+      }
+      return data as UserStats;
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      return null;
+    }
+  }
+
+  async getAllUserStats(): Promise<UserStats[]> {
+    try {
+      const { data, error } = await supabase
+        .from('user_stats')
+        .select('*');
+      if (error) throw error;
+      return data as UserStats[];
+    } catch (error) {
+      console.error('Error getting all user stats:', error);
+      return [];
+    }
+  }
+
+  async getChatInteractionRanking(limit = 10): Promise<{ usuario_id: string, total_mensagens: number }[]> {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_history')
+        .select('usuario_id')
+        .limit(10000); // Ajuste conforme o volume de dados
+      if (error) throw error;
+      // Agrupa e conta no frontend
+      const counts: Record<string, number> = {};
+      for (const msg of data as any[]) {
+        if (!msg.usuario_id) continue;
+        counts[msg.usuario_id] = (counts[msg.usuario_id] || 0) + 1;
+      }
+      return Object.entries(counts)
+        .map(([usuario_id, total_mensagens]) => ({ usuario_id, total_mensagens }))
+        .sort((a, b) => b.total_mensagens - a.total_mensagens)
+        .slice(0, limit);
+    } catch (error) {
+      console.error('Erro ao buscar ranking de interações do chat:', error);
+      return [];
+    }
+  }
+
+  async updateUserBlockedStatus(userId: string, isBlocked: boolean): Promise<User | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({ is_blocked: isBlocked })
+        .eq('id', userId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as User;
+    } catch (error) {
+      console.error('Error updating user blocked status:', error);
+      return null;
+    }
+  }
+
+  // ==========================================================================
+  // SALES METHODS
+  // ==========================================================================
+  async addSale(sale: Omit<Sale, 'id' | 'created_at'>): Promise<Sale | null> {
+    try {
+      const { data, error } = await supabase
+        .from('vendas')
+        .insert([sale])
+        .select()
+        .single();
+      if (error) throw error;
+      // Disparar webhook de venda realizada
+      await triggerWebhooks('venda_realizada', data);
+      return data as Sale;
+    } catch (error) {
+      console.error('Error adding sale:', error);
+      return null;
+    }
+  }
+
+  async getSales({ page = 1, perPage = 20, email, plano, startDate, endDate }: {
+    page?: number;
+    perPage?: number;
+    email?: string;
+    plano?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ sales: Sale[]; total: number }> {
+    try {
+      let query = supabase
+        .from('vendas')
+        .select('*', { count: 'exact' })
+        .order('data_venda', { ascending: false })
+        .range((page - 1) * perPage, page * perPage - 1);
+      if (email) query = query.ilike('email', `%${email}%`);
+      if (plano) query = query.eq('plano', plano);
+      if (startDate) query = query.gte('data_venda', startDate);
+      if (endDate) query = query.lte('data_venda', endDate);
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return { sales: data as Sale[], total: count || 0 };
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+      return { sales: [], total: 0 };
+    }
+  }
+
+  async updateSale(id: string, updates: Partial<Omit<Sale, 'id' | 'usuario_id' | 'created_at'>>): Promise<Sale | null> {
+    try {
+      const { data, error } = await supabase
+        .from('vendas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Sale;
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      return null;
+    }
+  }
+
+  async deleteSale(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('vendas')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+    }
+  }
+
+  // ==========================================================================
+  // MÉTODOS DE AGREGAÇÃO DE VENDAS PARA DASHBOARD
+  // ==========================================================================
+  async getSalesByPlan({ data_inicio, data_fim }: { data_inicio?: string, data_fim?: string } = {}): Promise<{ plano: string, total: number }[]> {
+    let query = supabase
+      .from('vendas')
+      .select('plano')
+    if (data_inicio) query = query.gte('data_venda', data_inicio);
+    if (data_fim) query = query.lte('data_venda', data_fim);
+    const { data, error } = await query;
+    if (error) throw error;
+    // Agrupa no frontend
+    const grouped: Record<string, number> = {};
+    (data as any[]).forEach(item => {
+      grouped[item.plano] = (grouped[item.plano] || 0) + 1;
+    });
+    return Object.entries(grouped).map(([plano, total]) => ({ plano, total }));
+  }
+
+  async getSalesEvolution({ data_inicio, data_fim }: { data_inicio?: string, data_fim?: string } = {}): Promise<{ data: string, total: number }[]> {
+    let query = supabase
+      .from('vendas')
+      .select('data_venda')
+      .order('data_venda', { ascending: true });
+    if (data_inicio) query = query.gte('data_venda', data_inicio);
+    if (data_fim) query = query.lte('data_venda', data_fim);
+    const { data, error } = await query;
+    if (error) throw error;
+    // Agrupa por data no frontend
+    const grouped: Record<string, number> = {};
+    (data as any[]).forEach(item => {
+      grouped[item.data_venda] = (grouped[item.data_venda] || 0) + 1;
+    });
+    return Object.entries(grouped).map(([data, total]) => ({ data, total }));
+  }
+
+  // Atualiza nome e whatsapp do usuário
+  async updateUser(userId: string, updates: { nome?: string; whatsapp?: string }): Promise<User | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as User;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return null;
+    }
+  }
+
+  // Função para notificar compromissos que vão acontecer em 1h
+  async checkAndNotifyUpcomingAppointments(): Promise<void> {
+    const now = new Date();
+    const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const inOneHourAndFive = new Date(now.getTime() + 65 * 60 * 1000);
+    const { data: compromissos, error } = await supabase
+      .from('compromissos')
+      .select('*')
+      .gte('data', inOneHour.toISOString())
+      .lt('data', inOneHourAndFive.toISOString())
+      .eq('notificado_1h', false);
+    if (error) {
+      console.error('Erro ao buscar compromissos para notificação:', error);
+      return;
+    }
+    for (const compromisso of compromissos || []) {
+      await triggerWebhooks('compromisso', compromisso);
+      await supabase
+        .from('compromissos')
+        .update({ notificado_1h: true })
+        .eq('id', compromisso.id);
     }
   }
 }

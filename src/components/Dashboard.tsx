@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, TrendingDown, TrendingUp, Calendar, Filter, Trash2, Download, Edit, Edit2, Target, BarChart3, Trophy, Bell, BookTemplate, Crown, Shield, DollarSign, PiggyBank, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { database, Expense, Budget, Income } from '@/lib/database';
+import { database, Expense, Budget, Income, Appointment } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, ComposedChart, Area, AreaChart } from 'recharts';
 import { Progress } from '@/components/ui/progress';
@@ -133,6 +133,30 @@ const Dashboard: React.FC = () => {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const device = useDevice();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [weeklyAppointments, setWeeklyAppointments] = useState<Appointment[]>([]);
+
+  // Estados para edição de agendamento
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [isEditAppointmentDialogOpen, setIsEditAppointmentDialogOpen] = useState(false);
+  const [editAppointment, setEditAppointment] = useState<{
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    location: string;
+    category: 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
+  }>(
+    {
+      title: '',
+      description: '',
+      date: '',
+      time: '',
+      location: '',
+      category: 'outros'
+    }
+  );
+
   useEffect(() => {
     if (device.isMobile) {
       setShowInstallBanner(true);
@@ -153,10 +177,15 @@ const Dashboard: React.FC = () => {
     // Buscar compromissos do dia
     if (isGold(user) && database.getAppointmentsByUser) {
       database.getAppointmentsByUser(user.id).then(userAppointments => {
+        setAppointments(userAppointments);
         const today = new Date().toISOString().split('T')[0];
         const todayAppointments = userAppointments.filter(apt => apt.date === today);
         setTodayAppointmentsCount(todayAppointments.length);
       });
+      // Buscar compromissos da semana
+      if (database.getUpcomingAppointments) {
+        database.getUpcomingAppointments(user.id, 7).then(weekApps => setWeeklyAppointments(weekApps));
+      }
     }
     // Buscar notificações não lidas
     if (database.getUnreadNotificationCount) {
@@ -635,6 +664,86 @@ const Dashboard: React.FC = () => {
     if (plan_type === 'trial') return 'Trial';
     return 'Sem Plano';
   }
+
+  // Função utilitária para garantir categoria válida
+  const sanitizeAppointmentCategory = (cat: string): 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros' => {
+    const valid = [
+      'pessoal', 'trabalho', 'saúde', 'educação', 'família', 'negócios', 'lazer', 'financeiro', 'outros'
+    ];
+    return (valid.includes(cat) ? cat : 'outros') as 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
+  };
+
+  // Função utilitária para garantir formato HH:mm no input time
+  const formatTimeForInput = (time: string | null | undefined) => {
+    if (!time) return '';
+    if (/^\d{2}:\d{2}$/.test(time)) return time;
+    if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time.slice(0, 5);
+    return '';
+  };
+
+  // Handler para editar agendamento
+  const handleEditAppointment = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setEditAppointment({
+      title: appointment.title,
+      description: appointment.description || '',
+      date: appointment.date,
+      time: formatTimeForInput(appointment.time),
+      location: appointment.location || '',
+      category: sanitizeAppointmentCategory(appointment.category)
+    });
+    setIsEditAppointmentDialogOpen(true);
+  };
+
+  const handleUpdateAppointment = async () => {
+    if (!editingAppointment) return;
+    try {
+      const updated = await database.updateAppointment(editingAppointment.id, {
+        title: editAppointment.title,
+        description: editAppointment.description,
+        date: editAppointment.date,
+        time: editAppointment.time,
+        location: editAppointment.location,
+        category: editAppointment.category
+      });
+      toast({
+        title: 'Sucesso! ✏️',
+        description: 'Agendamento atualizado com sucesso'
+      });
+      if (updated) {
+        setAppointments(prev => prev.map(a => a.id === editingAppointment.id ? { ...a, ...updated } : a));
+      }
+      setIsEditAppointmentDialogOpen(false);
+      setEditingAppointment(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar agendamento',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    try {
+      await database.deleteAppointment(id);
+      toast({
+        title: "Sucesso",
+        description: "Agendamento removido com sucesso"
+      });
+      setAppointments(prev => prev.filter(a => a.id !== id));
+      loadData();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao remover agendamento",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -1126,22 +1235,22 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Card Gasto Médio - Mobile */}
-            <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-3 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-3 relative overflow-hidden">
               <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <PiggyBank className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-200 flex items-center justify-center">
+                  <Calendar className="h-4 w-4 text-blue-700" />
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-purple-700">Gasto Médio</p>
-                <p className="text-lg font-bold text-purple-800">
-                  R$ {averageExpense.toFixed(2)}
+                <p className="text-xs font-medium text-blue-700">Compromissos da semana</p>
+                <p className="text-lg font-bold text-blue-800">
+                  {weeklyAppointments.length}
                 </p>
-                <p className="text-xs text-purple-600 opacity-80">
-                  por item
+                <p className="text-xs text-blue-600 opacity-80">
+                  agendados nos próximos 7 dias
                 </p>
               </div>
-              <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-purple-200 rounded-full opacity-20"></div>
+              <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-blue-200 rounded-full opacity-20"></div>
             </div>
           </div>
 
@@ -1215,22 +1324,22 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Card Gasto Médio - Desktop */}
-            <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-4 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 relative overflow-hidden">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <PiggyBank className="h-5 w-5 text-purple-600" />
-            </div>
+                <div className="w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-blue-700" />
+                </div>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-purple-700">Gasto Médio</p>
-                <p className="text-2xl font-bold text-purple-800">
-                  R$ {averageExpense.toFixed(2)}
+                <p className="text-sm font-medium text-blue-700">Compromissos da semana</p>
+                <p className="text-2xl font-bold text-blue-800">
+                  {weeklyAppointments.length}
                 </p>
-                <p className="text-sm text-purple-600 opacity-80">
-                  por item
+                <p className="text-sm text-blue-600 opacity-80">
+                  agendados nos próximos 7 dias
                 </p>
               </div>
-              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-purple-200 rounded-full opacity-20"></div>
+              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-blue-200 rounded-full opacity-20"></div>
             </div>
       </div>
 
@@ -1434,8 +1543,16 @@ const Dashboard: React.FC = () => {
                     description: expense.descricao,
                     category: expense.categoria,
                     date: expense.data
+                  })),
+                  ...appointments.map(appointment => ({
+                    ...appointment,
+                    type: 'appointment' as const,
+                    amount: 0,
+                    description: appointment.title,
+                    category: appointment.category,
+                    date: appointment.date
                   }))
-                ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                ].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
                 const totalPages = Math.ceil(allTransactions.length / transactionsPerPage);
                 const startIndex = (currentPage - 1) * transactionsPerPage;
@@ -1451,7 +1568,7 @@ const Dashboard: React.FC = () => {
                              className="group flex items-center justify-between py-2 px-1 hover:bg-gray-50 rounded-md transition-colors"
                            >
                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                               <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                               <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : transaction.type === 'appointment' ? 'bg-blue-500' : 'bg-red-500'}`}></div>
                                <div className="min-w-0 flex-1">
                                  <p className="font-medium text-sm text-gray-900 truncate">{transaction.description}</p>
                                  <p className="text-xs text-gray-500 capitalize">{transaction.category}</p>
@@ -1460,8 +1577,8 @@ const Dashboard: React.FC = () => {
                              
                              <div className="flex items-center gap-2">
                                <div className="text-right flex-shrink-0">
-                                 <p className={`font-semibold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                   {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toFixed(2)}
+                                 <p className={`font-semibold text-sm ${transaction.type === 'income' ? 'text-green-600' : transaction.type === 'appointment' ? 'text-blue-600' : 'text-red-600'}`}>
+                                   {transaction.type === 'income' ? '+' : transaction.type === 'appointment' ? '' : '-'}R$ {transaction.amount.toFixed(2)}
                                  </p>
                                  <p className="text-xs text-gray-400">
                                    {new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
@@ -1477,8 +1594,10 @@ const Dashboard: React.FC = () => {
                                    onClick={() => {
                                      if (transaction.type === 'expense') {
                                        handleEditExpense(transaction as any);
-                                     } else {
+                                     } else if (transaction.type === 'income') {
                                        handleEditIncome(transaction as any);
+                                     } else if (transaction.type === 'appointment') {
+                                       handleEditAppointment(transaction as any);
                                      }
                                    }}
                                  >
@@ -1493,8 +1612,10 @@ const Dashboard: React.FC = () => {
                                      if (confirm('Tem certeza que deseja excluir esta transação?')) {
                                        if (transaction.type === 'expense') {
                                          handleDeleteExpense(transaction.id);
-                                       } else {
+                                       } else if (transaction.type === 'income') {
                                          handleDeleteIncome(transaction.id);
+                                       } else if (transaction.type === 'appointment') {
+                                         handleDeleteAppointment(transaction.id);
                                        }
                                      }
                                    }}
@@ -1638,6 +1759,156 @@ const Dashboard: React.FC = () => {
     agendaBadge={todayAppointmentsCount}
     avisosBadge={unreadNotificationsCount}
   />
+
+  {/* Modal de edição de agendamento */}
+  <Dialog open={isEditAppointmentDialogOpen} onOpenChange={setIsEditAppointmentDialogOpen}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Editar Agendamento</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="edit-appointment-title">Título</Label>
+          <Input
+            id="edit-appointment-title"
+            value={editAppointment.title}
+            onChange={e => setEditAppointment(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="Ex: Consulta médica, Reunião..."
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-appointment-description">Descrição</Label>
+          <Input
+            id="edit-appointment-description"
+            value={editAppointment.description}
+            onChange={e => setEditAppointment(prev => ({ ...prev, description: e.target.value }))}
+            placeholder="Detalhes do compromisso"
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-appointment-date">Data</Label>
+          <Input
+            id="edit-appointment-date"
+            type="date"
+            value={editAppointment.date}
+            onChange={e => setEditAppointment(prev => ({ ...prev, date: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-appointment-time">Hora</Label>
+          <Input
+            id="edit-appointment-time"
+            type="time"
+            value={editAppointment.time}
+            onChange={e => setEditAppointment(prev => ({ ...prev, time: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-appointment-location">Local</Label>
+          <Input
+            id="edit-appointment-location"
+            value={editAppointment.location}
+            onChange={e => setEditAppointment(prev => ({ ...prev, location: e.target.value }))}
+            placeholder="Ex: Clínica, Escritório..."
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-appointment-category">Categoria</Label>
+          <Select value={editAppointment.category} onValueChange={value => setEditAppointment(prev => ({ ...prev, category: value as any }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pessoal">Pessoal</SelectItem>
+              <SelectItem value="trabalho">Trabalho</SelectItem>
+              <SelectItem value="saúde">Saúde</SelectItem>
+              <SelectItem value="educação">Educação</SelectItem>
+              <SelectItem value="família">Família</SelectItem>
+              <SelectItem value="negócios">Negócios</SelectItem>
+              <SelectItem value="lazer">Lazer</SelectItem>
+              <SelectItem value="financeiro">Financeiro</SelectItem>
+              <SelectItem value="outros">Outros</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Valor</Label>
+          <Input value="0,00" disabled className="bg-gray-100" />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setIsEditAppointmentDialogOpen(false)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleUpdateAppointment} disabled={!editAppointment.title || !editAppointment.date || !editAppointment.category}>
+          Salvar Alterações
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  {/* Modal de Edição de Gasto */}
+  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Editar Gasto</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="edit-expense-valor">Valor (R$)</Label>
+          <Input
+            id="edit-expense-valor"
+            type="number"
+            step="0.01"
+            value={editExpense.valor}
+            onChange={e => setEditExpense(prev => ({ ...prev, valor: e.target.value }))}
+            placeholder="0,00"
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-expense-categoria">Categoria</Label>
+          <Select value={editExpense.categoria} onValueChange={value => setEditExpense(prev => ({ ...prev, categoria: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {expenseCategories.map(category => (
+                <SelectItem key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="edit-expense-descricao">Descrição</Label>
+          <Textarea
+            id="edit-expense-descricao"
+            value={editExpense.descricao}
+            onChange={e => setEditExpense(prev => ({ ...prev, descricao: e.target.value }))}
+            placeholder="Descreva o gasto..."
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-expense-data">Data</Label>
+          <Input
+            id="edit-expense-data"
+            type="date"
+            value={editExpense.data}
+            onChange={e => setEditExpense(prev => ({ ...prev, data: e.target.value }))}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleUpdateExpense} disabled={!editExpense.valor || !editExpense.categoria || !editExpense.descricao}>
+          Salvar Alterações
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </div>
   );
 };

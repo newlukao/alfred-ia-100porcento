@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { useToast } from '../hooks/use-toast';
 import { supabaseDatabase } from '../lib/supabase-database';
-import { User, Expense, Income } from '../lib/supabase-database';
+import { User, Expense, Income, Appointment } from '../lib/supabase-database';
 import { 
   Crown, 
   Shield, 
@@ -25,7 +25,8 @@ import {
   Trash2,
   Filter,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Calendar
 } from 'lucide-react';
 import { isGold } from '../lib/utils';
 
@@ -37,6 +38,8 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [weeklyAppointments, setWeeklyAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -51,8 +54,10 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
   // Edit states
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [editingIncome, setEditingIncome] = useState<any>(null);
+  const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
   const [isEditIncomeDialogOpen, setIsEditIncomeDialogOpen] = useState(false);
+  const [isEditAppointmentDialogOpen, setIsEditAppointmentDialogOpen] = useState(false);
   const [editExpense, setEditExpense] = useState({
     valor: '',
     categoria: '',
@@ -66,6 +71,23 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     date: '',
     tags: ''
   });
+  const [editAppointment, setEditAppointment] = useState<{
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    location: string;
+    category: 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
+  }>(
+    {
+      title: '',
+      description: '',
+      date: '',
+      time: '',
+      location: '',
+      category: 'outros'
+    }
+  );
 
   // Form states for income
   const [incomeForm, setIncomeForm] = useState({
@@ -125,6 +147,18 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
         const userIncomes = await supabaseDatabase.getIncomesByUser(user.id);
         setIncomes(userIncomes);
       }
+
+      // Load appointments (only for gold plan)
+      if (isGold(user) && supabaseDatabase.getAppointmentsByUser) {
+        const userAppointments = await supabaseDatabase.getAppointmentsByUser(user.id);
+        setAppointments(userAppointments);
+
+        // Load weekly appointments (only for gold plan)
+        if (supabaseDatabase.getUpcomingAppointments) {
+          const weekApps = await supabaseDatabase.getUpcomingAppointments(user.id, 7);
+          setWeeklyAppointments(weekApps);
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -151,12 +185,13 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
 
   // Edit/Delete functions for expenses
   const handleEditExpense = (transaction: any) => {
+    console.log('Editando gasto:', transaction);
     setEditingExpense(transaction);
     setEditExpense({
-      valor: transaction.amount.toString(),
-      categoria: transaction.category,
-      descricao: transaction.description,
-      data: transaction.date
+      valor: transaction.amount?.toString() ?? transaction.valor?.toString() ?? '',
+      categoria: transaction.category ?? transaction.categoria ?? '',
+      descricao: transaction.description ?? transaction.descricao ?? '',
+      data: transaction.date ?? transaction.data ?? ''
     });
     setIsEditExpenseDialogOpen(true);
   };
@@ -229,13 +264,14 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
 
   // Edit/Delete functions for incomes
   const handleEditIncome = (transaction: any) => {
+    console.log('Editando recebimento:', transaction);
     setEditingIncome(transaction);
     setEditIncome({
-      amount: transaction.amount.toString(),
-      category: transaction.category,
-      description: transaction.description,
-      date: transaction.date,
-      tags: Array.isArray(transaction.tags) ? transaction.tags.join(', ') : ''
+      amount: transaction.amount?.toString() ?? '',
+      category: transaction.category ?? '',
+      description: transaction.description ?? '',
+      date: transaction.date ?? '',
+      tags: Array.isArray(transaction.tags) ? transaction.tags.join(', ') : (transaction.tags ?? '')
     });
     setIsEditIncomeDialogOpen(true);
   };
@@ -450,6 +486,73 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
     return 'Sem Plano';
   }
 
+  // Utilitário para garantir categoria válida de agendamento
+  const sanitizeAppointmentCategory = (cat: string): 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros' => {
+    const valid = [
+      'pessoal', 'trabalho', 'saúde', 'educação', 'família', 'negócios', 'lazer', 'financeiro', 'outros'
+    ];
+    return (valid.includes(cat) ? cat : 'outros') as 'pessoal' | 'trabalho' | 'saúde' | 'educação' | 'família' | 'negócios' | 'lazer' | 'financeiro' | 'outros';
+  };
+
+  // Função utilitária para garantir formato HH:mm no input time
+  const formatTimeForInput = (time: string | null | undefined) => {
+    if (!time) return '';
+    if (/^\d{2}:\d{2}$/.test(time)) return time;
+    if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time.slice(0, 5);
+    return '';
+  };
+
+  // Handler para editar agendamento
+  const handleEditAppointment = (transaction: any) => {
+    setEditingAppointment(transaction);
+    setEditAppointment({
+      title: transaction.title ?? transaction.description ?? '',
+      description: transaction.description ?? '',
+      date: transaction.date ?? '',
+      time: formatTimeForInput(transaction.time),
+      location: transaction.location ?? '',
+      category: sanitizeAppointmentCategory(transaction.category)
+    });
+    setIsEditAppointmentDialogOpen(true);
+  };
+
+  const handleUpdateAppointment = async () => {
+    if (!supabaseDatabase.updateAppointment || !editingAppointment) {
+      toast({
+        title: "Erro",
+        description: "Funcionalidade não disponível",
+        variant: "destructive"
+      });
+      return;
+    }
+    try {
+      const updatedAppointment = await supabaseDatabase.updateAppointment(editingAppointment.id, {
+        title: editAppointment.title,
+        description: editAppointment.description,
+        date: editAppointment.date,
+        time: editAppointment.time !== '' ? editAppointment.time : null,
+        location: editAppointment.location,
+        category: editAppointment.category
+      });
+      if (updatedAppointment) {
+        setAppointments(appointments.map(a => a.id === editingAppointment.id ? updatedAppointment : a));
+        setIsEditAppointmentDialogOpen(false);
+        setEditingAppointment(null);
+        toast({
+          title: "✅ Agendamento Atualizado!",
+          description: `${updatedAppointment.title} foi atualizado`
+        });
+      }
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar agendamento",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -605,23 +708,23 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
           </div>
         )}
 
-        {/* Card Gasto Médio */}
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-4 relative overflow-hidden">
+        {/* Card Compromissos da semana */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-              <PiggyBank className="h-5 w-5 text-purple-600" />
+            <div className="w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
+              <Calendar className="h-5 w-5 text-blue-700" />
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-medium text-purple-700">Gasto Médio</p>
-            <p className="text-2xl font-bold text-purple-800">
-              R$ {monthlyExpenses.length > 0 ? (totalExpenses / monthlyExpenses.length).toFixed(2) : '0.00'}
+            <p className="text-sm font-medium text-blue-700">Compromissos da semana</p>
+            <p className="text-2xl font-bold text-blue-800">
+              {weeklyAppointments.length}
             </p>
-            <p className="text-sm text-purple-600 opacity-80">
-              por item
+            <p className="text-sm text-blue-600 opacity-80">
+              agendados nos próximos 7 dias
             </p>
           </div>
-          <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-purple-200 rounded-full opacity-20"></div>
+          <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-blue-200 rounded-full opacity-20"></div>
         </div>
       </div>
 
@@ -851,7 +954,18 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                 date: income.date,
                 created_at: income.created_at,
                 tags: income.tags
-              })) : [])
+              })) : []),
+              ...appointments.map(appointment => ({
+                id: appointment.id,
+                type: 'appointment' as const,
+                description: appointment.title,
+                amount: 0,
+                category: appointment.category,
+                date: appointment.date,
+                time: appointment.time,
+                location: appointment.location,
+                created_at: appointment.created_at
+              }))
             ];
 
             // Aplicar filtros
@@ -887,7 +1001,7 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                   {paginatedTransactions.map((transaction) => (
                     <div key={`${transaction.type}-${transaction.id}`} className="group/item flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : transaction.type === 'appointment' ? 'bg-blue-500' : 'bg-red-500'}`}></div>
                         <div>
                           <p className="font-medium">{transaction.description}</p>
                           <div className="flex items-center gap-2">
@@ -899,10 +1013,12 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                               className={`text-xs px-2 py-0.5 ${
                                 transaction.type === 'income' 
                                   ? 'bg-green-50 text-green-700 border-green-200' 
-                                  : 'bg-red-50 text-red-700 border-red-200'
+                                  : transaction.type === 'appointment' 
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : 'bg-red-50 text-red-700 border-red-200'
                               }`}
                             >
-                              {transaction.type === 'income' ? 'Entrada' : 'Saída'}
+                              {transaction.type === 'income' ? 'Entrada' : transaction.type === 'appointment' ? 'Agendamento' : 'Saída'}
                             </Badge>
                           </div>
                         </div>
@@ -911,77 +1027,60 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
                         <div className="text-right flex items-center gap-2">
                           {transaction.type === 'income' ? (
                             <ArrowUp className="h-4 w-4 text-green-500" />
+                          ) : transaction.type === 'appointment' ? (
+                            <ArrowUp className="h-4 w-4 text-blue-500" />
                           ) : (
                             <ArrowDown className="h-4 w-4 text-red-500" />
                           )}
-                          <p className={`font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`font-bold ${transaction.type === 'income' ? 'text-green-600' : transaction.type === 'appointment' ? 'text-blue-600' : 'text-red-600'}`}>
                             R$ {transaction.amount.toFixed(2)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity duration-200">
-                          {transaction.type === 'expense' ? (
-                            <>
-                              <button
-                                onClick={() => handleEditExpense(transaction)}
-                                className="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors"
-                              >
-                                <Edit2 className="h-3 w-3 text-blue-600" />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (transaction.type === 'expense') {
+                                handleEditExpense(transaction);
+                              } else if (transaction.type === 'income') {
+                                handleEditIncome(transaction);
+                              } else if (transaction.type === 'appointment') {
+                                handleEditAppointment(transaction);
+                              }
+                            }}
+                            className="w-9 h-9 rounded-md bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors active:scale-95"
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <Edit2 className="h-4 w-4 text-blue-600" />
+                          </button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button className="w-9 h-9 rounded-md bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors active:scale-95" style={{ touchAction: 'manipulation' }}>
+                                <Trash2 className="h-4 w-4 text-red-600" />
                               </button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <button className="w-6 h-6 rounded-md bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors">
-                                    <Trash2 className="h-3 w-3 text-red-600" />
-                                  </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Excluir gasto</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tem certeza que deseja excluir o gasto "{transaction.description}"? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteExpense(transaction.id)} className="bg-red-600 hover:bg-red-700">
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          ) : (
-                            isGold(user) && (
-                              <>
-                                <button
-                                  onClick={() => handleEditIncome(transaction)}
-                                  className="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors"
-                                >
-                                  <Edit2 className="h-3 w-3 text-blue-600" />
-                                </button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <button className="w-6 h-6 rounded-md bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors">
-                                      <Trash2 className="h-3 w-3 text-red-600" />
-                                    </button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Excluir recebimento</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tem certeza que deseja excluir o recebimento "{transaction.description}"? Esta ação não pode ser desfeita.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteIncome(transaction.id)} className="bg-red-600 hover:bg-red-700">
-                                        Excluir
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )
-                          )}
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir {transaction.type === 'income' ? 'recebimento' : transaction.type === 'appointment' ? 'agendamento' : 'gasto'}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir {transaction.type === 'income' ? 'o recebimento' : transaction.type === 'appointment' ? 'o agendamento' : 'o gasto'} "{transaction.description}"? Esta ação não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => {
+                                  if (transaction.type === 'expense') {
+                                    handleDeleteExpense(transaction.id);
+                                  } else if (transaction.type === 'income') {
+                                    handleDeleteIncome(transaction.id);
+                                  } else if (transaction.type === 'appointment') {
+                                    handleDeleteAppointment(transaction.id);
+                                  }
+                                }} className={transaction.type === 'income' ? 'bg-green-600 hover:bg-green-700' : transaction.type === 'appointment' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}>
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </div>
@@ -1153,6 +1252,96 @@ export const PlanBasedDashboard: React.FC<PlanBasedDashboardProps> = ({ user }) 
               Cancelar
             </Button>
             <Button onClick={handleUpdateIncome} disabled={!editIncome.description || !editIncome.amount || !editIncome.category}>
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Appointment Dialog */}
+      <Dialog open={isEditAppointmentDialogOpen} onOpenChange={setIsEditAppointmentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Agendamento</DialogTitle>
+            <DialogDescription>
+              Faça as alterações necessárias no agendamento selecionado. O valor é sempre R$ 0,00.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-appointment-title">Título</Label>
+              <Input
+                id="edit-appointment-title"
+                value={editAppointment.title}
+                onChange={(e) => setEditAppointment({...editAppointment, title: e.target.value})}
+                placeholder="Ex: Consulta médica, Reunião..."
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-appointment-description">Descrição</Label>
+              <Input
+                id="edit-appointment-description"
+                value={editAppointment.description}
+                onChange={(e) => setEditAppointment({...editAppointment, description: e.target.value})}
+                placeholder="Detalhes do compromisso"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-appointment-date">Data</Label>
+              <Input
+                id="edit-appointment-date"
+                type="date"
+                value={editAppointment.date}
+                onChange={(e) => setEditAppointment({...editAppointment, date: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-appointment-time">Hora</Label>
+              <Input
+                id="edit-appointment-time"
+                type="time"
+                value={editAppointment.time}
+                onChange={(e) => setEditAppointment({...editAppointment, time: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-appointment-location">Local</Label>
+              <Input
+                id="edit-appointment-location"
+                value={editAppointment.location}
+                onChange={(e) => setEditAppointment({...editAppointment, location: e.target.value})}
+                placeholder="Ex: Clínica, Escritório..."
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-appointment-category">Categoria</Label>
+              <Select value={editAppointment.category} onValueChange={(value) => setEditAppointment({...editAppointment, category: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pessoal">Pessoal</SelectItem>
+                  <SelectItem value="trabalho">Trabalho</SelectItem>
+                  <SelectItem value="saúde">Saúde</SelectItem>
+                  <SelectItem value="educação">Educação</SelectItem>
+                  <SelectItem value="família">Família</SelectItem>
+                  <SelectItem value="negócios">Negócios</SelectItem>
+                  <SelectItem value="lazer">Lazer</SelectItem>
+                  <SelectItem value="financeiro">Financeiro</SelectItem>
+                  <SelectItem value="outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Valor</Label>
+              <Input value="0,00" disabled className="bg-gray-100" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditAppointmentDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateAppointment} disabled={!editAppointment.title || !editAppointment.date || !editAppointment.category}>
               Salvar Alterações
             </Button>
           </DialogFooter>

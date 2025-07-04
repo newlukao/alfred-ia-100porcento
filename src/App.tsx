@@ -15,6 +15,8 @@ import AdvancedAnalyticsPage from "@/components/AdvancedAnalyticsPage";
 import NotificationCenterPage from "@/components/NotificationCenterPage";
 import CalendarPage from "@/components/CalendarPage";
 import NotFound from "./pages/NotFound";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -76,7 +78,7 @@ const AppContent = () => {
   // console.log('🔄 APP CONTENT - Iniciando...');
   
   try {
-    const { user, isLoading } = useAuth();
+    const { user, isLoading, logout } = useAuth();
     // console.log('👤 AUTH STATE:', { user: user?.email || 'null', isLoading });
 
     if (isLoading) {
@@ -105,6 +107,25 @@ const AppContent = () => {
     if (!user) {
       console.log('🔐 Usuário não logado, mostrando LoginForm');
       return <LoginForm />;
+    }
+
+    if (user?.is_blocked) {
+      return (
+        <Dialog open={true}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sua conta foi bloqueada</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 text-center">
+              <p className="text-lg font-semibold text-red-700 mb-2">Você está temporariamente impedido de acessar o sistema.</p>
+              <p className="text-sm text-muted-foreground mb-4">Entre em contato com o suporte para mais informações.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="destructive" onClick={logout}>Desconectar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      );
     }
 
     console.log('✅ Usuário logado, mostrando Layout');
