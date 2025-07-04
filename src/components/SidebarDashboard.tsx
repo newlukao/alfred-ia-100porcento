@@ -449,10 +449,6 @@ const SidebarDashboard: React.FC = () => {
 
         {/* Bottom Actions */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-          <Button variant="ghost" className="w-full justify-start" size="sm">
-            <Settings className="w-4 h-4 mr-3" />
-            Configurações
-          </Button>
           <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" size="sm" onClick={logout}>
             <LogOut className="w-4 h-4 mr-3" />
             Sair

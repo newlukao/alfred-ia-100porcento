@@ -1120,8 +1120,17 @@ export class SupabaseDatabase {
         .select()
         .single();
       if (error) throw error;
-      // Disparar webhook de venda realizada
-      await triggerWebhooks('venda_realizada', data);
+      // Buscar o usuário para pegar o whatsapp
+      let whatsapp = null;
+      if (data && data.email) {
+        const user = await this.getUserByEmail(data.email);
+        whatsapp = user?.whatsapp || null;
+      }
+      // Disparar webhook de venda realizada com whatsapp
+      await triggerWebhooks('venda_realizada', {
+        ...data,
+        whatsapp
+      });
       return data as Sale;
     } catch (error) {
       console.error('Error adding sale:', error);
