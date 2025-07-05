@@ -17,6 +17,7 @@ import CalendarPage from "@/components/CalendarPage";
 import NotFound from "./pages/NotFound";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import RedefinirSenha from './pages/RedefinirSenha';
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -138,6 +139,7 @@ const AppContent = () => {
           <Route path="/advanced-analytics" element={<AdvancedAnalyticsPage />} />
           <Route path="/notification-center" element={<NotificationCenterPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenha />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>

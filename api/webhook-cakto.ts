@@ -43,6 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[Cakto Webhook] Evento recebido:', event);
     console.log('[Cakto Webhook] Secret recebido:', secret ? 'presente' : 'ausente');
     console.log('[Cakto Webhook] Data recebida:', data ? 'presente' : 'ausente');
+    console.log('[Cakto Webhook] Payload completo recebido:', JSON.stringify(req.body, null, 2));
 
     // Validação do segredo (segurança)
     if (secret !== SECRET) {
@@ -102,50 +103,66 @@ async function processarVendaAprovada(data: any) {
   }
 
   // Extrair dados do produto/plano
-  const produtoNome = data.product?.name || data.offer?.name || '';
+  const produtoNome = data.product?.name || '';
+  const ofertaNome = data.offer?.name || data.offerName || '';
   const valor = data.product?.price || data.transaction?.amount || data.amount || 0;
   const transactionId = data.transaction?.id || data.id || '';
 
-  // Determinar o plano e duração baseado no nome do produto
+  // Determinar o plano e duração baseado no nome da oferta
   let plano = 'bronze';
   let diasPlano = 30;
 
-  // Lógica para determinar o plano baseado no nome do produto
-  const produtoLower = produtoNome.toLowerCase();
-  
-  // Detectar tipo de plano
-  if (produtoLower.includes('ouro') || produtoLower.includes('gold') || produtoLower.includes('premium')) {
+  // Lógica para determinar o plano baseado no nome da oferta
+  const ofertaLower = ofertaNome.toLowerCase().replace(/\s/g, '');
+
+  if (ofertaLower.includes('ouro') || ofertaLower.includes('gold') || ofertaLower.includes('premium')) {
     plano = 'ouro';
-  } else if (produtoLower.includes('bronze') || produtoLower.includes('basico') || produtoLower.includes('basic')) {
+  } else if (ofertaLower.includes('bronze') || ofertaLower.includes('basico') || ofertaLower.includes('basic')) {
     plano = 'bronze';
-  } else if (produtoLower.includes('trial')) {
+  } else if (ofertaLower.includes('trial')) {
     plano = 'trial';
     diasPlano = 7;
-  } else {
-    // Fallback por valor (em centavos)
-    const valorReais = valor / 100;
-    if (valorReais >= 100) {
-      plano = 'ouro';
-    } else {
-      plano = 'bronze';
-    }
   }
 
-  // Detectar duração do plano pelo nome do produto
-  if (produtoLower.includes('1 mes') || produtoLower.includes('1mes') || produtoLower.includes('mensal')) {
+  // Detectar duração do plano pelo nome da oferta
+  if (ofertaLower.includes('1mes') || ofertaLower.includes('mensal')) {
     diasPlano = 30;
-  } else if (produtoLower.includes('3 mes') || produtoLower.includes('3mes') || produtoLower.includes('trimestral')) {
+  } else if (ofertaLower.includes('3mes') || ofertaLower.includes('trimestral')) {
     diasPlano = 90;
-  } else if (produtoLower.includes('6 mes') || produtoLower.includes('6mes') || produtoLower.includes('semestral')) {
+  } else if (ofertaLower.includes('6mes') || ofertaLower.includes('semestral')) {
     diasPlano = 180;
-  } else if (produtoLower.includes('1 ano') || produtoLower.includes('anual') || produtoLower.includes('12 mes')) {
+  } else if (ofertaLower.includes('1ano') || ofertaLower.includes('anual') || ofertaLower.includes('12mes')) {
     diasPlano = 365;
-  } else if (plano === 'ouro' && !produtoLower.includes('trial')) {
-    // Ouro padrão: 1 ano
+  } else if (plano === 'ouro' && !ofertaLower.includes('trial')) {
     diasPlano = 365;
-  } else if (plano === 'bronze' && !produtoLower.includes('trial')) {
-    // Bronze padrão: 1 mês
+  } else if (plano === 'bronze' && !ofertaLower.includes('trial')) {
     diasPlano = 30;
+  }
+
+  // Fallback: se não achar oferta, usa produto
+  if (!ofertaNome) {
+    const produtoLower = produtoNome.toLowerCase();
+    if (produtoLower.includes('ouro') || produtoLower.includes('gold') || produtoLower.includes('premium')) {
+      plano = 'ouro';
+    } else if (produtoLower.includes('bronze') || produtoLower.includes('basico') || produtoLower.includes('basic')) {
+      plano = 'bronze';
+    } else if (produtoLower.includes('trial')) {
+      plano = 'trial';
+      diasPlano = 7;
+    }
+    if (produtoLower.includes('1 mes') || produtoLower.includes('1mes') || produtoLower.includes('mensal')) {
+      diasPlano = 30;
+    } else if (produtoLower.includes('3 mes') || produtoLower.includes('3mes') || produtoLower.includes('trimestral')) {
+      diasPlano = 90;
+    } else if (produtoLower.includes('6 mes') || produtoLower.includes('6mes') || produtoLower.includes('semestral')) {
+      diasPlano = 180;
+    } else if (produtoLower.includes('1 ano') || produtoLower.includes('anual') || produtoLower.includes('12 mes')) {
+      diasPlano = 365;
+    } else if (plano === 'ouro' && !produtoLower.includes('trial')) {
+      diasPlano = 365;
+    } else if (plano === 'bronze' && !produtoLower.includes('trial')) {
+      diasPlano = 30;
+    }
   }
 
   // Calcular data de expiração
@@ -158,6 +175,7 @@ async function processarVendaAprovada(data: any) {
     diasPlano,
     valor: valor / 100,
     produtoNome,
+    ofertaNome,
     transactionId
   });
 
@@ -228,6 +246,7 @@ async function processarVendaAprovada(data: any) {
       data_venda: new Date().toISOString(),
       transaction_id: transactionId,
       produto_nome: produtoNome,
+      oferta_nome: ofertaNome,
     });
 
   if (saleError) {

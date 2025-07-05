@@ -12,6 +12,7 @@ export interface AppUser {
   data_criacao: string;
   trial_start?: string | null;
   whatsapp: string;
+  is_blocked?: boolean;
 }
 
 // Cache simples para usuários

@@ -43,6 +43,10 @@ const LoginForm: React.FC = () => {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
   const [modalType, setModalType] = useState<'first-access' | 'forgot-password' | null>(null);
+  const [showMagicModal, setShowMagicModal] = useState(false);
+  const [magicEmail, setMagicEmail] = useState('');
+  const [magicMsg, setMagicMsg] = useState('');
+  const [magicLoading, setMagicLoading] = useState(false);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +181,9 @@ const LoginForm: React.FC = () => {
     setFirstAccessMessage('');
     setFirstAccessLoading(true);
     try {
-      await supabase.auth.resetPasswordForEmail(firstAccessEmail.toLowerCase().trim());
+      await supabase.auth.resetPasswordForEmail(firstAccessEmail.toLowerCase().trim(), {
+        redirectTo: 'https://alfred-100.vercel.app/redefinir-senha'
+      });
       setFirstAccessMessage('Se o e-mail existir, você receberá um link para criar ou redefinir sua senha.');
     } catch (err) {
       setFirstAccessMessage('Se o e-mail existir, você receberá um link para criar ou redefinir sua senha.');
@@ -192,7 +198,9 @@ const LoginForm: React.FC = () => {
     setForgotPasswordMessage('');
     setForgotPasswordLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail.toLowerCase().trim());
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail.toLowerCase().trim(), {
+        redirectTo: 'https://alfred-100.vercel.app/redefinir-senha'
+      });
       if (error) {
         setForgotPasswordMessage('Erro ao enviar e-mail de redefinição: ' + error.message);
       } else {
@@ -203,6 +211,23 @@ const LoginForm: React.FC = () => {
     } finally {
       setForgotPasswordLoading(false);
     }
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMagicMsg('');
+    if (!magicEmail || !magicEmail.includes('@')) {
+      setMagicMsg('Digite um e-mail válido.');
+      return;
+    }
+    setMagicLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({ email: magicEmail.trim().toLowerCase() });
+    if (error) {
+      setMagicMsg('Erro ao enviar link mágico: ' + error.message);
+    } else {
+      setMagicMsg('Se o e-mail existir, você receberá um link para login sem senha.');
+    }
+    setMagicLoading(false);
   };
 
   return (
@@ -268,15 +293,15 @@ const LoginForm: React.FC = () => {
                 <div className="mt-4 text-center flex flex-col gap-2">
                   <button
                     className="text-blue-600 hover:underline text-sm"
-                    onClick={() => setModalType('first-access')}
+                    onClick={() => setShowMagicModal(true)}
                   >
-                    Primeiro acesso? Clique aqui.
+                    Primeiro acesso? Clique aqui
                   </button>
                   <button
                     className="text-blue-600 hover:underline text-sm"
-                    onClick={() => setModalType('forgot-password')}
+                    onClick={() => setShowMagicModal(true)}
                   >
-                    Esqueci minha senha
+                    Login sem senha (receber link por e-mail)
                   </button>
                 </div>
               </TabsContent>
@@ -408,6 +433,26 @@ const LoginForm: React.FC = () => {
           <DialogClose asChild>
             <Button variant="outline" className="w-full mt-2">Fechar</Button>
           </DialogClose>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showMagicModal} onOpenChange={setShowMagicModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login sem senha</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleMagicLink} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="Digite seu e-mail"
+              value={magicEmail}
+              onChange={e => setMagicEmail(e.target.value)}
+              required
+            />
+            <Button type="submit" className="w-full" disabled={magicLoading}>
+              {magicLoading ? 'Enviando...' : 'Enviar link de login'}
+            </Button>
+            {magicMsg && <AlertDescription className={magicMsg.includes('sucesso') ? 'text-green-600' : 'text-red-600'}>{magicMsg}</AlertDescription>}
+          </form>
         </DialogContent>
       </Dialog>
     </div>
