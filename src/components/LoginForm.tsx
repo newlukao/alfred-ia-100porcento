@@ -260,36 +260,36 @@ const LoginForm: React.FC = () => {
               
               <TabsContent value="login">
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  <div className="space-y-2">
+              <div className="space-y-2">
                     <Label htmlFor="login-email">E-mail</Label>
-                    <Input
+                <Input
                       id="login-email"
-                      name="email"
-                      type="email"
+                  name="email"
+                  type="email"
                       value={loginData.email}
                       onChange={handleLoginInputChange}
-                      placeholder="seu@email.com"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
                     <Label htmlFor="login-password">Senha</Label>
-                    <Input
+                <Input
                       id="login-password"
-                      name="password"
-                      type="password"
+                  name="password"
+                  type="password"
                       value={loginData.password}
                       onChange={handleLoginInputChange}
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Entrando...' : 'Entrar'}
-                  </Button>
-                </form>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Entrando...' : 'Entrar'}
+              </Button>
+            </form>
                 <div className="mt-4 text-center flex flex-col gap-2">
                   <button
                     className="text-blue-600 hover:underline text-sm"

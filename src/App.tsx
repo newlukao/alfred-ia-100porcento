@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import RedefinirSenha from './pages/RedefinirSenha';
 import LandingPage from './pages/LandingPage';
 import LpChatWidget from './pages/LpChatWidget';
+import AdsLandingPage from './pages/AdsLandingPage';
+import InfoLandingPage from './pages/InfoLandingPage';
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -80,8 +82,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 const AppContent = () => {
   // console.log('🔄 APP CONTENT - Iniciando...');
   const location = window.location.pathname;
+  if (location === '/ads') {
+    return <AdsLandingPage />;
+  }
   if (location === '/lp') {
-    return <LandingPage />;
+    return <InfoLandingPage />;
   }
   if (location === '/lp-chat-widget') {
     return <LpChatWidget />;

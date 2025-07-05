@@ -130,6 +130,7 @@ const autoDemoSteps = [
   { from: 'user', text: 'Agendar dentista amanhã 15h' },
   { from: 'alfred', text: 'Cuidar da saúde é importante! Não esquece de escovar os dentes! 😁' },
   { from: 'alfred', text: 'Compromisso "Dentista" agendado para amanhã às 15h! 🦷📅' },
+  { from: 'alfred', text: 'Suas anotações já estão disponíveis na sua dashboard e amanhã 1h antes do seu compromisso irei te lembrar pelo whatsapp.' },
 ];
 
 function getRandomReply() {
@@ -185,7 +186,16 @@ const FakeChat: React.FC = () => {
   };
 
   // Detectar se chegou ao fim do fluxo demo
-  const isDemoEnded = autoDemoDone && messages.length > 0 && messages[messages.length - 1].text.includes('Dentista');
+  const isDemoEnded = autoDemoDone && messages.length > 0 && messages[messages.length - 1].text.includes('disponíveis na sua dashboard');
+
+  // Adicionar função utilitária para abrir no navegador correto
+  function openAppInBrowser() {
+    const url = 'https://alfred-100.vercel.app';
+    window.location.href = url;
+  }
+
+  // No FakeChat, ajustar botão para ser clicável na /ads
+  const isAdsPage = typeof window !== 'undefined' && window.location.pathname === '/ads';
 
   return (
     <div className="rounded-2xl bg-white/80 shadow-xl p-4 flex flex-col gap-2 border border-indigo-100 min-h-[180px]">
@@ -220,9 +230,9 @@ const FakeChat: React.FC = () => {
           disabled={isReplying || !autoDemoDone || isDemoEnded}
         />
         <button
-          className={`rounded-full ${isDemoEnded ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'} text-white p-2 shadow transition`}
-          onClick={handleSend}
-          disabled={isReplying || !input.trim() || !autoDemoDone || isDemoEnded}
+          className={`rounded-full ${isDemoEnded ? (isAdsPage ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' : 'bg-gray-400 cursor-not-allowed') : 'bg-indigo-500 hover:bg-indigo-600'} text-white p-2 shadow transition`}
+          onClick={isDemoEnded && isAdsPage ? openAppInBrowser : handleSend}
+          disabled={isDemoEnded ? (!isAdsPage) : (isReplying || !input.trim() || !autoDemoDone)}
         >
           {isDemoEnded ? 'Continue no app' : (
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M2 21l21-9-21-9v7l15 2-15 2v7z" fill="currentColor"/></svg>
@@ -271,4 +281,5 @@ const LandingPage: React.FC = () => {
   );
 };
 
-export default LandingPage; 
+export default LandingPage;
+export { FakeChat }; 
