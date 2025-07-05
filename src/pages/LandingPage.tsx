@@ -190,7 +190,7 @@ const FakeChat: React.FC = () => {
 
   // Adicionar função utilitária para abrir no navegador correto
   function openAppInBrowser() {
-    const url = 'https://alfred-100.vercel.app';
+    const url = 'https://mordomoalfred.com/?tab=register';
     window.location.href = url;
   }
 
@@ -271,7 +271,7 @@ const LandingPage: React.FC = () => {
       <section className="w-full flex flex-col items-center justify-center pt-16 pb-8">
         <MascotSVG className="w-44 h-44 mb-4 animate-fade-in-up mascot-blink" />
         <h1 className="text-4xl md:text-6xl font-extrabold text-center text-indigo-700 drop-shadow-lg animate-fade-in-up">Alfred IA<br /><span className="text-purple-500">Seu mordomo financeiro</span></h1>
-        <p className="mt-4 text-lg md:text-2xl text-gray-700 text-center max-w-2xl animate-fade-in-up">Organize sua vida financeira com inteligência, simpatia e diversão. Experimente conversar com o Alfred!</p>
+        <p className="mt-4 text-lg md:text-2xl text-gray-700 text-center max-w-2xl animate-fade-in-up">Organize sua vida pessoal e financeira com inteligência e responsabilidade.<br />Veja como é ter um Alfred só seu!</p>
         <div className="mt-8 w-full max-w-md animate-fade-in-up">
           <FakeChat />
         </div>
