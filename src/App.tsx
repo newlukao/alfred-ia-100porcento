@@ -18,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import RedefinirSenha from './pages/RedefinirSenha';
+import LandingPage from './pages/LandingPage';
+import LpChatWidget from './pages/LpChatWidget';
 
 console.log('🚀 APP.TSX - Componente carregado');
 
@@ -77,7 +79,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 const AppContent = () => {
   // console.log('🔄 APP CONTENT - Iniciando...');
-  
+  const location = window.location.pathname;
+  if (location === '/lp') {
+    return <LandingPage />;
+  }
+  if (location === '/lp-chat-widget') {
+    return <LpChatWidget />;
+  }
   try {
     const { user, isLoading, logout } = useAuth();
     // console.log('👤 AUTH STATE:', { user: user?.email || 'null', isLoading });
@@ -140,6 +148,8 @@ const AppContent = () => {
           <Route path="/notification-center" element={<NotificationCenterPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+          <Route path="/lp" element={<LandingPage />} />
+          <Route path="/lp-chat-widget" element={<LpChatWidget />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>

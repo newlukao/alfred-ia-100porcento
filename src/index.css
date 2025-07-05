@@ -147,6 +147,59 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Fade in up */
+  .animate-fade-in-up {
+    animation: fade-in-up 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Bounce in */
+  .animate-bounce-in {
+    animation: bounce-in 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55) both;
+  }
+  @keyframes bounce-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    80% {
+      transform: scale(0.95);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* Gradient X animation */
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    animation: gradient-x 3s ease-in-out infinite;
+  }
+  @keyframes gradient-x {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
 }
 
 /* Mobile-specific styles */
@@ -341,4 +394,13 @@
 
 .footer, .bottom-bar, .mobile-nav {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mascot-blink ellipse[id^='eye-'] {
+  animation: blink 4s infinite;
+  transform-origin: center;
+}
+@keyframes blink {
+  0%, 97%, 100% { ry: 8; }
+  98%, 99% { ry: 1; }
 }
