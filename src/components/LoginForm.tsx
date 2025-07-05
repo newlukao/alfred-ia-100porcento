@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,10 +18,19 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 
+// Função para determinar a aba inicial com base na query string
+const getInitialTab = () => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'register') return 'register';
+  }
+  return 'login';
+};
+
 const LoginForm: React.FC = () => {
   const { login, register } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('login');
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -47,6 +56,13 @@ const LoginForm: React.FC = () => {
   const [magicEmail, setMagicEmail] = useState('');
   const [magicMsg, setMagicMsg] = useState('');
   const [magicLoading, setMagicLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'register') setActiveTab('register');
+    }
+  }, []);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
