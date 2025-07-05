@@ -238,7 +238,6 @@ async function processarVendaAprovada(data: any) {
   const { error: saleError } = await supabase
     .from('vendas')
     .insert({
-      admin_id: 'webhook-cakto',
       email,
       plano,
       tempo_plano: `${diasPlano} dias`,
