@@ -106,17 +106,29 @@ async function processarVendaAprovada(data: any) {
   const valor = data.product?.price || data.transaction?.amount || data.amount || 0;
   const transactionId = data.transaction?.id || data.id || '';
 
+  // LOG DETALHADO DO PRODUTO
+  console.log('[Cakto Webhook] Nome do produto recebido:', produtoNome);
+
   // Determinar o plano e duração baseado no nome do produto
   let plano = 'bronze';
   let diasPlano = 30;
 
   // Lógica para determinar o plano baseado no nome do produto
   const produtoLower = produtoNome.toLowerCase();
-  
+  console.log('[Cakto Webhook] Nome do produto (lower):', produtoLower);
+
   // Detectar tipo de plano
-  if (produtoLower.includes('ouro') || produtoLower.includes('gold') || produtoLower.includes('premium')) {
+  if (
+    produtoLower.includes('ouro') ||
+    produtoLower.includes('gold') ||
+    produtoLower.includes('premium')
+  ) {
     plano = 'ouro';
-  } else if (produtoLower.includes('bronze') || produtoLower.includes('basico') || produtoLower.includes('basic')) {
+  } else if (
+    produtoLower.includes('bronze') ||
+    produtoLower.includes('basico') ||
+    produtoLower.includes('basic')
+  ) {
     plano = 'bronze';
   } else if (produtoLower.includes('trial')) {
     plano = 'trial';
@@ -131,14 +143,33 @@ async function processarVendaAprovada(data: any) {
     }
   }
 
+  // LOG DETALHADO DO PLANO DETECTADO
+  console.log('[Cakto Webhook] Plano detectado:', plano);
+
   // Detectar duração do plano pelo nome do produto
-  if (produtoLower.includes('1 mes') || produtoLower.includes('1mes') || produtoLower.includes('mensal')) {
+  if (
+    produtoLower.includes('1 mes') ||
+    produtoLower.includes('1mes') ||
+    produtoLower.includes('mensal')
+  ) {
     diasPlano = 30;
-  } else if (produtoLower.includes('3 mes') || produtoLower.includes('3mes') || produtoLower.includes('trimestral')) {
+  } else if (
+    produtoLower.includes('3 mes') ||
+    produtoLower.includes('3mes') ||
+    produtoLower.includes('trimestral')
+  ) {
     diasPlano = 90;
-  } else if (produtoLower.includes('6 mes') || produtoLower.includes('6mes') || produtoLower.includes('semestral')) {
+  } else if (
+    produtoLower.includes('6 mes') ||
+    produtoLower.includes('6mes') ||
+    produtoLower.includes('semestral')
+  ) {
     diasPlano = 180;
-  } else if (produtoLower.includes('1 ano') || produtoLower.includes('anual') || produtoLower.includes('12 mes')) {
+  } else if (
+    produtoLower.includes('1 ano') ||
+    produtoLower.includes('anual') ||
+    produtoLower.includes('12 mes')
+  ) {
     diasPlano = 365;
   } else if (plano === 'ouro' && !produtoLower.includes('trial')) {
     // Ouro padrão: 1 ano
@@ -174,7 +205,6 @@ async function processarVendaAprovada(data: any) {
   if (user) {
     // Usuário existe: atualizar plano
     console.log('[Cakto Webhook] Atualizando usuário existente:', user.id);
-    
     const { error: updateError } = await supabase
       .from('users')
       .update({
@@ -184,7 +214,6 @@ async function processarVendaAprovada(data: any) {
         whatsapp: whatsapp || user.whatsapp,
       })
       .eq('id', user.id);
-
     if (updateError) {
       console.error('[Cakto Webhook] Erro ao atualizar usuário:', updateError);
       throw updateError;
@@ -193,7 +222,6 @@ async function processarVendaAprovada(data: any) {
     // Usuário não existe: criar novo
     console.log('[Cakto Webhook] Criando novo usuário:', email);
     action = 'user_created';
-    
     const { data: newUser, error: createError } = await supabase
       .from('users')
       .insert({
@@ -207,13 +235,22 @@ async function processarVendaAprovada(data: any) {
       })
       .select()
       .single();
-
     if (createError) {
       console.error('[Cakto Webhook] Erro ao criar usuário:', createError);
       throw createError;
     }
-
     user = newUser;
+    // ENVIAR E-MAIL DE CRIAR SENHA
+    try {
+      const { data: resetData, error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
+      if (resetError) {
+        console.error('[Cakto Webhook] Erro ao enviar e-mail de criar senha:', resetError);
+      } else {
+        console.log('[Cakto Webhook] E-mail de criar senha enviado para:', email);
+      }
+    } catch (e) {
+      console.error('[Cakto Webhook] Erro inesperado ao enviar e-mail de senha:', e);
+    }
   }
 
   // Registrar a venda
@@ -229,10 +266,10 @@ async function processarVendaAprovada(data: any) {
       transaction_id: transactionId,
       produto_nome: produtoNome,
     });
-
   if (saleError) {
     console.error('[Cakto Webhook] Erro ao registrar venda:', saleError);
-    // Não falha o processo se não conseguir registrar a venda
+  } else {
+    console.log('[Cakto Webhook] Venda registrada com sucesso para:', email);
   }
 
   // Disparar webhook interno para notificações
@@ -248,7 +285,6 @@ async function processarVendaAprovada(data: any) {
   });
 
   console.log('[Cakto Webhook] Venda processada com sucesso para:', email);
-  
   return { user_id: user.id, action };
 }
 
