@@ -8,4 +8,4 @@ Queria ver se é possivel...
 
 cd C:\Users\Lucas\Desktop\alfred-ia-100porcento\alfred-ia-100porcento
 npm install
-npm run dev
+npm run devnpm r

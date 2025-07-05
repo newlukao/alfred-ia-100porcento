@@ -124,23 +124,8 @@ async function processarVendaAprovada(data: any) {
     produtoLower.includes('premium')
   ) {
     plano = 'ouro';
-  } else if (
-    produtoLower.includes('bronze') ||
-    produtoLower.includes('basico') ||
-    produtoLower.includes('basic')
-  ) {
-    plano = 'bronze';
-  } else if (produtoLower.includes('trial')) {
-    plano = 'trial';
-    diasPlano = 7;
   } else {
-    // Fallback por valor (em centavos)
-    const valorReais = valor / 100;
-    if (valorReais >= 100) {
-      plano = 'ouro';
-    } else {
-      plano = 'bronze';
-    }
+    plano = 'bronze';
   }
 
   // LOG DETALHADO DO PLANO DETECTADO
@@ -172,10 +157,8 @@ async function processarVendaAprovada(data: any) {
   ) {
     diasPlano = 365;
   } else if (plano === 'ouro' && !produtoLower.includes('trial')) {
-    // Ouro padrão: 1 ano
     diasPlano = 365;
   } else if (plano === 'bronze' && !produtoLower.includes('trial')) {
-    // Bronze padrão: 1 mês
     diasPlano = 30;
   }
 
@@ -268,6 +251,7 @@ async function processarVendaAprovada(data: any) {
     });
   if (saleError) {
     console.error('[Cakto Webhook] Erro ao registrar venda:', saleError);
+    throw new Error('Erro ao registrar venda: ' + saleError.message);
   } else {
     console.log('[Cakto Webhook] Venda registrada com sucesso para:', email);
   }

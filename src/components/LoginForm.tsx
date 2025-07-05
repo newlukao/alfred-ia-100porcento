@@ -7,6 +7,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose
+} from '@/components/ui/dialog';
 
 const LoginForm: React.FC = () => {
   const { login, register } = useAuth();
@@ -24,6 +34,15 @@ const LoginForm: React.FC = () => {
     confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showFirstAccess, setShowFirstAccess] = useState(false);
+  const [firstAccessEmail, setFirstAccessEmail] = useState('');
+  const [firstAccessLoading, setFirstAccessLoading] = useState(false);
+  const [firstAccessMessage, setFirstAccessMessage] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+  const [modalType, setModalType] = useState<'first-access' | 'forgot-password' | null>(null);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,6 +171,40 @@ const LoginForm: React.FC = () => {
     setRegisterData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Função para iniciar fluxo de primeiro acesso
+  const handleFirstAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFirstAccessMessage('');
+    setFirstAccessLoading(true);
+    try {
+      await supabase.auth.resetPasswordForEmail(firstAccessEmail.toLowerCase().trim());
+      setFirstAccessMessage('Se o e-mail existir, você receberá um link para criar ou redefinir sua senha.');
+    } catch (err) {
+      setFirstAccessMessage('Se o e-mail existir, você receberá um link para criar ou redefinir sua senha.');
+    } finally {
+      setFirstAccessLoading(false);
+    }
+  };
+
+  // Função para reset de senha
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotPasswordMessage('');
+    setForgotPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail.toLowerCase().trim());
+      if (error) {
+        setForgotPasswordMessage('Erro ao enviar e-mail de redefinição: ' + error.message);
+      } else {
+        setForgotPasswordMessage('E-mail de redefinição enviado! Verifique sua caixa de entrada.');
+      }
+    } catch (err) {
+      setForgotPasswordMessage('Erro ao enviar e-mail de redefinição.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20">
       <div className="w-full max-w-md space-y-6">
@@ -182,36 +235,50 @@ const LoginForm: React.FC = () => {
               
               <TabsContent value="login">
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label htmlFor="login-email">E-mail</Label>
-                <Input
+                    <Input
                       id="login-email"
-                  name="email"
-                  type="email"
+                      name="email"
+                      type="email"
                       value={loginData.email}
                       onChange={handleLoginInputChange}
-                  placeholder="seu@email.com"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
+                      placeholder="seu@email.com"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
                     <Label htmlFor="login-password">Senha</Label>
-                <Input
+                    <Input
                       id="login-password"
-                  name="password"
-                  type="password"
+                      name="password"
+                      type="password"
                       value={loginData.password}
                       onChange={handleLoginInputChange}
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Entrando...' : 'Entrar'}
-              </Button>
-            </form>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Entrando...' : 'Entrar'}
+                  </Button>
+                </form>
+                <div className="mt-4 text-center flex flex-col gap-2">
+                  <button
+                    className="text-blue-600 hover:underline text-sm"
+                    onClick={() => setModalType('first-access')}
+                  >
+                    Primeiro acesso? Clique aqui.
+                  </button>
+                  <button
+                    className="text-blue-600 hover:underline text-sm"
+                    onClick={() => setModalType('forgot-password')}
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
               </TabsContent>
               <TabsContent value="register">
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
@@ -293,34 +360,56 @@ const LoginForm: React.FC = () => {
             {/* Removido alerta de ambiente de desenvolvimento */}
           </CardContent>
         </Card>
-
-        {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-          <div className="space-y-2">
-            <div className="text-2xl">🤖</div>
-            <h3 className="font-medium">IA Inteligente</h3>
-            <p className="text-xs text-muted-foreground">
-              ChatGPT analisa seus gastos automaticamente
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="text-2xl">📊</div>
-            <h3 className="font-medium">Dashboard</h3>
-            <p className="text-xs text-muted-foreground">
-              Gráficos e relatórios detalhados
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="text-2xl">🔒</div>
-            <h3 className="font-medium">Seguro</h3>
-            <p className="text-xs text-muted-foreground">
-              Dados protegidos com Supabase Auth
-            </p>
-          </div>
-        </div>
       </div>
+      <Dialog open={!!modalType} onOpenChange={open => !open && setModalType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {modalType === 'first-access' ? 'Primeiro acesso' : 'Redefinir senha'}
+            </DialogTitle>
+            <DialogDescription>
+              {modalType === 'first-access'
+                ? 'Informe seu e-mail para criar sua senha de acesso.'
+                : 'Informe seu e-mail para receber o link de redefinição.'}
+            </DialogDescription>
+          </DialogHeader>
+          {modalType === 'first-access' && (
+            <form onSubmit={handleFirstAccess} className="space-y-2">
+              <Label htmlFor="first-access-email">E-mail</Label>
+              <Input
+                id="first-access-email"
+                type="email"
+                value={firstAccessEmail}
+                onChange={e => setFirstAccessEmail(e.target.value)}
+                required
+              />
+              <Button type="submit" className="w-full" disabled={firstAccessLoading}>
+                {firstAccessLoading ? 'Enviando...' : 'Enviar link de acesso'}
+              </Button>
+              {firstAccessMessage && <AlertDescription className="text-green-600">{firstAccessMessage}</AlertDescription>}
+            </form>
+          )}
+          {modalType === 'forgot-password' && (
+            <form onSubmit={handleForgotPassword} className="space-y-2">
+              <Label htmlFor="forgot-password-email">E-mail</Label>
+              <Input
+                id="forgot-password-email"
+                type="email"
+                value={forgotPasswordEmail}
+                onChange={e => setForgotPasswordEmail(e.target.value)}
+                required
+              />
+              <Button type="submit" className="w-full" disabled={forgotPasswordLoading}>
+                {forgotPasswordLoading ? 'Enviando...' : 'Enviar link de redefinição'}
+              </Button>
+              {forgotPasswordMessage && <AlertDescription className={forgotPasswordMessage.includes('Erro') ? 'text-red-600' : 'text-green-600'}>{forgotPasswordMessage}</AlertDescription>}
+            </form>
+          )}
+          <DialogClose asChild>
+            <Button variant="outline" className="w-full mt-2">Fechar</Button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
