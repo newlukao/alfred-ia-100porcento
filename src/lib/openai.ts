@@ -734,6 +734,8 @@ DETECÇÃO INTELIGENTE DE COMPROMISSOS:
 - "encontro cliente às 9h" = título="Encontro cliente", data="hoje", hora="09:00", categoria="negócios"
 - "reuniao depois de amanha as 15 horas" = título="Reunião", data="depois de amanhã", hora="15:00", categoria="trabalho"
 - "consulta dia 25 as 10 horas" = título="Consulta", data="dia 25", hora="10:00", categoria="saúde"
+- "reunião amanhã às 20:30" = título="Reunião", data="amanhã", hora="20:30", categoria="trabalho"
+- "consulta dia 25 as 09:15" = título="Consulta", data="dia 25", hora="09:15", categoria="saúde"
 
 CATEGORIAS AUTOMÁTICAS:
 - reunião, meeting, trabalho → "trabalho"
@@ -747,6 +749,8 @@ LÓGICA SIMPLES:
 1. Se tem TÍTULO + DATA/TEMPO + HORA → pergunta "Tá certo?" mostrando detalhes
 2. Se falta info específica → pergunta o que falta
 3. Se usuário confirma → isValid = true
+
+IMPORTANTE: Sempre extraia o horário completo no formato HH:mm (ex: 20:30, 09:15, 08:00). Nunca arredonde para a hora cheia se o usuário informar minutos.
 
 FORMATO (JSON):
 {
@@ -931,13 +935,11 @@ IMPORTANTES:
     }
     
     // Detectar hora
-    const horaMatch = message.match(/(\d{1,2})h|(\d{1,2}):(\d{2})|às (\d{1,2})|as (\d{1,2})|(\d{1,2}) horas/);
+    const horaMatch = message.match(/(\d{1,2}:\d{2})/);
     if (horaMatch) {
-      if (horaMatch[1]) hora = `${horaMatch[1]}:00`;
-      else if (horaMatch[2] && horaMatch[3]) hora = `${horaMatch[2]}:${horaMatch[3]}`;
-      else if (horaMatch[4]) hora = `${horaMatch[4]}:00`;
-      else if (horaMatch[5]) hora = `${horaMatch[5]}:00`;
-      else if (horaMatch[6]) hora = `${horaMatch[6]}:00`;
+      hora = horaMatch[1];
+    } else if (message.match(/(\d{1,2})h/)) {
+      hora = message.match(/(\d{1,2})h/)[1].padStart(2, '0') + ':00';
     }
     
     // Se conseguiu extrair informações básicas, fazer confirmação

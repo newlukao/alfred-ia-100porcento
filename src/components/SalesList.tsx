@@ -7,6 +7,7 @@ interface Sale {
   email: string;
   plano: string;
   valor: number;
+  tempo_plano?: string;
 }
 
 interface SalesListProps {
@@ -31,6 +32,7 @@ const SalesList: React.FC<SalesListProps> = ({ sales, currentPage, onPageChange,
             <th className="p-2 border-b text-left">Data</th>
             <th className="p-2 border-b text-left">E-mail</th>
             <th className="p-2 border-b text-center">Plano</th>
+            <th className="p-2 border-b text-center">Tempo</th>
             <th className="p-2 border-b text-right">Valor</th>
             <th className="p-2 border-b text-center">Ações</th>
           </tr>
@@ -49,6 +51,7 @@ const SalesList: React.FC<SalesListProps> = ({ sales, currentPage, onPageChange,
               }</td>
               <td className="p-2 text-left">{sale.email}</td>
               <td className="p-2 text-center capitalize">{sale.plano}</td>
+              <td className="p-2 text-center">{sale.tempo_plano || '-'}</td>
               <td className="p-2 text-right">R$ {sale.valor.toFixed(2)}</td>
               <td className="p-2 text-center flex gap-2 justify-center">
                 <Button size="sm" variant="outline" onClick={() => onEdit(sale)}>Editar</Button>

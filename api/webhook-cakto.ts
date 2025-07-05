@@ -241,7 +241,7 @@ async function processarVendaAprovada(data: any) {
       email,
       plano,
       tempo_plano: `${diasPlano} dias`,
-      valor: valor / 100, // Converter de centavos para reais
+      valor: valor,
       data_venda: new Date().toISOString(),
       transaction_id: transactionId,
       produto_nome: produtoNome,
